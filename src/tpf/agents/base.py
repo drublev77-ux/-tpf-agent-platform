@@ -33,6 +33,7 @@ class Ctx:
     deployer: Deployer | None
     github: GitHubPublisher | None
     order: dict[str, Any]
+    payments: Any = None  # tpf.payments.PaymentGateway, or None for manual invoicing
 
     @property
     def order_id(self) -> int:

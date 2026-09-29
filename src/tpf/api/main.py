@@ -8,14 +8,17 @@ from contextlib import asynccontextmanager
 from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import StreamingResponse
+import asyncpg
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, EmailStr, Field
 
 from tpf.config import get_settings
 from tpf.db import create_pool
 from tpf.notifications import make_notifier
 from tpf.orchestrator.service import Orchestrator
-from tpf.orchestrator.states import Ev, State, TransitionError
+from tpf.orchestrator import queue
+from tpf.orchestrator.states import TASK_FOR_STATE, Ev, State, TransitionError
+from tpf.payments import WebhookError, verify_stripe_webhook
 
 
 @asynccontextmanager
@@ -202,8 +205,75 @@ async def raise_budget(order_id: int, request: Request, add_tokens: int = 500_00
 
 @app.post("/admin/orders/{order_id}/payment", dependencies=[Depends(operator)])
 async def payment_received(order_id: int, request: Request) -> dict[str, Any]:
-    """Call from the payment provider's webhook handler (Stripe, ЮKassa) once prepayment clears."""
-    return await _fire(orch(request), order_id, Ev.PAYMENT_RECEIVED, "payments")
+    """The operator confirms a payment received outside Stripe (bank transfer, cash)."""
+    o = orch(request)
+    try:
+        order = await o.get_order(order_id)
+    except KeyError:
+        raise HTTPException(404, "order not found") from None
+    stage = {State.AWAITING_PAYMENT: "prepayment", State.AWAITING_FINAL_PAYMENT: "final"}.get(State(order["state"]))
+    if stage is None:
+        raise HTTPException(409, f"order is {order['state']}; no payment is due")
+    try:
+        recorded = await o.record_payment(stage=stage, order_id=order_id, actor="operator")
+    except TransitionError as e:
+        raise HTTPException(409, str(e)) from None
+    if not recorded:
+        raise HTTPException(409, "no pending payment for this order yet; the worker creates it within a minute")
+    return public(await o.get_order(order_id))
+
+
+@app.post("/webhooks/stripe", include_in_schema=False)
+async def stripe_webhook(request: Request) -> dict[str, str]:
+    """Stripe calls this when a Checkout Session completes or expires. The signature is checked
+    against STRIPE_WEBHOOK_SECRET before anything is trusted."""
+    payload = await request.body()
+    try:
+        event = verify_stripe_webhook(payload, request.headers.get("stripe-signature"), get_settings().stripe_webhook_secret)
+    except WebhookError as e:
+        raise HTTPException(400, str(e)) from None
+
+    o = orch(request)
+    obj = (event.get("data") or {}).get("object") or {}
+    kind = event.get("type")
+    if kind in ("checkout.session.completed", "checkout.session.async_payment_succeeded") and obj.get("payment_status") == "paid":
+        try:
+            await o.record_payment(stage=(obj.get("metadata") or {}).get("stage", ""), session_id=obj.get("id"), actor="stripe")
+        except TransitionError:
+            pass  # e.g. the order was cancelled meanwhile; the payment row still says paid for the operator
+    elif kind == "checkout.session.expired":
+        row = await o.pool.fetchrow(
+            "UPDATE payments SET status = 'expired' WHERE provider_session_id = $1 AND status = 'pending' "
+            "RETURNING order_id, stage", obj.get("id"))
+        if row:
+            # Still waiting for this payment? Send a fresh link.
+            order = await o.get_order(row["order_id"])
+            waiting = {"prepayment": State.AWAITING_PAYMENT, "final": State.AWAITING_FINAL_PAYMENT}[row["stage"]]
+            if order["state"] == waiting:
+                async with o.pool.acquire() as conn:
+                    try:
+                        await queue.enqueue(conn, row["order_id"], TASK_FOR_STATE[waiting])
+                    except asyncpg.UniqueViolationError:
+                        pass  # a request task is already queued
+    return {"received": "ok"}
+
+
+PAGE = """<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TPF Technology</title><style>body{{margin:0;min-height:100vh;display:grid;place-items:center;background:#07090C;color:#E6EDF2;
+font-family:system-ui,sans-serif;text-align:center;padding:24px}}h1{{font-size:28px;margin:0 0 12px}}p{{color:#B7C3CC;margin:0}}b{{color:#5CE1F0}}</style>
+</head><body><main><h1>{title}</h1><p>{text}</p></main></body></html>"""
+
+
+@app.get("/pay/done", include_in_schema=False)
+async def pay_done(order: int = 0) -> HTMLResponse:
+    return HTMLResponse(PAGE.format(lang="ru", title="Спасибо! Оплата получена",
+                                    text=f"Заказ <b>№{order}</b>: работа продолжится автоматически. Мы сообщим о следующем шаге."))
+
+
+@app.get("/pay/cancelled", include_in_schema=False)
+async def pay_cancelled(order: int = 0) -> HTMLResponse:
+    return HTMLResponse(PAGE.format(lang="ru", title="Оплата не завершена",
+                                    text=f"Заказ <b>№{order}</b>: ссылка на оплату остаётся в силе, вы можете вернуться к ней позже."))
 
 
 @app.get("/health")

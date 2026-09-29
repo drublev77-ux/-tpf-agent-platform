@@ -32,8 +32,21 @@ class Settings(BaseSettings):
     # Commercial terms
     hourly_rate: float = 40.0
     currency: str = "USD"
-    payment_required: bool = False
-    prepayment_share: float = 0.5
+    # Payments: off | stripe | manual (the operator confirms bank transfers in /admin)
+    payment_provider: str = "off"
+    prepayment_share: float = 0.5  # 0.5 = 50% before work + 50% before release; 1 = all upfront; 0 = all at the end
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+
+    @property
+    def payment_required(self) -> bool:
+        """A prepayment is due after the estimate is approved."""
+        return self.payment_provider != "off" and self.prepayment_share > 0
+
+    @property
+    def final_payment_required(self) -> bool:
+        """A final payment is due after acceptance, before the production release."""
+        return self.payment_provider != "off" and self.prepayment_share < 1
 
     # Sandbox
     sandbox: str = "docker"  # docker | vercel (build checks run as Vercel previews) | local (dev only)

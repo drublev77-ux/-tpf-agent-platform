@@ -15,6 +15,7 @@ from tpf.db import create_pool
 from tpf.llm.gateway import AnthropicGateway, Budget, BudgetExceeded, LLMGateway
 from tpf.notifications import make_notifier
 from tpf.orchestrator import queue
+from tpf.payments import PaymentGateway, make_gateway
 from tpf.orchestrator.service import Orchestrator
 from tpf.orchestrator.states import TASK_FOR_STATE, State, TransitionError
 from tpf.tools.deploy import Deployer, VercelDeployer
@@ -30,9 +31,10 @@ class Worker:
     def __init__(
         self, *, pool: asyncpg.Pool, settings: Settings, orch: Orchestrator, llm: LLMGateway,
         sandbox: Sandbox, deployer: Deployer | None, github: GitHubPublisher | None,
+        payments: PaymentGateway | None = None,
     ) -> None:
         self.pool, self.settings, self.orch, self.llm = pool, settings, orch, llm
-        self.sandbox, self.deployer, self.github = sandbox, deployer, github
+        self.sandbox, self.deployer, self.github, self.payments = sandbox, deployer, github, payments
         self.stopping = asyncio.Event()
 
     async def run_once(self) -> bool:
@@ -48,7 +50,8 @@ class Worker:
             return True
 
         handler = HANDLERS[task["kind"]]
-        ctx = Ctx(self.orch, self.llm, self.settings, self.sandbox, self.deployer, self.github, order)
+        ctx = Ctx(self.orch, self.llm, self.settings, self.sandbox, self.deployer, self.github, order,
+                  payments=self.payments)
         await self.orch.log(order["id"], "task_started", task["kind"], {"task": task["id"], "attempt": task["attempts"]})
         try:
             outcome = await handler(ctx)
@@ -73,6 +76,9 @@ class Worker:
                     order["id"], outcome.event, actor=task["kind"], data=outcome.data,
                     details=outcome.details, complete_task=task["id"], task_result=outcome.data,
                 )
+            else:  # the task did its work without moving the order (e.g. a payment link was sent)
+                async with self.pool.acquire() as conn:
+                    await queue.mark_done(conn, task["id"], outcome.data)
         except TransitionError as e:  # e.g. the client cancelled while the agent worked
             async with self.pool.acquire() as conn:
                 await queue.mark_failed(conn, task["id"], f"transition rejected: {e}")
@@ -99,6 +105,7 @@ async def main() -> None:
         ("ANTHROPIC_API_KEY", settings.anthropic_api_key),
         ("VERCEL_TOKEN", settings.vercel_token if settings.sandbox == "vercel" else "n/a"),
         ("DATABASE_URL", settings.database_url if "localhost" not in settings.database_url else ""),
+        ("STRIPE_SECRET_KEY", settings.stripe_secret_key if settings.payment_provider == "stripe" else "n/a"),
     ) if not value]
     if missing:
         # Idle instead of crash-looping: setting the variables on the host redeploys the worker.
@@ -112,6 +119,7 @@ async def main() -> None:
         pool=pool, settings=settings, orch=orch, llm=llm, sandbox=make_sandbox(settings),
         deployer=VercelDeployer(settings) if settings.vercel_token else None,
         github=GitHubPublisher(settings) if settings.github_token and settings.github_owner else None,
+        payments=make_gateway(settings),
     )
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):

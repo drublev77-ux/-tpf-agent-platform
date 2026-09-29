@@ -34,6 +34,23 @@ src/tpf/
   worker.py                 воркер: берёт задачи и запускает агентов
 ```
 
+## Оплата (Stripe, 50/50)
+
+1. Клиент утверждает смету. Заказ ждёт предоплату: воркер создаёт ссылку Stripe Checkout на 50% и отправляет её клиенту.
+2. Stripe сообщает об оплате вебхуком на `/webhooks/stripe`. API проверяет подпись, и агенты начинают работу.
+3. Клиент принимает стейджинг. Заказ ждёт остаток: вторая ссылка на оставшиеся 50%.
+4. После второй оплаты DevOps выкатывает сайт в production.
+
+Суммы всегда берутся из утверждённой сметы и считаются кодом, а не моделью. Повторный вебхук не засчитывается дважды: в базе уникальный индекс. Если ссылка истекла (Stripe держит её 24 ч), клиенту автоматически уходит новая. Для оплаты по счёту укажите `PAYMENT_PROVIDER=manual`: оператор подтверждает оплату через `POST /admin/orders/{id}/payment`.
+
+Как включить:
+
+| Где | Переменные |
+| --- | --- |
+| Vercel (API) | `PAYMENT_PROVIDER=stripe`, `PREPAYMENT_SHARE=0.5`, `STRIPE_WEBHOOK_SECRET` |
+| Railway (воркер) | `PAYMENT_PROVIDER=stripe`, `PREPAYMENT_SHARE=0.5`, `STRIPE_SECRET_KEY`, `PUBLIC_BASE_URL` |
+| Stripe → Developers → Webhooks | endpoint `https://tpf-agent-platform.vercel.app/webhooks/stripe`, события `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.expired` |
+
 ## Боевое развёртывание: Vercel + Supabase + Railway
 
 | Часть | Где | Как |

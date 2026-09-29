@@ -7,6 +7,7 @@ from typing import Any
 from tpf.agents.base import SAFETY_NOTE, Ctx, Outcome, conversation
 from tpf.agents.reviewer import review
 from tpf.orchestrator.states import Ev
+from tpf.payments import stage_amounts
 
 MAX_CLARIFICATION_ROUNDS = 2
 
@@ -142,11 +143,28 @@ async def run(ctx: Ctx) -> Outcome:
     estimate = {
         **out["estimate"], "total_hours": hours, "hourly_rate": s.hourly_rate,
         "price": price, "currency": s.currency,
-        "prepayment": round(price * s.prepayment_share, 2) if s.payment_required else 0,
     }
+    if s.payment_provider != "off":
+        split = stage_amounts(price, s.prepayment_share)
+        estimate["payments"] = {"prepayment": float(split["prepayment"]), "final": float(split["final"])}
     await ctx.orch.save_artifact(ctx.order_id, "spec", out["spec"], "analyst")
     await ctx.orch.save_artifact(ctx.order_id, "estimate", estimate, "analyst")
+    details = _format_details(ctx.order["language"], hours, price, s.currency, estimate["duration_days"])
+    if "payments" in estimate:
+        details += _payment_terms(ctx.order["language"], estimate["payments"], s.currency)
     return Outcome(
-        Ev.SPEC_READY, data={"total_hours": hours, "price": price, "currency": s.currency},
-        details=_format_details(ctx.order["language"], hours, price, s.currency, estimate["duration_days"]),
+        Ev.SPEC_READY, data={"total_hours": hours, "price": price, "currency": s.currency}, details=details,
     )
+
+
+def _payment_terms(language: str, parts: dict[str, float], currency: str) -> str:
+    pre, fin = parts["prepayment"], parts["final"]
+    money = lambda v: f"{v:,.2f} {currency}".replace(",", " ")  # noqa: E731
+    if language == "ru":
+        return "; оплата: " + ", ".join(filter(None, [
+            f"{money(pre)} до старта" if pre else "", f"{money(fin)} перед запуском" if fin else ""]))
+    if language == "zh":
+        return "；付款：" + "，".join(filter(None, [
+            f"开工前 {money(pre)}" if pre else "", f"上线前 {money(fin)}" if fin else ""]))
+    return "; payment: " + ", ".join(filter(None, [
+        f"{money(pre)} before we start" if pre else "", f"{money(fin)} before release" if fin else ""]))

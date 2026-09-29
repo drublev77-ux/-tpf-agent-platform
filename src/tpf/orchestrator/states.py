@@ -21,6 +21,7 @@ class State(StrEnum):
     CHECKS = "checks"                                # QA and security gates
     STAGING = "staging"                              # DevOps: preview deployment
     AWAITING_ACCEPTANCE = "awaiting_acceptance"      # client decision #2
+    AWAITING_FINAL_PAYMENT = "awaiting_final_payment"  # remaining balance, before release
     RELEASE = "release"                              # DevOps: production deployment
     DELIVERED = "delivered"
     PAUSED = "paused"                                # escalated to an engineer
@@ -28,7 +29,10 @@ class State(StrEnum):
 
 
 TERMINAL = {State.DELIVERED, State.CANCELLED}
-WAITING_FOR_CLIENT = {State.AWAITING_CLIENT_INFO, State.AWAITING_ESTIMATE, State.AWAITING_PAYMENT, State.AWAITING_ACCEPTANCE}
+WAITING_FOR_CLIENT = {
+    State.AWAITING_CLIENT_INFO, State.AWAITING_ESTIMATE, State.AWAITING_PAYMENT,
+    State.AWAITING_ACCEPTANCE, State.AWAITING_FINAL_PAYMENT,
+}
 
 # Entering one of these states queues the agent task that does its work.
 TASK_FOR_STATE: dict[State, str] = {
@@ -38,6 +42,8 @@ TASK_FOR_STATE: dict[State, str] = {
     State.CHECKS: "qa",
     State.STAGING: "deploy_staging",
     State.RELEASE: "deploy_production",
+    State.AWAITING_PAYMENT: "request_prepayment",           # creates the checkout link, sends it
+    State.AWAITING_FINAL_PAYMENT: "request_final_payment",
 }
 
 
@@ -49,6 +55,7 @@ class Ev(StrEnum):
     ESTIMATE_APPROVED = "estimate_approved"
     ESTIMATE_REJECTED = "estimate_rejected"
     PAYMENT_RECEIVED = "payment_received"
+    FINAL_PAYMENT_RECEIVED = "final_payment_received"
     DESIGN_READY = "design_ready"
     CODE_READY = "code_ready"
     CHECKS_PASSED = "checks_passed"
@@ -74,7 +81,7 @@ _TABLE: dict[tuple[State, Ev], State] = {
     (State.DEVELOPMENT, Ev.CODE_READY): State.CHECKS,
     (State.CHECKS, Ev.CHECKS_PASSED): State.STAGING,
     (State.STAGING, Ev.STAGING_DEPLOYED): State.AWAITING_ACCEPTANCE,
-    (State.AWAITING_ACCEPTANCE, Ev.ACCEPTED): State.RELEASE,
+    (State.AWAITING_FINAL_PAYMENT, Ev.FINAL_PAYMENT_RECEIVED): State.RELEASE,
     (State.AWAITING_ACCEPTANCE, Ev.CHANGES_REQUESTED): State.DEVELOPMENT,
     (State.RELEASE, Ev.RELEASED): State.DELIVERED,
 }
@@ -99,6 +106,7 @@ def apply(
     check_attempts: int = 0,
     max_check_attempts: int = 3,
     payment_required: bool = False,
+    final_payment_required: bool = False,
     paused_from: State | None = None,
 ) -> Transition:
     """Return the transition for `event` in `state`, or raise TransitionError."""
@@ -124,6 +132,10 @@ def apply(
 
     if (state, event) == (State.AWAITING_ESTIMATE, Ev.ESTIMATE_APPROVED):
         target = State.AWAITING_PAYMENT if payment_required else State.DESIGN
+        return Transition(target, check_attempts)
+
+    if (state, event) == (State.AWAITING_ACCEPTANCE, Ev.ACCEPTED):
+        target = State.AWAITING_FINAL_PAYMENT if final_payment_required else State.RELEASE
         return Transition(target, check_attempts)
 
     if (state, event) == (State.CHECKS, Ev.CHECKS_FAILED):

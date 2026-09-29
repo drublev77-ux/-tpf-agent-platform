@@ -40,6 +40,21 @@ def test_operator_endpoints_need_the_admin_token(client):
     assert client.get("/admin/orders", headers={"X-Admin-Token": "test-admin"}).status_code == 200
 
 
+def test_stripe_webhook_requires_a_valid_signature(client, monkeypatch):
+    import hashlib, hmac, json, time
+    from tpf.config import get_settings
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", "whsec_test")
+    get_settings.cache_clear()
+    body = json.dumps({"type": "checkout.session.completed",
+                       "data": {"object": {"id": "cs_unknown", "payment_status": "paid", "metadata": {"stage": "prepayment"}}}}).encode()
+    assert client.post("/webhooks/stripe", content=body, headers={"Stripe-Signature": "t=1,v1=bad"}).status_code == 400
+    ts = int(time.time())
+    sig = hmac.new(b"whsec_test", f"{ts}.".encode() + body, hashlib.sha256).hexdigest()
+    r = client.post("/webhooks/stripe", content=body, headers={"Stripe-Signature": f"t={ts},v1={sig}"})
+    assert r.status_code == 200                               # signed, unknown session: acknowledged, nothing moves
+    assert client.get("/pay/done?order=7").status_code == 200
+
+
 def test_validation_rejects_bad_input(client):
     r = client.post("/orders", json={"client_name": "A", "client_email": "not-an-email", "request_text": "short"})
     assert r.status_code == 422

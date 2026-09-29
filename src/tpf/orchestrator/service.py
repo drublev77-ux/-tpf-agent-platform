@@ -78,6 +78,7 @@ class Orchestrator:
                 check_attempts=row["check_attempts"],
                 max_check_attempts=self.settings.max_check_attempts,
                 payment_required=self.settings.payment_required,
+                final_payment_required=self.settings.final_payment_required,
                 paused_from=State(row["paused_from"]) if row["paused_from"] else None,
             )
             await conn.execute(
@@ -164,7 +165,52 @@ class Orchestrator:
             order_id, kind, str(name), from_state, to_state, actor, data,
         )
 
+    # --- payments ---------------------------------------------------------------------------
+
+    async def record_payment(
+        self, *, stage: str, actor: str, session_id: str | None = None, order_id: int | None = None,
+    ) -> bool:
+        """Mark a payment paid (by Stripe session id, or the latest pending one of an order) and move
+        the order on. Idempotent: a repeated webhook finds nothing pending and changes nothing."""
+        async with self.pool.acquire() as conn, conn.transaction():
+            if session_id:
+                row = await conn.fetchrow(
+                    "UPDATE payments SET status = 'paid', paid_at = now() "
+                    "WHERE provider_session_id = $1 AND status IN ('pending', 'expired') RETURNING order_id, stage, amount, currency",
+                    session_id)
+            else:
+                row = await conn.fetchrow(
+                    "UPDATE payments SET status = 'paid', paid_at = now() WHERE id = ("
+                    "  SELECT id FROM payments WHERE order_id = $1 AND stage = $2 AND status = 'pending' ORDER BY id DESC LIMIT 1"
+                    ") RETURNING order_id, stage, amount, currency",
+                    order_id, stage)
+            if row is None:
+                return False
+            # Other open links for the same stage are now void.
+            await conn.execute(
+                "UPDATE payments SET status = 'cancelled' WHERE order_id = $1 AND stage = $2 AND status = 'pending'",
+                row["order_id"], row["stage"])
+        event = Ev.PAYMENT_RECEIVED if row["stage"] == "prepayment" else Ev.FINAL_PAYMENT_RECEIVED
+        await self.fire(row["order_id"], event, actor=actor,
+                        data={"stage": row["stage"], "amount": str(row["amount"]), "currency": row["currency"]})
+        return True
+
+    async def notify_client(self, order: dict[str, Any], text: str) -> None:
+        await self.add_message(order["id"], "out", text)
+        try:
+            await self.notifier.to_client(order, text)
+        except Exception:
+            log.exception("notification failed for order %s", order["id"])
+
+    async def notify_operator(self, order: dict[str, Any], text: str) -> None:
+        try:
+            await self.notifier.to_operator(order, text)
+        except Exception:
+            log.exception("operator notification failed for order %s", order["id"])
+
     async def _notify(self, order: dict[str, Any], tr: Transition, details: str) -> None:
+        if tr.to_state in (State.AWAITING_PAYMENT, State.AWAITING_FINAL_PAYMENT):
+            return  # the payment task sends its own message, with the checkout link
         try:
             if tr.to_state is State.PAUSED:
                 await self.notifier.to_operator(order, f"Заказ #{order['id']} на паузе: {details or 'эскалация'}")
