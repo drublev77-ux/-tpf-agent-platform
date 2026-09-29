@@ -12,7 +12,7 @@ from tpf.db import create_pool, migrate
 from tpf.llm.gateway import Budget, BudgetExceeded
 from tpf.notifications import LogNotifier
 from tpf.orchestrator.service import Orchestrator
-from tpf.tools.deploy import Deployment
+from tpf.tools.deploy import Deployment, DeployError
 from tpf.tools.sandbox import RunResult
 from tpf.worker import Worker
 
@@ -75,10 +75,16 @@ class FakeSandbox:
 class FakeDeployer:
     def __init__(self) -> None:
         self.deploys: list[tuple[str, bool, int]] = []
+        self.build_commands: list[str | None] = []
+        self.failures: list[DeployError] = []
 
-    async def deploy(self, project, files, production):
+    async def deploy(self, project, files, production, build_command=None):
         self.deploys.append((project, production, len(files)))
-        return Deployment("dpl_1", f"https://{project}{'' if production else '-preview'}.vercel.app", "READY")
+        self.build_commands.append(build_command)
+        if self.failures:
+            raise self.failures.pop(0)
+        n = len(self.deploys)
+        return Deployment(f"dpl_{n}", f"https://{project}{'' if production else f'-preview{n}'}.vercel.app", "READY")
 
 
 @pytest.fixture

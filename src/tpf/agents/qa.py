@@ -11,8 +11,11 @@ from typing import Any
 
 from tpf.agents.base import Ctx, Outcome
 from tpf.agents.reviewer import review
+from tpf.agents.devops import project_name
 from tpf.orchestrator.states import Ev
-from tpf.tools.template import materialize, route_to_page
+from tpf.tools.deploy import DeployError
+from tpf.tools.sandbox import RunResult
+from tpf.tools.template import all_files, materialize, route_to_page
 
 BUILD_CMD = (
     "export NEXT_TELEMETRY_DISABLED=1; "
@@ -22,6 +25,25 @@ BUILD_CMD = (
     "npm audit --omit=dev --audit-level=high || exit 30"
 )
 REVIEW_CODE_CHARS = 120_000
+
+# The same gates, run by Vercel's own isolated build when the worker has no Docker (SANDBOX=vercel).
+VERCEL_BUILD_CMD = "npm run build && npm audit --omit=dev --audit-level=high"
+
+
+async def _build_on_vercel(ctx: Ctx, files: list[dict[str, str]], version: int, report: dict[str, Any]) -> RunResult:
+    """Build the code as a Vercel preview. A green preview is kept for staging, so it is not built twice."""
+    if ctx.deployer is None:
+        return RunResult(1, "SANDBOX=vercel needs VERCEL_TOKEN")
+    try:
+        dep = await ctx.deployer.deploy(project_name(ctx.order_id), all_files(files), production=False,
+                                        build_command=VERCEL_BUILD_CMD)
+    except DeployError as e:
+        log = e.log or str(e)
+        # npm audit prints "found N vulnerabilities" / "Severity:" only when it is the step that failed.
+        code = 30 if ("npm audit" in log and "Severity:" in log) else 20
+        return RunResult(code, log)
+    report["preview"] = {"url": dep.url, "deployment_id": dep.id, "code_version": version}
+    return RunResult(0, f"Vercel build ok: {dep.url}")
 
 
 def _code_digest(files: list[dict[str, str]]) -> list[dict[str, str]]:
@@ -54,8 +76,11 @@ async def run(ctx: Ctx) -> Outcome:
     version = await ctx.orch.pool.fetchval(
         "SELECT max(version) FROM artifacts WHERE order_id = $1 AND kind = 'code'", ctx.order_id
     )
-    workdir = materialize(Path(ctx.settings.workspace_root) / f"order-{ctx.order_id}" / f"v{version}", files)
-    run_result = await ctx.sandbox.run(workdir, BUILD_CMD)
+    if ctx.settings.sandbox == "vercel":
+        run_result = await _build_on_vercel(ctx, files, version, report)
+    else:
+        workdir = materialize(Path(ctx.settings.workspace_root) / f"order-{ctx.order_id}" / f"v{version}", files)
+        run_result = await ctx.sandbox.run(workdir, BUILD_CMD)
     stage = {0: "ok", 10: "install", 20: "build", 30: "audit"}.get(run_result.exit_code, "sandbox")
     report["build"] = {
         "ok": run_result.exit_code in (0, 30) and not run_result.timed_out,

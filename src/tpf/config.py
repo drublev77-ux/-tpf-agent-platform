@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     prepayment_share: float = 0.5
 
     # Sandbox
-    sandbox: str = "docker"  # docker | local
+    sandbox: str = "docker"  # docker | vercel (build checks run as Vercel previews) | local (dev only)
     sandbox_image: str = "node:22-alpine"
     sandbox_timeout_sec: int = 900
     workspace_root: str = "/tmp/tpf-workspaces"

@@ -1,4 +1,9 @@
-"""Deployment to Vercel through its REST API: files are uploaded inline, Vercel builds the site."""
+"""Deployment to Vercel through its REST API: files are uploaded inline, Vercel builds the site.
+
+Vercel's build runs in its own isolated environment, so a preview deployment doubles as the
+QA build check when the worker has no Docker (SANDBOX=vercel): a failed build comes back as a
+DeployError carrying the build log.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -17,12 +22,17 @@ class Deployment:
     state: str
 
 
-class Deployer(Protocol):
-    async def deploy(self, project: str, files: list[dict[str, str]], production: bool) -> Deployment: ...
-
-
 class DeployError(RuntimeError):
-    pass
+    def __init__(self, message: str, log: str = "", deployment_id: str | None = None) -> None:
+        super().__init__(message)
+        self.log = log
+        self.deployment_id = deployment_id
+
+
+class Deployer(Protocol):
+    async def deploy(
+        self, project: str, files: list[dict[str, str]], production: bool, build_command: str | None = None,
+    ) -> Deployment: ...
 
 
 class VercelDeployer:
@@ -37,21 +47,25 @@ class VercelDeployer:
             headers={"Authorization": f"Bearer {settings.vercel_token}"},
         )
 
-    async def deploy(self, project: str, files: list[dict[str, str]], production: bool) -> Deployment:
+    async def deploy(
+        self, project: str, files: list[dict[str, str]], production: bool, build_command: str | None = None,
+    ) -> Deployment:
+        settings: dict = {"framework": "nextjs"}
+        if build_command:
+            settings |= {"buildCommand": build_command, "installCommand": "npm install --no-audit --no-fund"}
         body = {
             "name": project,
             "files": [{"file": f["path"], "data": f["content"]} for f in files],
-            "projectSettings": {"framework": "nextjs"},
+            "projectSettings": settings,
         }
         if production:
             body["target"] = "production"
-        r = await self.client.post("/v13/deployments", params=self.params, json=body)
+        r = await self.client.post("/v13/deployments", params=self.params | {"skipAutoDetectionConfirmation": "1"}, json=body)
         if r.status_code >= 400:
             raise DeployError(f"Vercel {r.status_code}: {r.text[:500]}")
-        dep = r.json()
-        return await self._wait(dep["id"])
+        return await self._wait(r.json()["id"])
 
-    async def _wait(self, deployment_id: str, timeout_sec: int = 900) -> Deployment:
+    async def _wait(self, deployment_id: str, timeout_sec: int = 1200) -> Deployment:
         waited = 0
         while waited < timeout_sec:
             r = await self.client.get(f"/v13/deployments/{deployment_id}", params=self.params)
@@ -61,7 +75,21 @@ class VercelDeployer:
             if state == "READY":
                 return Deployment(d["id"], "https://" + d["url"], state)
             if state in ("ERROR", "CANCELED"):
-                raise DeployError(f"deployment {deployment_id} ended in {state}")
+                raise DeployError(
+                    f"deployment {deployment_id} ended in {state}",
+                    log=await self.build_log(deployment_id), deployment_id=deployment_id,
+                )
             await asyncio.sleep(10)
             waited += 10
-        raise DeployError(f"deployment {deployment_id} not ready after {timeout_sec}s")
+        raise DeployError(f"deployment {deployment_id} not ready after {timeout_sec}s", deployment_id=deployment_id)
+
+    async def build_log(self, deployment_id: str, tail_chars: int = 8000) -> str:
+        try:
+            r = await self.client.get(
+                f"/v3/deployments/{deployment_id}/events", params=self.params | {"builds": "1", "limit": "-1"},
+            )
+            r.raise_for_status()
+            lines = [(e.get("payload") or {}).get("text") or e.get("text") or "" for e in r.json()]
+            return "\n".join(line for line in lines if line)[-tail_chars:]
+        except Exception as e:  # noqa: BLE001 — the log is a nice-to-have for the Developer agent
+            return f"(build log unavailable: {e})"

@@ -21,7 +21,8 @@ from tpf.orchestrator.states import Ev, State, TransitionError
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    app.state.pool = await create_pool()
+    # Serverless: many short-lived instances, each keeps only a couple of connections.
+    app.state.pool = await create_pool(min_size=0, max_size=3)
     app.state.orch = Orchestrator(app.state.pool, settings, make_notifier(settings))
     yield
     await app.state.pool.close()
@@ -142,14 +143,26 @@ async def cancel(request: Request, order: dict = Depends(client_order)) -> dict[
     return await _fire(orch(request), order["id"], Ev.CANCEL, "client")
 
 
+SSE_WINDOW_SEC = 240  # below the function's maxDuration; EventSource reconnects with Last-Event-ID
+
+
 @app.get("/orders/{order_id}/events")
-async def stream_events(request: Request, order: dict = Depends(client_order)) -> StreamingResponse:
-    """Server-sent events: the live status feed for the client portal."""
+async def stream_events(
+    request: Request, order: dict = Depends(client_order), last_event_id: str | None = Header(default=None),
+) -> StreamingResponse:
+    """Server-sent events: the live status feed for the client portal.
+
+    Each connection lives up to SSE_WINDOW_SEC; the browser's EventSource reconnects on its own and
+    sends Last-Event-ID, so the feed resumes exactly where it stopped."""
     o = orch(request)
+    start_after = int(last_event_id) if last_event_id and last_event_id.isdigit() else 0
 
     async def gen():
-        last = 0
-        while not await request.is_disconnected():
+        last = start_after
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + SSE_WINDOW_SEC
+        yield "retry: 2000\n\n"
+        while loop.time() < deadline and not await request.is_disconnected():
             for ev in await o.events(order["id"], last):
                 last = ev["id"]
                 payload = {k: ev[k] for k in ("id", "name", "from_state", "to_state", "actor")}

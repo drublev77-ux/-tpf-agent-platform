@@ -15,9 +15,18 @@ async def _init_connection(conn: asyncpg.Connection) -> None:
     await conn.set_type_codec("jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog")
 
 
-async def create_pool(dsn: str | None = None) -> asyncpg.Pool:
+def uses_transaction_pooler(dsn: str) -> bool:
+    """Supabase's transaction pooler (Supavisor, port 6543) and PgBouncer in transaction mode
+    cannot keep prepared statements between transactions."""
+    return ":6543" in dsn or "pgbouncer=true" in dsn
+
+
+async def create_pool(dsn: str | None = None, *, min_size: int = 1, max_size: int = 10) -> asyncpg.Pool:
+    dsn = dsn or get_settings().database_url
+    extra = {"statement_cache_size": 0} if uses_transaction_pooler(dsn) else {}
     return await asyncpg.create_pool(
-        dsn or get_settings().database_url, min_size=1, max_size=10, init=_init_connection
+        dsn.replace("?pgbouncer=true", "").replace("&pgbouncer=true", ""),
+        min_size=min_size, max_size=max_size, init=_init_connection, **extra,
     )
 
 

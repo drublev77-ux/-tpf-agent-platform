@@ -88,7 +88,8 @@ class LocalSandbox:
 
 
 def make_sandbox(settings: Settings) -> Sandbox:
-    return LocalSandbox(settings) if settings.sandbox == "local" else DockerSandbox(settings)
+    # SANDBOX=vercel: QA builds on Vercel (agents/qa.py) and never calls the local sandbox.
+    return DockerSandbox(settings) if settings.sandbox == "docker" else LocalSandbox(settings)
 
 
 def quote(s: str) -> str:

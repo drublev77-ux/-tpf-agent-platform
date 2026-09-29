@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from tpf.agents.base import Ctx, Outcome
 from tpf.orchestrator.states import Ev
-from tpf.tools.deploy import DeployError
+from tpf.tools.deploy import Deployment, DeployError
 from tpf.tools.template import all_files
 
 
@@ -16,16 +16,32 @@ async def _files(ctx: Ctx) -> list[dict[str, str]] | None:
     return all_files(code["files"]) if code else None
 
 
+async def _reuse_qa_preview(ctx: Ctx) -> Deployment | None:
+    """With SANDBOX=vercel, QA already built the latest code as a preview: use it as staging."""
+    report = await ctx.orch.latest_artifact(ctx.order_id, "qa_report")
+    preview = (report or {}).get("preview")
+    if not (report and report.get("passed") and preview):
+        return None
+    latest = await ctx.orch.pool.fetchval(
+        "SELECT max(version) FROM artifacts WHERE order_id = $1 AND kind = 'code'", ctx.order_id
+    )
+    if preview.get("code_version") != latest:
+        return None
+    return Deployment(preview["deployment_id"], preview["url"], "READY")
+
+
 async def deploy_staging(ctx: Ctx) -> Outcome:
     if ctx.deployer is None:
         return Outcome(escalate="Деплой не настроен: задайте VERCEL_TOKEN")
     files = await _files(ctx)
     if files is None:
         return Outcome(escalate="Нет кода для деплоя")
-    try:
-        dep = await ctx.deployer.deploy(project_name(ctx.order_id), files, production=False)
-    except DeployError as e:
-        return Outcome(escalate=f"Деплой на стейджинг не удался: {e}")
+    dep = await _reuse_qa_preview(ctx)
+    if dep is None:
+        try:
+            dep = await ctx.deployer.deploy(project_name(ctx.order_id), files, production=False)
+        except DeployError as e:
+            return Outcome(escalate=f"Деплой на стейджинг не удался: {e}")
     await ctx.orch.pool.execute("UPDATE orders SET staging_url = $2 WHERE id = $1", ctx.order_id, dep.url)
     await ctx.orch.save_artifact(ctx.order_id, "deployment", {"target": "staging", "id": dep.id, "url": dep.url}, "devops")
     return Outcome(Ev.STAGING_DEPLOYED, data={"url": dep.url}, details=dep.url)

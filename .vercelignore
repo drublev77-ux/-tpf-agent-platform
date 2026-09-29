@@ -1,0 +1,6 @@
+tests/
+Dockerfile
+Dockerfile.worker
+docker-compose.yml
+railway.json
+.env*
