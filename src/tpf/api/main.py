@@ -207,9 +207,20 @@ async def payment_received(order_id: int, request: Request) -> dict[str, Any]:
 
 
 @app.get("/health")
-async def health(request: Request) -> dict[str, str]:
-    await orch(request).pool.fetchval("SELECT 1")
-    return {"status": "ok"}
+async def health(request: Request):
+    """Liveness plus a database round trip. On failure, names the error class so a deploy can be
+    diagnosed without log access; the message is shown with any credentials stripped."""
+    from fastapi.responses import JSONResponse
+
+    try:
+        await orch(request).pool.fetchval("SELECT count(*) FROM orders")
+    except Exception as e:  # noqa: BLE001
+        dsn = get_settings().database_url
+        msg = str(e)
+        if "@" in dsn:
+            msg = msg.replace(dsn.split("@")[0], "***")
+        return JSONResponse({"status": "error", "database": f"{type(e).__name__}: {msg[:300]}"}, status_code=503)
+    return {"status": "ok", "database": "ok"}
 
 
 def run() -> None:
