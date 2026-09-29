@@ -5,6 +5,7 @@ import asyncio
 import logging
 import os
 import signal
+import sys
 
 import asyncpg
 
@@ -15,7 +16,7 @@ from tpf.db import create_pool
 from tpf.llm.gateway import AnthropicGateway, Budget, BudgetExceeded, LLMGateway
 from tpf.notifications import make_notifier
 from tpf.orchestrator import queue
-from tpf.payments import PaymentGateway, make_gateway
+from tpf.payments import PaymentGateway, ensure_stripe_webhook, make_gateway
 from tpf.orchestrator.service import Orchestrator
 from tpf.orchestrator.states import TASK_FOR_STATE, State, TransitionError
 from tpf.tools.deploy import Deployer, VercelDeployer
@@ -99,7 +100,8 @@ class Worker:
 
 
 async def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    # stdout, so hosting dashboards (Railway) do not flag every info line as an error
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s", stream=sys.stdout)
     settings = get_settings()
     missing = [name for name, value in (
         ("ANTHROPIC_API_KEY", settings.anthropic_api_key),
@@ -121,6 +123,11 @@ async def main() -> None:
         github=GitHubPublisher(settings) if settings.github_token and settings.github_owner else None,
         payments=make_gateway(settings),
     )
+    if settings.payment_provider == "stripe":
+        try:
+            log.info("stripe: %s", await ensure_stripe_webhook(settings, pool))
+        except Exception:  # payments stay requestable; the webhook can be fixed without stopping agents
+            log.exception("stripe: could not provision the webhook endpoint")
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, worker.stopping.set)

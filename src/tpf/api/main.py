@@ -18,7 +18,7 @@ from tpf.notifications import make_notifier
 from tpf.orchestrator.service import Orchestrator
 from tpf.orchestrator import queue
 from tpf.orchestrator.states import TASK_FOR_STATE, Ev, State, TransitionError
-from tpf.payments import WebhookError, verify_stripe_webhook
+from tpf.payments import WebhookError, verify_stripe_webhook, webhook_secret
 
 
 @asynccontextmanager
@@ -228,8 +228,9 @@ async def stripe_webhook(request: Request) -> dict[str, str]:
     """Stripe calls this when a Checkout Session completes or expires. The signature is checked
     against STRIPE_WEBHOOK_SECRET before anything is trusted."""
     payload = await request.body()
+    secret = await webhook_secret(get_settings(), orch(request).pool)
     try:
-        event = verify_stripe_webhook(payload, request.headers.get("stripe-signature"), get_settings().stripe_webhook_secret)
+        event = verify_stripe_webhook(payload, request.headers.get("stripe-signature"), secret)
     except WebhookError as e:
         raise HTTPException(400, str(e)) from None
 
@@ -290,7 +291,11 @@ async def health(request: Request):
         if "@" in dsn:
             msg = msg.replace(dsn.split("@")[0], "***")
         return JSONResponse({"status": "error", "database": f"{type(e).__name__}: {msg[:300]}"}, status_code=503)
-    return {"status": "ok", "database": "ok"}
+    s = get_settings()
+    payments = {"provider": s.payment_provider}
+    if s.payment_provider == "stripe":
+        payments["webhook_secret"] = bool(await webhook_secret(s, orch(request).pool))
+    return {"status": "ok", "database": "ok", "payments": payments}
 
 
 def run() -> None:

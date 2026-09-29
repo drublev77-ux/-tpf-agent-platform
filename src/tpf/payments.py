@@ -120,6 +120,62 @@ def verify_stripe_webhook(payload: bytes, signature_header: str | None, secret: 
     return json.loads(payload)
 
 
+WEBHOOK_EVENTS = ("checkout.session.completed", "checkout.session.async_payment_succeeded", "checkout.session.expired")
+SECRET_KEY = "stripe_webhook_secret"
+ENDPOINT_KEY = "stripe_webhook_endpoint_id"
+
+
+async def webhook_secret(settings: Settings, pool: Any) -> str:
+    """The signing secret: from the environment if set there, else the one the worker provisioned."""
+    if settings.stripe_webhook_secret:
+        return settings.stripe_webhook_secret
+    return await pool.fetchval("SELECT value FROM app_settings WHERE key = $1", SECRET_KEY) or ""
+
+
+async def ensure_stripe_webhook(settings: Settings, pool: Any, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
+    """Make sure Stripe sends checkout events to this platform, creating the endpoint if needed.
+
+    Stripe reveals an endpoint's signing secret only when it is created, so an endpoint for our URL
+    whose secret we do not hold is replaced by a new one (that is the only way to learn the secret).
+    Returns what was done, for the log."""
+    url = settings.public_base_url.rstrip("/") + "/webhooks/stripe"
+    own = client is None
+    client = client or httpx.AsyncClient(base_url=StripeGateway.API, timeout=30,
+                                         headers={"Authorization": f"Bearer {settings.stripe_secret_key}"})
+    try:
+        account = (await client.get("/account")).json()
+        info: dict[str, Any] = {"account": account.get("id"), "country": account.get("country"),
+                                "charges_enabled": account.get("charges_enabled"),
+                                "mode": "live" if settings.stripe_secret_key.startswith(("sk_live", "rk_live")) else "test"}
+        stored_id = await pool.fetchval("SELECT value FROM app_settings WHERE key = $1", ENDPOINT_KEY)
+        stored_secret = await pool.fetchval("SELECT value FROM app_settings WHERE key = $1", SECRET_KEY)
+
+        r = await client.get("/webhook_endpoints", params={"limit": 100})
+        if r.status_code >= 400:
+            raise PaymentError(f"Stripe {r.status_code}: {r.text[:300]}")
+        ours = [e for e in r.json().get("data", []) if e.get("url") == url]
+        keep = next((e for e in ours if e["id"] == stored_id and stored_secret), None)
+        if keep and set(WEBHOOK_EVENTS) <= set(keep.get("enabled_events", [])) and keep.get("status") == "enabled":
+            return info | {"webhook": "ok", "endpoint": keep["id"]}
+
+        for e in ours:  # endpoints for our URL whose secret we cannot know
+            await client.delete(f"/webhook_endpoints/{e['id']}")
+        form = {"url": url, "description": "TPF Agent Platform: client payments", "enabled_events[]": list(WEBHOOK_EVENTS)}
+        created = await client.post("/webhook_endpoints", data=form)
+        if created.status_code >= 400:
+            raise PaymentError(f"Stripe {created.status_code}: {created.text[:300]}")
+        ep = created.json()
+        async with pool.acquire() as conn, conn.transaction():
+            for key, value in ((SECRET_KEY, ep["secret"]), (ENDPOINT_KEY, ep["id"])):
+                await conn.execute(
+                    "INSERT INTO app_settings (key, value) VALUES ($1, $2) "
+                    "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()", key, value)
+        return info | {"webhook": "created", "endpoint": ep["id"], "replaced": [e["id"] for e in ours]}
+    finally:
+        if own:
+            await client.aclose()
+
+
 def make_gateway(settings: Settings) -> PaymentGateway | None:
     if settings.payment_provider == "stripe":
         return StripeGateway(settings)

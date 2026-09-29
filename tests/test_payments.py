@@ -149,3 +149,42 @@ def test_webhook_signature():
         verify_stripe_webhook(body, sign(body, "whsec_x", ts=int(time.time()) - 3600), "whsec_x")  # replay
     with pytest.raises(WebhookError):
         verify_stripe_webhook(body, None, "whsec_x")
+
+
+# --- webhook provisioning ----------------------------------------------------------------------
+
+async def test_worker_provisions_the_stripe_webhook_once(env):
+    import httpx
+    from tpf.payments import ensure_stripe_webhook, webhook_secret
+
+    env.settings.stripe_secret_key = "sk_test_123"
+    env.settings.public_base_url = "https://api.example.com"
+    endpoints: dict[str, dict] = {"we_old": {"id": "we_old", "url": "https://api.example.com/webhooks/stripe",
+                                            "enabled_events": ["*"], "status": "enabled"}}
+    deleted: list[str] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.path == "/v1/account":
+            return httpx.Response(200, json={"id": "acct_1", "country": "EE", "charges_enabled": True})
+        if req.method == "GET" and req.url.path == "/v1/webhook_endpoints":
+            return httpx.Response(200, json={"data": list(endpoints.values())})
+        if req.method == "DELETE":
+            eid = req.url.path.rsplit("/", 1)[-1]
+            deleted.append(eid)
+            endpoints.pop(eid, None)
+            return httpx.Response(200, json={"deleted": True})
+        if req.method == "POST" and req.url.path == "/v1/webhook_endpoints":
+            form = httpx.QueryParams(req.content.decode())
+            ep = {"id": "we_new", "url": form["url"], "enabled_events": form.get_list("enabled_events[]"),
+                  "status": "enabled", "secret": "whsec_new"}
+            endpoints["we_new"] = {k: v for k, v in ep.items() if k != "secret"}
+            return httpx.Response(200, json=ep)
+        return httpx.Response(404)
+
+    client = httpx.AsyncClient(base_url="https://api.stripe.com/v1", transport=httpx.MockTransport(handler))
+    first = await ensure_stripe_webhook(env.settings, env.pool, client)
+    assert first["webhook"] == "created" and deleted == ["we_old"] and first["mode"] == "test"
+    assert await webhook_secret(env.settings, env.pool) == "whsec_new"
+
+    second = await ensure_stripe_webhook(env.settings, env.pool, client)   # restart: nothing to do
+    assert second["webhook"] == "ok" and deleted == ["we_old"]
