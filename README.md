@@ -34,7 +34,21 @@ src/tpf/
   worker.py                 воркер: берёт задачи и запускает агентов
 ```
 
-## Запуск
+## Боевое развёртывание: Vercel + Supabase + Railway
+
+| Часть | Где | Как |
+| --- | --- | --- |
+| API | Vercel, проект `tpf-agent-platform`, регион fra1 | `app.py` + `vercel.json`, деплой из этого репозитория |
+| База | Supabase, проект `tpf-agent-platform` (eu-central-1) | миграции 001–003; приложение ходит под ролью `tpf_app` через пулер `:6543` |
+| Воркер | Railway (или Fly.io/Render) | `Dockerfile.worker` + `railway.json`, `SANDBOX=vercel` |
+
+Воркеру Docker не нужен: сборку и `npm audit` каждого сайта выполняет Vercel как превью‑деплой. Зелёное превью сразу становится стейджингом.
+
+Переменные воркера: `DATABASE_URL` (та же строка, что у API), `ANTHROPIC_API_KEY`, `VERCEL_TOKEN`, `SANDBOX=vercel`, при желании `NOTIFIER=webhook` + `NOTIFY_WEBHOOK_URL`.
+
+Бесплатный тариф Vercel (Hobby) по правилам Vercel предназначен только для некоммерческого использования. Перед работой с реальными клиентами переведите проект на Pro.
+
+## Локальный запуск
 
 ```bash
 cp .env.example .env        # задайте ANTHROPIC_API_KEY, VERCEL_TOKEN, ADMIN_TOKEN
