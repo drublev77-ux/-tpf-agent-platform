@@ -1,0 +1,35 @@
+[project]
+name = "tpf-agent-platform"
+version = "0.1.0"
+description = "TPF Technology: autonomous AI agents that take client orders from request to delivery"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "asyncpg>=0.29",
+  "httpx>=0.27",
+  "pydantic[email]>=2.6",
+  "pydantic-settings>=2.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23"]
+
+[project.scripts]
+tpf-api = "tpf.api.main:run"
+tpf-worker = "tpf.worker:run"
+tpf-migrate = "tpf.db:migrate_cli"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+tpf = ["migrations/*.sql"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
