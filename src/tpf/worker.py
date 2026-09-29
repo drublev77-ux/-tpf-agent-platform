@@ -95,6 +95,16 @@ class Worker:
 async def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     settings = get_settings()
+    missing = [name for name, value in (
+        ("ANTHROPIC_API_KEY", settings.anthropic_api_key),
+        ("VERCEL_TOKEN", settings.vercel_token if settings.sandbox == "vercel" else "n/a"),
+        ("DATABASE_URL", settings.database_url if "localhost" not in settings.database_url else ""),
+    ) if not value]
+    if missing:
+        # Idle instead of crash-looping: setting the variables on the host redeploys the worker.
+        log.error("worker not started: set %s", ", ".join(missing))
+        while True:
+            await asyncio.sleep(3600)
     pool = await create_pool()
     orch = Orchestrator(pool, settings, make_notifier(settings))
     llm = AnthropicGateway(settings, Budget(pool, settings))
