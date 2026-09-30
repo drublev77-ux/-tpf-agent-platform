@@ -45,7 +45,21 @@ class Orchestrator:
             )
             await self._event(conn, order_id, "client", "order_created", "client", {"channel": channel})
         await self.fire(order_id, Ev.INTAKE_ACCEPTED, actor="intake")
-        return await self.get_order(order_id), token
+        order = await self.get_order(order_id)
+        await self._welcome(order)
+        return order, token
+
+    async def _welcome(self, order: dict[str, Any]) -> None:
+        """Confirmation with the portal link; the operator hears about every new order."""
+        try:
+            text = render("received", order["language"], order["id"], "")
+            if text:
+                await self.notifier.to_client(order, text)
+            await self.notifier.to_operator(
+                order, f"Новый заказ #{order['id']} от {order['client_name']} <{order['client_email']}> "
+                       f"({order['channel']}, {order['language']}):\n{order['request_text'][:1500]}")
+        except Exception:
+            log.exception("welcome notification failed for order %s", order["id"])
 
     async def get_order(self, order_id: int) -> dict[str, Any]:
         row = await self.pool.fetchrow("SELECT * FROM orders WHERE id = $1", order_id)

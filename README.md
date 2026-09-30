@@ -51,6 +51,17 @@ src/tpf/
 | Railway (воркер) | `PAYMENT_PROVIDER=stripe`, `PREPAYMENT_SHARE=0.5`, `STRIPE_SECRET_KEY`, `PUBLIC_BASE_URL` |
 | Stripe → Developers → Webhooks | endpoint `https://tpf-agent-platform.vercel.app/webhooks/stripe`, события `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.expired` |
 
+## Кабинет клиента и письма
+
+У каждого заказа есть личная страница `/portal/{id}?t=<токен>` (ru/en/zh, без JavaScript): статус, переписка,
+ТЗ и смета, кнопки оплаты, ссылка на стейджинг, утверждение сметы и приёмка работы. Ссылку возвращает `POST /orders`
+(`portal_url`), и она же стоит кнопкой в каждом письме.
+
+Письма уходят через HTTPS API (Railway блокирует SMTP): `EMAIL_PROVIDER=resend|brevo`, `EMAIL_API_KEY`,
+`EMAIL_FROM` (домен отправителя подтверждается у провайдера), `EMAIL_REPLY_TO`, `OPERATOR_EMAIL`.
+Клиент получает подтверждение заявки, вопросы, смету, ссылки на оплату, стейджинг и сдачу — на своём языке.
+Оператор — новые заказы и эскалации. Сбой почты заказ не останавливает.
+
 ## Боевое развёртывание: Vercel + Supabase + Railway
 
 | Часть | Где | Как |

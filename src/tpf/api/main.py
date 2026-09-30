@@ -12,6 +12,7 @@ import asyncpg
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, EmailStr, Field
 
+from tpf.notifications import portal_url
 from tpf.config import get_settings
 from tpf.db import create_pool
 from tpf.notifications import make_notifier
@@ -99,7 +100,8 @@ async def _fire(o: Orchestrator, order_id: int, event: Ev, actor: str, data: dic
 @app.post("/orders", status_code=201)
 async def create_order(body: OrderIn, request: Request) -> dict[str, Any]:
     order, token = await orch(request).create_order(**body.model_dump())
-    return {"order": public(order), "client_token": token}
+    return {"order": public(order), "client_token": token,
+            "portal_url": portal_url(get_settings().public_base_url, order["id"], token)}
 
 
 @app.get("/orders/{order_id}")
@@ -302,3 +304,8 @@ def run() -> None:
     import uvicorn
 
     uvicorn.run("tpf.api.main:app", host="0.0.0.0", port=8000)
+
+
+from tpf.api.portal import router as portal_router  # noqa: E402  (after app: the portal reads app.state)
+
+app.include_router(portal_router)

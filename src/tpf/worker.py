@@ -18,7 +18,7 @@ from tpf.notifications import make_notifier
 from tpf.orchestrator import queue
 from tpf.payments import PaymentGateway, ensure_stripe_webhook, make_gateway
 from tpf.orchestrator.service import Orchestrator
-from tpf.orchestrator.states import TASK_FOR_STATE, State, TransitionError
+from tpf.orchestrator.states import TASK_FOR_STATE, TransitionError
 from tpf.tools.deploy import Deployer, VercelDeployer
 from tpf.tools.github import GitHubPublisher
 from tpf.tools.sandbox import Sandbox, make_sandbox

@@ -64,6 +64,16 @@ class Settings(BaseSettings):
     notifier: str = "log"  # log | webhook
     notify_webhook_url: str = ""
     public_base_url: str = "http://localhost:8000"
+    # E-mail over an HTTPS API (Railway blocks outbound SMTP): off | resend | brevo
+    email_provider: str = "off"
+    email_api_key: str = ""
+    email_from: str = ""       # "TPF Technology <orders@your-domain>" — the domain must be verified
+    email_reply_to: str = ""
+    operator_email: str = ""   # escalations and new orders; empty = log only
+
+    @property
+    def email_enabled(self) -> bool:
+        return self.email_provider in ("resend", "brevo") and bool(self.email_api_key and self.email_from)
 
 
 @lru_cache
