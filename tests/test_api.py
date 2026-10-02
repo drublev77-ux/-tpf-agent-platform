@@ -41,7 +41,10 @@ def test_operator_endpoints_need_the_admin_token(client):
 
 
 def test_stripe_webhook_requires_a_valid_signature(client, monkeypatch):
-    import hashlib, hmac, json, time
+    import hashlib
+    import hmac
+    import json
+    import time
     from tpf.config import get_settings
     monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", "whsec_test")
     get_settings.cache_clear()
@@ -58,3 +61,14 @@ def test_stripe_webhook_requires_a_valid_signature(client, monkeypatch):
 def test_validation_rejects_bad_input(client):
     r = client.post("/orders", json={"client_name": "A", "client_email": "not-an-email", "request_text": "short"})
     assert r.status_code == 422
+
+
+def test_public_site_and_intake_limit(client, monkeypatch):
+    page = client.get("/")
+    assert page.status_code == 200 and "TPF" in page.text and "fetch('/orders'" in page.text
+    assert client.get("/brand.jpg").headers["content-type"] == "image/jpeg"
+    monkeypatch.setenv("INTAKE_HOURLY_LIMIT", "1")
+    get_settings.cache_clear()
+    order = {"client_name": "A", "client_email": "a@example.com", "request_text": "Нужен лендинг для кофейни."}
+    assert client.post("/orders", json=order).status_code == 201
+    assert client.post("/orders", json=order).status_code == 429

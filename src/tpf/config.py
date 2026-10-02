@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     email_api_key: str = ""
     email_from: str = ""       # "TPF Technology <orders@your-domain>" — the domain must be verified
     email_reply_to: str = ""
+    intake_hourly_limit: int = 20  # new orders per hour across all channels
     operator_email: str = ""   # escalations and new orders; empty = log only
 
     @property

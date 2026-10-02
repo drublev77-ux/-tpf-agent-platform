@@ -5,11 +5,12 @@ import asyncio
 import hmac
 import json
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 import asyncpg
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel, EmailStr, Field
 
 from tpf.notifications import portal_url
@@ -99,6 +100,10 @@ async def _fire(o: Orchestrator, order_id: int, event: Ev, actor: str, data: dic
 
 @app.post("/orders", status_code=201)
 async def create_order(body: OrderIn, request: Request) -> dict[str, Any]:
+    # The public site form posts here; cap intake so a flood cannot burn the LLM budget.
+    recent = await orch(request).pool.fetchval("SELECT count(*) FROM orders WHERE created_at > now() - interval '1 hour'")
+    if recent >= get_settings().intake_hourly_limit:
+        raise HTTPException(429, "too many orders right now, try again later")
     order, token = await orch(request).create_order(**body.model_dump())
     return {"order": public(order), "client_token": token,
             "portal_url": portal_url(get_settings().public_base_url, order["id"], token)}
@@ -304,6 +309,22 @@ def run() -> None:
     import uvicorn
 
     uvicorn.run("tpf.api.main:app", host="0.0.0.0", port=8000)
+
+
+SITE_DIR = Path(__file__).resolve().parent.parent / "site"
+
+
+@app.get("/", include_in_schema=False)
+async def site() -> FileResponse:
+    """The public TPF Technology site; its contact form posts to /orders."""
+    return FileResponse(SITE_DIR / "index.html", media_type="text/html; charset=utf-8",
+                        headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/brand.jpg", include_in_schema=False)
+async def brand() -> FileResponse:
+    return FileResponse(SITE_DIR / "brand.jpg", media_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=86400"})
 
 
 from tpf.api.portal import router as portal_router  # noqa: E402  (after app: the portal reads app.state)
