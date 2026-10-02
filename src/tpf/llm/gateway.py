@@ -98,26 +98,34 @@ class AnthropicGateway:
     ) -> dict[str, Any]:
         await self.budget.check(order_id)
         model = self.model_for(model_class)
+        # Newer models reject a forced tool_choice, so the tool is offered with "auto" and the
+        # instruction to call it; a reply without the call gets one corrective turn.
+        messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
         body = {
             "model": model,
             "max_tokens": max_tokens,
-            "system": system,
-            "messages": [{"role": "user", "content": prompt}],
+            "system": system + "\n\nReturn your result only by calling the `submit` tool, exactly once. "
+                               "Do not answer in plain text.",
+            "messages": messages,
             "tools": [{
                 "name": "submit",
                 "description": "Submit your finished result. Call exactly once.",
                 "input_schema": schema,
             }],
-            "tool_choice": {"type": "tool", "name": "submit"},
+            "tool_choice": {"type": "auto"},
         }
-        data = await self._post(body)
-        usage = data.get("usage", {})
-        await self.budget.record(order_id, agent, model, usage.get("input_tokens", 0), usage.get("output_tokens", 0))
-        if data.get("stop_reason") == "max_tokens":
-            raise LLMError(f"{agent}: output hit max_tokens={max_tokens}")
-        for block in data.get("content", []):
-            if block.get("type") == "tool_use" and block.get("name") == "submit":
-                return block["input"]
+        for attempt in range(2):
+            data = await self._post(body)
+            usage = data.get("usage", {})
+            await self.budget.record(order_id, agent, model, usage.get("input_tokens", 0), usage.get("output_tokens", 0))
+            if data.get("stop_reason") == "max_tokens":
+                raise LLMError(f"{agent}: output hit max_tokens={max_tokens}")
+            for block in data.get("content", []):
+                if block.get("type") == "tool_use" and block.get("name") == "submit":
+                    return block["input"]
+            if attempt == 0:
+                messages.append({"role": "assistant", "content": data.get("content") or [{"type": "text", "text": "(no output)"}]})
+                messages.append({"role": "user", "content": "Call the `submit` tool now with the complete result."})
         raise LLMError(f"{agent}: model returned no submit call")
 
     async def _post(self, body: dict[str, Any]) -> dict[str, Any]:
