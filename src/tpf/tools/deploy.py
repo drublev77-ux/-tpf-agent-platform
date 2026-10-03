@@ -44,6 +44,7 @@ class VercelDeployer:
         # A token scoped to a team is refused without the team; accept its id (team_…) or its slug.
         team = settings.vercel_team_id.strip()
         self.params = ({"teamId": team} if team.startswith("team_") else {"slug": team}) if team else {}
+        self._public: set[str] = set()
         self.client = httpx.AsyncClient(
             base_url=self.API, timeout=120,
             headers={"Authorization": f"Bearer {settings.vercel_token}"},
@@ -65,7 +66,19 @@ class VercelDeployer:
         r = await self.client.post("/v13/deployments", params=self.params | {"skipAutoDetectionConfirmation": "1"}, json=body)
         if r.status_code >= 400:
             raise DeployError(f"Vercel {r.status_code}: {r.text[:500]}")
+        await self._make_public(project)
         return await self._wait(r.json()["id"])
+
+    async def _make_public(self, project: str) -> None:
+        """New Vercel projects hide previews behind a Vercel login; the client must see staging."""
+        if project in self._public:
+            return
+        try:
+            r = await self.client.patch(f"/v9/projects/{project}", params=self.params, json={"ssoProtection": None})
+            if r.status_code < 400:
+                self._public.add(project)
+        except httpx.HTTPError:
+            pass  # the deployment itself is fine; the next deploy tries again
 
     async def _wait(self, deployment_id: str, timeout_sec: int = 1200) -> Deployment:
         waited = 0
