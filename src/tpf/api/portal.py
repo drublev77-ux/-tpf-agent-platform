@@ -28,7 +28,7 @@ router = APIRouter(include_in_schema=False)
 
 T: dict[str, dict[str, str]] = {
     "ru": {
-        "source": "Исходный код", "zip": "Скачать ZIP", "gh_label": "Ваше имя пользователя на GitHub — пригласим в приватный репозиторий", "gh_btn": "Получить доступ", "title": "Заказ №{id}", "status": "Статус", "conversation": "Переписка", "you": "Вы", "studio": "TPF Technology",
+        "missing": "Нужно от вас — пока на сайте заглушки", "source": "Исходный код", "zip": "Скачать ZIP", "gh_label": "Ваше имя пользователя на GitHub — пригласим в приватный репозиторий", "gh_btn": "Получить доступ", "title": "Заказ №{id}", "status": "Статус", "conversation": "Переписка", "you": "Вы", "studio": "TPF Technology",
         "spec": "Техническое задание", "pages": "Страницы", "criteria": "Критерии приёмки", "estimate": "Смета",
         "hours": "Трудоёмкость", "price": "Стоимость", "duration": "Срок", "days": "дн.", "h": "ч",
         "pay_pre": "Предоплата", "pay_final": "Остаток перед запуском", "paid": "оплачено", "pay_now": "Оплатить",
@@ -39,7 +39,7 @@ T: dict[str, dict[str, str]] = {
         "err": "Не получилось: {why}", "open_link": "Открыть",
     },
     "en": {
-        "source": "Source code", "zip": "Download ZIP", "gh_label": "Your GitHub username — we will invite you to the private repository", "gh_btn": "Get access", "title": "Order #{id}", "status": "Status", "conversation": "Conversation", "you": "You", "studio": "TPF Technology",
+        "missing": "Needed from you — the site shows placeholders for now", "source": "Source code", "zip": "Download ZIP", "gh_label": "Your GitHub username — we will invite you to the private repository", "gh_btn": "Get access", "title": "Order #{id}", "status": "Status", "conversation": "Conversation", "you": "You", "studio": "TPF Technology",
         "spec": "Specification", "pages": "Pages", "criteria": "Acceptance criteria", "estimate": "Estimate",
         "hours": "Effort", "price": "Price", "duration": "Timeline", "days": "days", "h": "h",
         "pay_pre": "Deposit", "pay_final": "Balance before release", "paid": "paid", "pay_now": "Pay now",
@@ -50,7 +50,7 @@ T: dict[str, dict[str, str]] = {
         "err": "Could not do that: {why}", "open_link": "Open",
     },
     "zh": {
-        "source": "源代码", "zip": "下载 ZIP", "gh_label": "您的 GitHub 用户名——我们将邀请您加入私有仓库", "gh_btn": "获取访问权限", "title": "订单 #{id}", "status": "状态", "conversation": "沟通记录", "you": "您", "studio": "TPF Technology",
+        "missing": "需要您提供——网站目前显示占位符", "source": "源代码", "zip": "下载 ZIP", "gh_label": "您的 GitHub 用户名——我们将邀请您加入私有仓库", "gh_btn": "获取访问权限", "title": "订单 #{id}", "status": "状态", "conversation": "沟通记录", "you": "您", "studio": "TPF Technology",
         "spec": "需求规格书", "pages": "页面", "criteria": "验收标准", "estimate": "报价",
         "hours": "工作量", "price": "价格", "duration": "工期", "days": "天", "h": "小时",
         "pay_pre": "预付款", "pay_final": "上线前尾款", "paid": "已付", "pay_now": "立即付款",
@@ -214,9 +214,11 @@ async def portal(order_id: int, request: Request, t: str = "", done: str = "", e
     if spec:
         pages = "".join(f'<li><b>{escape(p.get("name", ""))}</b> — {escape(p.get("purpose", ""))}</li>' for p in spec.get("pages", []))
         crit = "".join(f"<li>{escape(c)}</li>" for c in spec.get("acceptance_criteria", []))
+        miss = "".join(f"<li>{escape(c)}</li>" for c in spec.get("missing_content", []))
         parts.append(f'<section><h2>{tr["spec"]}: {escape(spec.get("title", ""))}</h2><p>{escape(spec.get("summary", ""))}</p>'
                      + (f'<h3 class="muted">{tr["pages"]}</h3><ul>{pages}</ul>' if pages else "")
-                     + (f'<h3 class="muted">{tr["criteria"]}</h3><ul>{crit}</ul>' if crit else "") + "</section>")
+                     + (f'<h3 class="muted">{tr["criteria"]}</h3><ul>{crit}</ul>' if crit else "")
+                     + (f'<h3 style="color:var(--warn)">{tr["missing"]}</h3><ul>{miss}</ul>' if miss else "") + "</section>")
 
     # --- conversation ---
     if messages:

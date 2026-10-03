@@ -100,11 +100,17 @@ async def run(ctx: Ctx) -> Outcome:
             artifact=_code_digest(files),
             criteria=[
                 *spec.get("acceptance_criteria", []),
+                "No invented business facts: every phone, e-mail, address, opening hours, price, menu or product item "
+                "and person's name on the site is copied from the spec's client_content; anything else is a visible "
+                "placeholder in square brackets",
                 "Implements every route and section in the architecture",
-                "No invented client facts (prices, contacts, reviews); placeholders are used instead",
                 "Accessible: semantic HTML, alt text on images, labels on form fields",
             ],
-            context=f"Architecture:\n{json.dumps(arch, ensure_ascii=False)}",
+            context=(f"Architecture:\n{json.dumps(arch, ensure_ascii=False)}\n\n"
+                     f"Spec client_content (the only facts the client gave):\n"
+                     f"{json.dumps(spec.get('client_content', []), ensure_ascii=False)}\n"
+                     f"Spec missing_content (must be placeholders):\n"
+                     f"{json.dumps(spec.get('missing_content', []), ensure_ascii=False)}"),
         )
         report["acceptance"] = {"ok": verdict["approved"], "issues": verdict["issues"]}
     else:

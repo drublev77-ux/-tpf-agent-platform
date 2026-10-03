@@ -41,13 +41,23 @@ SCHEMA = {
                 "features": {"type": "array", "items": {"type": "string"}},
                 "languages": {"type": "array", "items": {"type": "string"}},
                 "assumptions": {"type": "array", "items": {"type": "string"}},
+                "client_content": {
+                    "type": "array", "items": {"type": "string"},
+                    "description": "Every publishable fact the client actually gave, verbatim: business name, phone, e-mail, "
+                                   "address, opening hours, prices, menu or product items, people's names, links. Nothing invented.",
+                },
+                "missing_content": {
+                    "type": "array", "items": {"type": "string"},
+                    "description": "Facts the site needs but the client has not given (e.g. 'phone number', 'prices'), in the "
+                                   "client's language. The site will show a bracketed placeholder for each.",
+                },
                 "out_of_scope": {"type": "array", "items": {"type": "string"}},
                 "acceptance_criteria": {
                     "type": "array", "items": {"type": "string"},
                     "description": "Checkable statements, each verifiable by looking at the site",
                 },
             },
-            "required": ["title", "summary", "pages", "features", "acceptance_criteria"],
+            "required": ["title", "summary", "pages", "features", "acceptance_criteria", "client_content", "missing_content"],
         },
         "estimate": {
             "type": "object",
@@ -70,7 +80,14 @@ SYSTEM = (
     "The pilot builds websites and landing pages only: a static Next.js site with no backend, no user "
     "accounts and no payments. Read the client's request and conversation and produce a precise spec and "
     "an effort estimate in hours. Ask the client questions only when an answer would change the pages, "
-    "features or price; otherwise make a reasonable assumption and list it. Write the spec and questions "
+    "features or price; otherwise make a reasonable assumption and list it. "
+    "One thing you never assume is the client's own facts. Anything that will be published as a fact about "
+    "the business — its name, phone, e-mail, address, opening hours, prices, menu or product items, people's "
+    "names, social links, legal details — must come from the client. If the site needs such facts and the "
+    "client has not given them, ask for all of them in one short list of questions before writing the spec. "
+    "When you do write the spec, copy the facts the client gave into client_content verbatim and list every "
+    "fact still missing in missing_content; the site will show a visible placeholder for those. Design choices "
+    "(palette, layout, wording of headings) are yours to assume. Write the spec and questions "
     "in the client's language. Estimate honestly: include design, content layout, responsive checks and "
     "deployment. " + SAFETY_NOTE
 )
@@ -80,6 +97,7 @@ REVIEW_CRITERIA = [
     "The spec fits the pilot: static website, no backend, no accounts, no payments",
     "Acceptance criteria are specific and checkable by looking at the site",
     "Assumptions are stated where the client did not decide",
+    "client_content contains only facts found in the client conversation; every other fact the site needs is in missing_content",
     "The estimate covers every page and feature and its hours are plausible for the scope",
 ]
 
