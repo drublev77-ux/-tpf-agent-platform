@@ -183,7 +183,7 @@ async def run(ctx: Ctx) -> Outcome:
         )
         out: dict[str, Any] = await ctx.llm.structured(
             order_id=ctx.order_id, agent="analyst", model_class="strong",
-            system=system_prompt(ctx.tenant_db is not None), prompt=prompt, schema=SCHEMA, max_tokens=8000,
+            system=system_prompt(ctx.tenant_db is not None), prompt=prompt, schema=SCHEMA, max_tokens=16000,
         )
 
         if not out.get("in_pilot_scope", False):

@@ -123,7 +123,7 @@ async def run(ctx: Ctx) -> Outcome:
         prompt = base + ("\n\nFix these reviewer issues:\n" + "\n".join(f"- {i}" for i in issues) if issues else "")
         arch: dict[str, Any] = await ctx.llm.structured(
             order_id=ctx.order_id, agent="architect", model_class="strong",
-            system=system, prompt=prompt, schema=SCHEMA, max_tokens=8000,
+            system=system, prompt=prompt, schema=SCHEMA, max_tokens=24000 if has_database(kind) else 8000,
         )
         verdict = await review(
             ctx, author="architect", artifact_name="architecture", artifact=arch,

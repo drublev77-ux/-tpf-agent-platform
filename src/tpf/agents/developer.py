@@ -123,7 +123,7 @@ async def run(ctx: Ctx) -> Outcome:
             order_id=ctx.order_id, agent="developer", model_class="code",
             system=system,
             prompt=prompt + ("\n\nYour previous output was rejected by static checks:\n" + "\n".join(problems) if problems else ""),
-            schema=SCHEMA, max_tokens=48000 if has_database(kind) else 32000,
+            schema=SCHEMA, max_tokens={"bot": 64000, "app": 48000}.get(kind, 32000),
         )
         problems = check_files(out["files"], routes, kind)
         if not problems:
