@@ -125,7 +125,10 @@ async def main() -> None:
     )
     if settings.payment_provider == "stripe":
         try:
-            log.info("stripe: %s", await ensure_stripe_webhook(settings, pool))
+            # Two workers starting together (a redeploy) must not each create an endpoint: take turns.
+            async with pool.acquire() as conn, conn.transaction():
+                await conn.execute("SELECT pg_advisory_xact_lock(770101)")
+                log.info("stripe: %s", await ensure_stripe_webhook(settings, pool))
         except Exception:  # payments stay requestable; the webhook can be fixed without stopping agents
             log.exception("stripe: could not provision the webhook endpoint")
     loop = asyncio.get_running_loop()

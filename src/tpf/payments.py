@@ -159,7 +159,10 @@ async def ensure_stripe_webhook(settings: Settings, pool: Any, client: httpx.Asy
         ours += [e for e in endpoints if e["id"] == stored_id and e.get("url") != url]
         keep = next((e for e in ours if e["id"] == stored_id and e.get("url") == url and stored_secret), None)
         if keep and set(WEBHOOK_EVENTS) <= set(keep.get("enabled_events", [])) and keep.get("status") == "enabled":
-            return info | {"webhook": "ok", "endpoint": keep["id"]}
+            extra = [e["id"] for e in ours if e["id"] != keep["id"]]
+            for eid in extra:  # leftovers: an old address, or a twin made by a worker that started at the same moment
+                await client.delete(f"/webhook_endpoints/{eid}")
+            return info | {"webhook": "ok", "endpoint": keep["id"]} | ({"removed": extra} if extra else {})
 
         for e in ours:  # endpoints for our URL whose secret we cannot know
             await client.delete(f"/webhook_endpoints/{e['id']}")
