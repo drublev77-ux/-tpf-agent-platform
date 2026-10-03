@@ -188,3 +188,37 @@ async def test_worker_provisions_the_stripe_webhook_once(env):
 
     second = await ensure_stripe_webhook(env.settings, env.pool, client)   # restart: nothing to do
     assert second["webhook"] == "ok" and deleted == ["we_old"]
+
+
+async def test_webhook_moves_with_the_domain(env):
+    import httpx
+    from tpf.payments import ensure_stripe_webhook, webhook_secret
+
+    env.settings.stripe_secret_key = "sk_test_123"
+    endpoints: dict[str, dict] = {"we_other": {"id": "we_other", "url": "https://someone-else.example/hook", "enabled_events": ["*"], "status": "enabled"}}
+    n = {"i": 0}
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.path == "/v1/account":
+            return httpx.Response(200, json={"id": "acct_1"})
+        if req.method == "GET":
+            return httpx.Response(200, json={"data": list(endpoints.values())})
+        if req.method == "DELETE":
+            endpoints.pop(req.url.path.rsplit("/", 1)[-1], None)
+            return httpx.Response(200, json={"deleted": True})
+        n["i"] += 1
+        form = httpx.QueryParams(req.content.decode())
+        ep = {"id": f"we_{n['i']}", "url": form["url"], "enabled_events": form.get_list("enabled_events[]"), "status": "enabled"}
+        endpoints[ep["id"]] = ep
+        return httpx.Response(200, json=ep | {"secret": f"whsec_{n['i']}"})
+
+    client = httpx.AsyncClient(base_url="https://api.stripe.com/v1", transport=httpx.MockTransport(handler))
+    env.settings.public_base_url = "https://old.example.com"
+    await ensure_stripe_webhook(env.settings, env.pool, client)
+    env.settings.public_base_url = "https://new.example.com"
+    moved = await ensure_stripe_webhook(env.settings, env.pool, client)
+    assert moved["webhook"] == "created" and moved["replaced"] == ["we_1"]
+    assert sorted(endpoints) == ["we_2", "we_other"]                      # ours moved; a stranger's endpoint is untouched
+    assert endpoints["we_2"]["url"] == "https://new.example.com/webhooks/stripe"
+    assert await webhook_secret(env.settings, env.pool) == "whsec_2"
+    assert (await ensure_stripe_webhook(env.settings, env.pool, client))["webhook"] == "ok"
