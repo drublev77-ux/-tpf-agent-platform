@@ -153,7 +153,10 @@ async def ensure_stripe_webhook(settings: Settings, pool: Any, client: httpx.Asy
         r = await client.get("/webhook_endpoints", params={"limit": 100})
         if r.status_code >= 400:
             raise PaymentError(f"Stripe {r.status_code}: {r.text[:300]}")
-        ours = [e for e in r.json().get("data", []) if e.get("url") == url]
+        endpoints = r.json().get("data", [])
+        ours = [e for e in endpoints if e.get("url") == url]
+        # The endpoint this platform created earlier under another address (the domain changed) goes too.
+        ours += [e for e in endpoints if e["id"] == stored_id and e.get("url") != url]
         keep = next((e for e in ours if e["id"] == stored_id and stored_secret), None)
         if keep and set(WEBHOOK_EVENTS) <= set(keep.get("enabled_events", [])) and keep.get("status") == "enabled":
             return info | {"webhook": "ok", "endpoint": keep["id"]}
