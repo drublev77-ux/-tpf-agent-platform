@@ -7,21 +7,28 @@ for changes. Server-rendered HTML, no JavaScript, in the client's language (ru /
 from __future__ import annotations
 
 import hmac
+import io
+import re
+import zipfile
 from html import escape
 from typing import Any
 from urllib.parse import parse_qs, quote
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from tpf.notifications import portal_url  # noqa: F401  (re-exported)
+import asyncpg
+
+from tpf.orchestrator import queue
 from tpf.orchestrator.states import Ev, State, TransitionError
+from tpf.tools.template import all_files
 
 router = APIRouter(include_in_schema=False)
 
 T: dict[str, dict[str, str]] = {
     "ru": {
-        "title": "Заказ №{id}", "status": "Статус", "conversation": "Переписка", "you": "Вы", "studio": "TPF Technology",
+        "source": "Исходный код", "zip": "Скачать ZIP", "gh_label": "Ваше имя пользователя на GitHub — пригласим в приватный репозиторий", "gh_btn": "Получить доступ", "title": "Заказ №{id}", "status": "Статус", "conversation": "Переписка", "you": "Вы", "studio": "TPF Technology",
         "spec": "Техническое задание", "pages": "Страницы", "criteria": "Критерии приёмки", "estimate": "Смета",
         "hours": "Трудоёмкость", "price": "Стоимость", "duration": "Срок", "days": "дн.", "h": "ч",
         "pay_pre": "Предоплата", "pay_final": "Остаток перед запуском", "paid": "оплачено", "pay_now": "Оплатить",
@@ -32,7 +39,7 @@ T: dict[str, dict[str, str]] = {
         "err": "Не получилось: {why}", "open_link": "Открыть",
     },
     "en": {
-        "title": "Order #{id}", "status": "Status", "conversation": "Conversation", "you": "You", "studio": "TPF Technology",
+        "source": "Source code", "zip": "Download ZIP", "gh_label": "Your GitHub username — we will invite you to the private repository", "gh_btn": "Get access", "title": "Order #{id}", "status": "Status", "conversation": "Conversation", "you": "You", "studio": "TPF Technology",
         "spec": "Specification", "pages": "Pages", "criteria": "Acceptance criteria", "estimate": "Estimate",
         "hours": "Effort", "price": "Price", "duration": "Timeline", "days": "days", "h": "h",
         "pay_pre": "Deposit", "pay_final": "Balance before release", "paid": "paid", "pay_now": "Pay now",
@@ -43,7 +50,7 @@ T: dict[str, dict[str, str]] = {
         "err": "Could not do that: {why}", "open_link": "Open",
     },
     "zh": {
-        "title": "订单 #{id}", "status": "状态", "conversation": "沟通记录", "you": "您", "studio": "TPF Technology",
+        "source": "源代码", "zip": "下载 ZIP", "gh_label": "您的 GitHub 用户名——我们将邀请您加入私有仓库", "gh_btn": "获取访问权限", "title": "订单 #{id}", "status": "状态", "conversation": "沟通记录", "you": "您", "studio": "TPF Technology",
         "spec": "需求规格书", "pages": "页面", "criteria": "验收标准", "estimate": "报价",
         "hours": "工作量", "price": "价格", "duration": "工期", "days": "天", "h": "小时",
         "pay_pre": "预付款", "pay_final": "上线前尾款", "paid": "已付", "pay_now": "立即付款",
@@ -78,12 +85,22 @@ STATUS: dict[str, dict[str, str]] = {
 
 DONE = {
     "ru": {"message": "ответ отправлен", "approved": "смета утверждена", "rejected": "замечания по смете отправлены",
-           "accepted": "работа принята", "changes": "правки отправлены"},
+           "accepted": "работа принята", "changes": "правки отправлены", "repo": "запрос отправлен, приглашение придёт от GitHub"},
     "en": {"message": "reply sent", "approved": "estimate approved", "rejected": "estimate comments sent",
-           "accepted": "work accepted", "changes": "change request sent"},
+           "accepted": "work accepted", "changes": "change request sent", "repo": "request sent, GitHub will deliver the invitation"},
     "zh": {"message": "回复已发送", "approved": "报价已确认", "rejected": "报价意见已发送",
-           "accepted": "已验收", "changes": "修改意见已发送"},
+           "accepted": "已验收", "changes": "修改意见已发送", "repo": "请求已发送，GitHub 将发出邀请"},
 }
+
+ERR = {
+    "ru": {"state": "сейчас это действие недоступно", "comment": "напишите, что нужно изменить", "empty": "пустое сообщение",
+           "gh": "имя пользователя GitHub указано неверно", "busy": "предыдущий запрос ещё выполняется"},
+    "en": {"state": "this action is not available right now", "comment": "please tell us what to change", "empty": "the message is empty",
+           "gh": "that GitHub username is not valid", "busy": "the previous request is still running"},
+    "zh": {"state": "当前无法执行此操作", "comment": "请说明需要修改的内容", "empty": "消息为空",
+           "gh": "GitHub 用户名无效", "busy": "上一个请求仍在处理中"},
+}
+GH_USER = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$")
 
 CSS = """
 :root{--bg:#07090C;--card:#0B0F14;--line:#1C2630;--ink:#E6EDF2;--muted:#9AA7B2;--accent:#5CE1F0;--accent-ink:#04161A;--ok:#7CF5C4;--warn:#FFB35C}
@@ -97,7 +114,7 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0}dt{color:va
 ul{margin:6px 0 0;padding-left:20px}.muted{color:var(--muted)}
 .btn{display:inline-block;min-height:44px;padding:11px 20px;border-radius:999px;border:0;background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:700;text-decoration:none;cursor:pointer}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}.btn:focus-visible,textarea:focus-visible{outline:2px solid var(--ok);outline-offset:2px}
-form{margin-top:12px}textarea{width:100%;min-height:96px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+form{margin-top:12px}input[type=text],input:not([type]){width:100%;height:48px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}textarea{width:100%;min-height:96px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
 label{display:block;font-size:14px;color:var(--muted);margin-bottom:6px}.row{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
 .notice{border-color:var(--ok)}.error{border-color:var(--warn)}a{color:var(--accent)}
 """
@@ -139,7 +156,7 @@ async def portal(order_id: int, request: Request, t: str = "", done: str = "", e
     if done:
         parts.append(f'<section class="notice" role="status">{escape(tr["done"].format(what=DONE[lang].get(done, done)))}</section>')
     if err:
-        parts.append(f'<section class="error" role="alert">{escape(tr["err"].format(why=err))}</section>')
+        parts.append(f'<section class="error" role="alert">{escape(tr["err"].format(why=ERR[lang].get(err, err)))}</section>')
 
     # --- what the client can do right now ---
     if st == State.AWAITING_CLIENT_INFO:
@@ -169,6 +186,16 @@ async def portal(order_id: int, request: Request, t: str = "", done: str = "", e
             + "</section>")
     if order["production_url"]:
         parts.append(f'<section><h2>{tr["live"]}</h2><a href="{escape(order["production_url"])}">{escape(order["production_url"])}</a></section>')
+
+    if st == State.DELIVERED and await o.latest_artifact(order_id, "code"):
+        published = await o.pool.fetchval(
+            "SELECT 1 FROM events WHERE order_id = $1 AND name = 'code_published' LIMIT 1", order_id)
+        gh = _form(f"{base}/repo-access", t,
+                   f'<label for="gh">{tr["gh_label"]}</label><input id="gh" name="username" required maxlength="39" '
+                   f'autocapitalize="none" autocomplete="username" spellcheck="false">'
+                   f'<div class="row"><button class="btn ghost">{tr["gh_btn"]}</button></div>') if published else ""
+        parts.append(f'<section><h2>{tr["source"]}</h2>'
+                     f'<a class="btn" href="{base}/source.zip?t={quote(t)}">{tr["zip"]}</a>{gh}</section>')
 
     # --- estimate and payments ---
     if estimate:
@@ -264,3 +291,37 @@ async def portal_acceptance(order_id: int, request: Request) -> RedirectResponse
         return _back(order_id, form["t"], err="comment")
     return await _act(request, order_id, form["t"], Ev.ACCEPTED if approved else Ev.CHANGES_REQUESTED,
                       "accepted" if approved else "changes", comment)
+
+
+@router.get("/portal/{order_id}/source.zip")
+async def portal_source(order_id: int, request: Request, t: str = "") -> Response:
+    """The delivered order's full source as a ZIP: the client owns the code, GitHub account or not."""
+    order = await _load(request, order_id, t)
+    code = await request.app.state.orch.latest_artifact(order_id, "code")
+    if order["state"] != State.DELIVERED or not code:
+        raise HTTPException(404, "not found")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for f in all_files(code["files"]):
+            z.writestr(f"tpf-order-{order_id}/{f['path'].lstrip('/')}", f["content"])
+    return Response(buf.getvalue(), media_type="application/zip", headers={
+        "Content-Disposition": f'attachment; filename="tpf-order-{order_id}.zip"', "Cache-Control": "no-store"})
+
+
+@router.post("/portal/{order_id}/repo-access")
+async def portal_repo_access(order_id: int, request: Request) -> RedirectResponse:
+    form = await _form_data(request)
+    order = await _load(request, order_id, form.get("t", ""))
+    username = form.get("username", "").strip().lstrip("@")
+    if order["state"] != State.DELIVERED:
+        return _back(order_id, form["t"], err="state")
+    if not GH_USER.match(username):
+        return _back(order_id, form["t"], err="gh")
+    o = request.app.state.orch
+    try:
+        async with o.pool.acquire() as conn:
+            await queue.enqueue(conn, order_id, "grant_repo_access", {"username": username})
+    except asyncpg.UniqueViolationError:  # one live task per order: the previous request is still in the queue
+        return _back(order_id, form["t"], err="busy")
+    await o.log(order_id, "repo_access_requested", "client", {"username": username}, kind="client")
+    return _back(order_id, form["t"], done="repo")

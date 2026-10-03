@@ -34,6 +34,7 @@ class Ctx:
     github: GitHubPublisher | None
     order: dict[str, Any]
     payments: Any = None  # tpf.payments.PaymentGateway, or None for manual invoicing
+    payload: dict[str, Any] = field(default_factory=dict)  # the task's own input
 
     @property
     def order_id(self) -> int:

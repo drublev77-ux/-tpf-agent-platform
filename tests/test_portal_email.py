@@ -123,3 +123,74 @@ def test_notifier_selection_and_links():
     assert not isinstance(make_notifier(_settings(email_provider="off")), EmailNotifier)
     html = email_html("Смотрите https://x.vercel.app\nспасибо", "zh", "https://p/1?t=a")
     assert '<a href="https://x.vercel.app"' in html and "查看订单" in html and "<br>" in html
+
+
+# --- source code handover ------------------------------------------------------------------------
+
+class FakeGitHub:
+    owner = "acme"
+
+    def __init__(self) -> None:
+        self.invited: list[tuple[str, str]] = []
+
+    async def publish(self, repo, files, message):
+        return f"https://github.com/{self.owner}/{repo}"
+
+    async def invite(self, repo, username):
+        if username == "ghost-user":
+            raise LookupError(username)
+        self.invited.append((repo, username))
+        return "invited"
+
+
+async def test_client_gets_repo_access_without_moving_the_order(env):
+    from tpf.orchestrator import queue
+    from tpf.orchestrator.states import Ev, State
+    from test_pipeline import new_order, state
+
+    env.worker.github = FakeGitHub()
+    oid, _ = await new_order(env)
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    await env.orch.fire(oid, Ev.ACCEPTED, actor="client")
+    await env.drain()
+    assert await state(env, oid) is State.DELIVERED
+
+    for user in ("anna-dev", "ghost-user"):
+        async with env.pool.acquire() as conn:
+            await queue.enqueue(conn, oid, "grant_repo_access", {"username": user})
+        await env.drain()
+    assert env.worker.github.invited == [(f"tpf-order-{oid}", "anna-dev")]
+    assert await state(env, oid) is State.DELIVERED
+    out = [m["text"] for m in await env.orch.messages(oid) if m["direction"] == "out"]
+    assert "anna-dev" in out[-2] and f"github.com/acme/tpf-order-{oid}" in out[-2]
+    assert "ghost-user" in out[-1] and "Не нашли" in out[-1]
+    assert await env.pool.fetchval("SELECT count(*) FROM tasks WHERE order_id=$1 AND status IN ('queued','running')", oid) == 0
+
+
+def test_portal_source_zip_and_repo_request(client):
+    import io, zipfile
+    from tpf.api.main import app
+    oid, token = _order(client)
+    orch = app.state.orch
+    assert client.get(f"/portal/{oid}/source.zip", params={"t": token}).status_code == 404     # nothing delivered yet
+    client.portal.call(orch.pool.execute, "UPDATE tasks SET status='done' WHERE order_id=$1", oid)
+    client.portal.call(orch.save_artifact, oid, "code", {"files": [{"path": "app/page.tsx", "content": "export default 1"}]}, "developer")
+    client.portal.call(orch.pool.execute, "UPDATE orders SET state='delivered' WHERE id=$1", oid)
+    client.portal.call(orch.log, oid, "code_published", "devops", {"repo": "x"})
+
+    page = client.get(f"/portal/{oid}", params={"t": token}).text
+    assert "source.zip" in page and 'name="username"' in page
+    assert client.get(f"/portal/{oid}/source.zip", params={"t": "wrong"}).status_code == 404
+    z = zipfile.ZipFile(io.BytesIO(client.get(f"/portal/{oid}/source.zip", params={"t": token}).content))
+    assert f"tpf-order-{oid}/app/page.tsx" in z.namelist() and f"tpf-order-{oid}/package.json" in z.namelist()
+
+    bad = client.post(f"/portal/{oid}/repo-access", data={"t": token, "username": "not a name!"}, follow_redirects=False)
+    assert "err=gh" in bad.headers["location"]
+    ok = client.post(f"/portal/{oid}/repo-access", data={"t": token, "username": "@anna-dev"}, follow_redirects=False)
+    assert "done=repo" in ok.headers["location"]
+    task = client.portal.call(orch.pool.fetchrow, "SELECT kind, payload FROM tasks WHERE order_id=$1 AND status='queued'", oid)
+    assert (task["kind"], task["payload"]) == ("grant_repo_access", {"username": "anna-dev"})
+    again = client.post(f"/portal/{oid}/repo-access", data={"t": token, "username": "anna-dev"}, follow_redirects=False)
+    assert "err=busy" in again.headers["location"]

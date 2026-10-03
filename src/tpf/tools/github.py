@@ -44,3 +44,16 @@ class GitHubPublisher:
                 if not res.ok:
                     raise RuntimeError(f"{cmd[1]} failed: {res.output.replace(self.token, '***')[-500:]}")
         return f"https://github.com/{self.owner}/{repo}"
+
+    async def invite(self, repo: str, username: str) -> str:
+        """Give a GitHub user read access to an order's repository. Returns "invited" or "already"."""
+        headers = {"Authorization": f"Bearer {self.token}", "Accept": "application/vnd.github+json"}
+        async with httpx.AsyncClient(base_url=self.API, headers=headers, timeout=30) as gh:
+            r = await gh.put(f"/repos/{self.owner}/{repo}/collaborators/{username}", json={"permission": "pull"})
+        if r.status_code == 201:
+            return "invited"
+        if r.status_code == 204:
+            return "already"
+        if r.status_code == 404:
+            raise LookupError(f"GitHub user or repository not found: {username}")
+        raise RuntimeError(f"GitHub {r.status_code}: {r.text[:300]}")

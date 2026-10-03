@@ -9,7 +9,7 @@ import sys
 
 import asyncpg
 
-from tpf.agents import HANDLERS
+from tpf.agents import HANDLERS, SIDE_TASKS
 from tpf.agents.base import Ctx
 from tpf.config import Settings, get_settings
 from tpf.db import create_pool
@@ -45,14 +45,14 @@ class Worker:
             return False
         order = await self.orch.get_order(task["order_id"])
         expected = STATE_FOR_TASK.get(task["kind"])
-        if expected is None or order["state"] != expected:
+        if task["kind"] not in SIDE_TASKS and (expected is None or order["state"] != expected):
             async with self.pool.acquire() as conn:
                 await queue.mark_failed(conn, task["id"], f"stale task: order is {order['state']}")
             return True
 
         handler = HANDLERS[task["kind"]]
         ctx = Ctx(self.orch, self.llm, self.settings, self.sandbox, self.deployer, self.github, order,
-                  payments=self.payments)
+                  payments=self.payments, payload=task["payload"] or {})
         await self.orch.log(order["id"], "task_started", task["kind"], {"task": task["id"], "attempt": task["attempts"]})
         try:
             outcome = await handler(ctx)
