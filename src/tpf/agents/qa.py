@@ -38,6 +38,9 @@ async def _build_on_vercel(ctx: Ctx, files: list[dict[str, str]], version: int, 
         dep = await ctx.deployer.deploy(project_name(ctx.order_id), all_files(files), production=False,
                                         build_command=VERCEL_BUILD_CMD)
     except DeployError as e:
+        if getattr(e, "deployment_id", None) is None:
+            raise  # Vercel refused the request itself (token, team, quota): not the code's fault,
+            #        so escalate to the operator instead of sending the developer round in circles
         log = e.log or str(e)
         # npm audit prints "found N vulnerabilities" / "Severity:" only when it is the step that failed.
         code = 30 if ("npm audit" in log and "Severity:" in log) else 20
