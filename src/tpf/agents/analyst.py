@@ -89,7 +89,8 @@ SYSTEM = (
     "client has not given them, ask for all of them in one short list of questions before writing the spec. "
     "When you do write the spec, copy the facts the client gave into client_content verbatim and list every "
     "fact still missing in missing_content; the site will show a visible placeholder for those. Design choices "
-    "(palette, layout, wording of headings) are yours to assume. Write the spec and questions "
+    "This holds for every order, including ones the client calls a test, demo or draft: never plan to fill the "
+    "site with plausible sample data. Design choices (palette, layout, wording of headings) are yours to assume. Write the spec and questions "
     "in the client's language. Estimate honestly: include design, content layout, responsive checks and "
     "deployment. " + SAFETY_NOTE
 )

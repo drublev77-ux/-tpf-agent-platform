@@ -37,6 +37,24 @@ class LLMGateway(Protocol):
     ) -> dict[str, Any]: ...
 
 
+def missing_required(schema: dict[str, Any], value: Any, path: str = "") -> list[str]:
+    """Paths of the fields a JSON schema marks as required that `value` does not have."""
+    out: list[str] = []
+    if schema.get("type") == "object" and isinstance(value, dict):
+        for key in schema.get("required", []):
+            if key not in value or value[key] is None:
+                out.append(f"{path}{key}")
+        for key, sub in schema.get("properties", {}).items():
+            if key in value and value[key] is not None:
+                out += missing_required(sub, value[key], f"{path}{key}.")
+    elif schema.get("type") == "array" and isinstance(value, list) and isinstance(schema.get("items"), dict):
+        for i, item in enumerate(value[:200]):
+            out += missing_required(schema["items"], item, f"{path}{i}.")
+    elif schema.get("type") == "object" and path:
+        out.append(path.rstrip("."))  # an object was expected here
+    return out
+
+
 class Budget:
     """Token accounting per order, stored on the order row."""
 
@@ -114,19 +132,32 @@ class AnthropicGateway:
             }],
             "tool_choice": {"type": "auto"},
         }
-        for attempt in range(2):
+        problem = "model returned no submit call"
+        for attempt in range(3):
             data = await self._post(body)
             usage = data.get("usage", {})
             await self.budget.record(order_id, agent, model, usage.get("input_tokens", 0), usage.get("output_tokens", 0))
             if data.get("stop_reason") == "max_tokens":
                 raise LLMError(f"{agent}: output hit max_tokens={max_tokens}")
-            for block in data.get("content", []):
-                if block.get("type") == "tool_use" and block.get("name") == "submit":
-                    return block["input"]
-            if attempt == 0:
-                messages.append({"role": "assistant", "content": data.get("content") or [{"type": "text", "text": "(no output)"}]})
+            call = next((b for b in data.get("content", []) if b.get("type") == "tool_use" and b.get("name") == "submit"), None)
+            if call is not None:
+                # Without a forced tool call the API does not hold the model to the schema's required
+                # fields, so they are checked here and the model is sent back for whatever is missing.
+                missing = missing_required(schema, call["input"])
+                if not missing:
+                    return call["input"]
+                problem = "submit call is missing required fields: " + ", ".join(missing[:20])
+            if attempt == 2:
+                break
+            messages.append({"role": "assistant", "content": data.get("content") or [{"type": "text", "text": "(no output)"}]})
+            if call is None:
                 messages.append({"role": "user", "content": "Call the `submit` tool now with the complete result."})
-        raise LLMError(f"{agent}: model returned no submit call")
+            else:
+                results = [{"type": "tool_result", "tool_use_id": b["id"], "is_error": True,
+                            "content": f"Rejected: {problem}. Call `submit` again with the complete result, every required field filled."}
+                           for b in data["content"] if b.get("type") == "tool_use"]
+                messages.append({"role": "user", "content": results})
+        raise LLMError(f"{agent}: {problem}")
 
     async def _post(self, body: dict[str, Any]) -> dict[str, Any]:
         delay = 2.0
