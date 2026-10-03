@@ -77,6 +77,16 @@ class FakeDeployer:
         self.deploys: list[tuple[str, bool, int]] = []
         self.build_commands: list[str | None] = []
         self.failures: list[DeployError] = []
+        self.env: dict[str, dict[str, str]] = {}
+        self.health_problems: list[str | None] = []
+        self.health_checks: list[str] = []
+
+    async def set_env(self, project, env):
+        self.env.setdefault(project, {}).update(env)
+
+    async def health(self, url, path="/api/tpf-health"):
+        self.health_checks.append(url)
+        return self.health_problems.pop(0) if self.health_problems else None
 
     async def deploy(self, project, files, production, build_command=None):
         self.deploys.append((project, production, len(files)))

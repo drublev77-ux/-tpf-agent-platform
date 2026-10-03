@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     github_token: str = ""
     github_owner: str = ""
 
+    # Web applications: a separate Postgres where each order gets its own schema and role. Empty = sites only.
+    tenant_database_url: str = ""
+
     # Notifications
     notifier: str = "log"  # log | webhook
     notify_webhook_url: str = ""

@@ -23,13 +23,13 @@ import asyncpg
 from tpf.orchestrator import queue
 from tpf.orchestrator.states import Ev, State, TransitionError
 from tpf.config import get_settings
-from tpf.tools.template import all_files, form_endpoint
+from tpf.tools.template import all_files, form_endpoint, kind_of
 
 router = APIRouter(include_in_schema=False)
 
 T: dict[str, dict[str, str]] = {
     "ru": {
-        "inbox": "Сообщения с формы вашего сайта", "inbox_note": "Каждое сообщение мы также пересылаем вам на почту. Здесь последние 50.", "missing": "Нужно от вас — пока на сайте заглушки", "source": "Исходный код", "zip": "Скачать ZIP", "gh_label": "Ваше имя пользователя на GitHub — пригласим в приватный репозиторий", "gh_btn": "Получить доступ", "title": "Заказ №{id}", "status": "Статус", "conversation": "Переписка", "you": "Вы", "studio": "TPF Technology",
+        "admin": "Панель управления", "admin_note": "Здесь вы сами добавляете и меняете данные приложения. Пароль никому не передавайте.", "admin_stg_note": "Это проверочная версия: данные из неё в рабочую версию не переносятся, у рабочей будет свой пароль.", "password": "Пароль", "inbox": "Сообщения с формы вашего сайта", "inbox_note": "Каждое сообщение мы также пересылаем вам на почту. Здесь последние 50.", "missing": "Нужно от вас — пока на сайте заглушки", "source": "Исходный код", "zip": "Скачать ZIP", "gh_label": "Ваше имя пользователя на GitHub — пригласим в приватный репозиторий", "gh_btn": "Получить доступ", "title": "Заказ №{id}", "status": "Статус", "conversation": "Переписка", "you": "Вы", "studio": "TPF Technology",
         "spec": "Техническое задание", "pages": "Страницы", "criteria": "Критерии приёмки", "estimate": "Смета",
         "hours": "Трудоёмкость", "price": "Стоимость", "duration": "Срок", "days": "дн.", "h": "ч",
         "pay_pre": "Предоплата", "pay_final": "Остаток перед запуском", "paid": "оплачено", "pay_now": "Оплатить",
@@ -40,7 +40,7 @@ T: dict[str, dict[str, str]] = {
         "err": "Не получилось: {why}", "open_link": "Открыть",
     },
     "en": {
-        "inbox": "Messages from your site's form", "inbox_note": "Each message is also e-mailed to you. The latest 50 are shown here.", "missing": "Needed from you — the site shows placeholders for now", "source": "Source code", "zip": "Download ZIP", "gh_label": "Your GitHub username — we will invite you to the private repository", "gh_btn": "Get access", "title": "Order #{id}", "status": "Status", "conversation": "Conversation", "you": "You", "studio": "TPF Technology",
+        "admin": "Admin area", "admin_note": "This is where you add and edit the application's data yourself. Keep the password private.", "admin_stg_note": "This is the review version: its data is not carried over to the live version, which gets its own password.", "password": "Password", "inbox": "Messages from your site's form", "inbox_note": "Each message is also e-mailed to you. The latest 50 are shown here.", "missing": "Needed from you — the site shows placeholders for now", "source": "Source code", "zip": "Download ZIP", "gh_label": "Your GitHub username — we will invite you to the private repository", "gh_btn": "Get access", "title": "Order #{id}", "status": "Status", "conversation": "Conversation", "you": "You", "studio": "TPF Technology",
         "spec": "Specification", "pages": "Pages", "criteria": "Acceptance criteria", "estimate": "Estimate",
         "hours": "Effort", "price": "Price", "duration": "Timeline", "days": "days", "h": "h",
         "pay_pre": "Deposit", "pay_final": "Balance before release", "paid": "paid", "pay_now": "Pay now",
@@ -51,7 +51,7 @@ T: dict[str, dict[str, str]] = {
         "err": "Could not do that: {why}", "open_link": "Open",
     },
     "zh": {
-        "inbox": "您网站表单收到的留言", "inbox_note": "每条留言也会通过邮件发送给您。此处显示最近 50 条。", "missing": "需要您提供——网站目前显示占位符", "source": "源代码", "zip": "下载 ZIP", "gh_label": "您的 GitHub 用户名——我们将邀请您加入私有仓库", "gh_btn": "获取访问权限", "title": "订单 #{id}", "status": "状态", "conversation": "沟通记录", "you": "您", "studio": "TPF Technology",
+        "admin": "管理后台", "admin_note": "您可以在这里自行添加和修改应用数据。请勿泄露密码。", "admin_stg_note": "这是审核版本：其中的数据不会带到正式版本，正式版本会有单独的密码。", "password": "密码", "inbox": "您网站表单收到的留言", "inbox_note": "每条留言也会通过邮件发送给您。此处显示最近 50 条。", "missing": "需要您提供——网站目前显示占位符", "source": "源代码", "zip": "下载 ZIP", "gh_label": "您的 GitHub 用户名——我们将邀请您加入私有仓库", "gh_btn": "获取访问权限", "title": "订单 #{id}", "status": "状态", "conversation": "沟通记录", "you": "您", "studio": "TPF Technology",
         "spec": "需求规格书", "pages": "页面", "criteria": "验收标准", "estimate": "报价",
         "hours": "工作量", "price": "价格", "duration": "工期", "days": "天", "h": "小时",
         "pay_pre": "预付款", "pay_final": "上线前尾款", "paid": "已付", "pay_now": "立即付款",
@@ -185,8 +185,12 @@ async def portal(order_id: int, request: Request, t: str = "", done: str = "", e
                 f'<input type="hidden" name="approved" value="0"><label for="c2">{tr["comment_req"]}</label>'
                 f'<textarea id="c2" name="comment" required></textarea><div class="row"><button class="btn ghost">{tr["changes"]}</button></div>')
             + "</section>")
+    if st == State.AWAITING_ACCEPTANCE and order["staging_url"]:
+        parts.append(await _admin_block(o, order_id, "stg", order["staging_url"], tr))
     if order["production_url"]:
         parts.append(f'<section><h2>{tr["live"]}</h2><a href="{escape(order["production_url"])}">{escape(order["production_url"])}</a></section>')
+        if st == State.DELIVERED:
+            parts.append(await _admin_block(o, order_id, "prod", order["production_url"], tr))
 
     if st == State.DELIVERED and await o.latest_artifact(order_id, "code"):
         published = await o.pool.fetchval(
@@ -305,6 +309,19 @@ async def portal_acceptance(order_id: int, request: Request) -> RedirectResponse
                       "accepted" if approved else "changes", comment)
 
 
+async def _admin_block(o: Any, order_id: int, env: str, site_url: str, tr: dict[str, str]) -> str:
+    """For an application: where its admin area is and the owner's password. Empty for a plain site."""
+    password = await o.pool.fetchval(
+        "SELECT admin_password FROM app_databases WHERE order_id = $1 AND env = $2", order_id, env)
+    if not password:
+        return ""
+    url = site_url.rstrip("/") + "/admin"
+    note = tr["admin_note"] + (" " + tr["admin_stg_note"] if env == "stg" else "")
+    return (f'<section><h2>{tr["admin"]}</h2><p class="muted">{escape(note)}</p>'
+            f'<dl><dt>{tr["open_link"]}</dt><dd><a href="{escape(url)}" target="_blank" rel="noopener">{escape(url)}</a></dd>'
+            f'<dt>{tr["password"]}</dt><dd><code>{escape(password)}</code></dd></dl></section>')
+
+
 @router.get("/portal/{order_id}/source.zip")
 async def portal_source(order_id: int, request: Request, t: str = "") -> Response:
     """The delivered order's full source as a ZIP: the client owns the code, GitHub account or not."""
@@ -314,7 +331,8 @@ async def portal_source(order_id: int, request: Request, t: str = "") -> Respons
         raise HTTPException(404, "not found")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        for f in all_files(code["files"], form_endpoint(get_settings().public_base_url, order_id)):
+        spec = await request.app.state.orch.latest_artifact(order_id, "spec")
+        for f in all_files(code["files"], form_endpoint(get_settings().public_base_url, order_id), kind_of(spec)):
             z.writestr(f"tpf-order-{order_id}/{f['path'].lstrip('/')}", f["content"])
     return Response(buf.getvalue(), media_type="application/zip", headers={
         "Content-Disposition": f'attachment; filename="tpf-order-{order_id}.zip"', "Cache-Control": "no-store"})

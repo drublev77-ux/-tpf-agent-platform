@@ -69,6 +69,31 @@ class VercelDeployer:
         await self._make_public(project)
         return await self._wait(r.json()["id"])
 
+    async def set_env(self, project: str, env: dict[str, str]) -> None:
+        """Create the project if needed and set its environment variables (kept encrypted by Vercel)."""
+        r = await self.client.post("/v11/projects", params=self.params, json={"name": project, "framework": "nextjs"})
+        if r.status_code >= 400 and r.status_code != 409:   # 409: the project already exists
+            raise DeployError(f"Vercel {r.status_code}: {r.text[:500]}")
+        body = [{"key": k, "value": v, "type": "encrypted", "target": ["production", "preview"]} for k, v in env.items()]
+        r = await self.client.post(f"/v10/projects/{project}/env", params=self.params | {"upsert": "true"}, json=body)
+        if r.status_code >= 400:
+            raise DeployError(f"Vercel {r.status_code}: {r.text[:500]}")
+
+    async def health(self, url: str, path: str = "/api/tpf-health") -> str | None:
+        """None when the deployed application answers that its database is reachable, else what went wrong."""
+        last = "no answer"
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as http:
+            for _ in range(4):
+                try:
+                    r = await http.get(url.rstrip("/") + path)
+                    if r.status_code == 200 and r.json().get("db") == "ok":
+                        return None
+                    last = f"{path} answered {r.status_code}: {r.text[:200]}"
+                except (httpx.HTTPError, ValueError) as e:
+                    last = f"{path}: {type(e).__name__}: {e}"
+                await asyncio.sleep(4)
+        return last
+
     async def _make_public(self, project: str) -> None:
         """New Vercel projects hide previews behind a Vercel login; the client must see staging."""
         if project in self._public:

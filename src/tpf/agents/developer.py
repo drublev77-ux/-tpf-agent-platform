@@ -7,7 +7,8 @@ from typing import Any
 
 from tpf.agents.base import SAFETY_NOTE, Ctx, Outcome
 from tpf.orchestrator.states import Ev
-from tpf.tools.template import MAX_FILE_BYTES, TEMPLATE_RULES, route_to_page, validate_path
+from tpf.tools.tenantdb import check_schema_sql
+from tpf.tools.template import MAX_FILE_BYTES, SCHEMA_PATH, kind_of, route_to_page, rules_for, validate_path
 
 SCHEMA = {
     "type": "object",
@@ -32,16 +33,20 @@ SYSTEM = (
     "'Example street', round made-up prices): for anything not in client_content show a visible placeholder in "
     "square brackets in the site's language, such as [телефон] or [PHONE]. A tel: or mailto: link without a "
     "real value points to '#'. "
-    + TEMPLATE_RULES + " " + SAFETY_NOTE
+)
+APP_NOTE = (
+    "This order is a web application: implement the data_model as db/schema.sql and build the admin area the "
+    "architecture describes, with empty-state texts for lists that have no records yet. Records the owner will "
+    "add through the admin area are not seeded with invented examples. "
 )
 
 
-def check_files(files: list[dict[str, str]], routes: list[str]) -> list[str]:
+def check_files(files: list[dict[str, str]], routes: list[str], kind: str = "site") -> list[str]:
     """Static checks the code must pass before it goes to QA."""
     problems = []
     paths = set()
     for f in files:
-        err = validate_path(f["path"])
+        err = validate_path(f["path"], kind)
         if err:
             problems.append(err)
         if len(f["content"].encode("utf-8")) > MAX_FILE_BYTES:
@@ -49,9 +54,19 @@ def check_files(files: list[dict[str, str]], routes: list[str]) -> list[str]:
         if f["path"] in paths:
             problems.append(f"duplicate file: {f['path']}")
         paths.add(f["path"])
-    for required in ["app/layout.tsx", *(route_to_page(r) for r in routes)]:
+    for required in ["app/layout.tsx", *(route_to_page(r) for r in routes), *([SCHEMA_PATH] if kind == "app" else [])]:
         if required not in paths:
             problems.append(f"missing required file: {required}")
+    if kind == "app":
+        for f in files:
+            if f["path"] == SCHEMA_PATH:
+                bad = check_schema_sql(f["content"])
+                if bad:
+                    problems.append(bad)
+            elif "sql.unsafe" in f["content"]:
+                problems.append(f"sql.unsafe is not allowed: {f['path']}")
+            elif "@/tpf/db" in f["content"] and f["content"].lstrip().startswith(("'use client'", '"use client"')):
+                problems.append(f"the database client is imported in a client component: {f['path']}")
     return problems
 
 
@@ -82,6 +97,8 @@ async def run(ctx: Ctx) -> Outcome:
     previous = await ctx.orch.latest_artifact(ctx.order_id, "code")
     feedback = await _feedback(ctx)
     routes = [r["path"] for r in arch["routes"]]
+    kind = kind_of(spec)
+    system = SYSTEM + (APP_NOTE if kind == "app" else "") + rules_for(kind) + " " + SAFETY_NOTE
 
     prompt = (
         f"Spec:\n{json.dumps(spec, ensure_ascii=False, indent=2)}\n\n"
@@ -94,11 +111,11 @@ async def run(ctx: Ctx) -> Outcome:
     for _ in range(2):
         out: dict[str, Any] = await ctx.llm.structured(
             order_id=ctx.order_id, agent="developer", model_class="code",
-            system=SYSTEM,
+            system=system,
             prompt=prompt + ("\n\nYour previous output was rejected by static checks:\n" + "\n".join(problems) if problems else ""),
-            schema=SCHEMA, max_tokens=32000,
+            schema=SCHEMA, max_tokens=48000 if kind == "app" else 32000,
         )
-        problems = check_files(out["files"], routes)
+        problems = check_files(out["files"], routes, kind)
         if not problems:
             await ctx.orch.save_artifact(ctx.order_id, "code", {"files": out["files"]}, "developer")
             await ctx.orch.log(ctx.order_id, "code_written", "developer", {"files": len(out["files"]), "notes": out["notes"]})

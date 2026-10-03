@@ -22,6 +22,7 @@ from tpf.orchestrator.states import TASK_FOR_STATE, TransitionError
 from tpf.tools.deploy import Deployer, VercelDeployer
 from tpf.tools.github import GitHubPublisher
 from tpf.tools.sandbox import Sandbox, make_sandbox
+from tpf.tools.tenantdb import make_tenant_db
 
 log = logging.getLogger("tpf.worker")
 
@@ -32,10 +33,11 @@ class Worker:
     def __init__(
         self, *, pool: asyncpg.Pool, settings: Settings, orch: Orchestrator, llm: LLMGateway,
         sandbox: Sandbox, deployer: Deployer | None, github: GitHubPublisher | None,
-        payments: PaymentGateway | None = None,
+        payments: PaymentGateway | None = None, tenant_db: object | None = None,
     ) -> None:
         self.pool, self.settings, self.orch, self.llm = pool, settings, orch, llm
         self.sandbox, self.deployer, self.github, self.payments = sandbox, deployer, github, payments
+        self.tenant_db = tenant_db
         self.stopping = asyncio.Event()
 
     async def run_once(self) -> bool:
@@ -52,7 +54,7 @@ class Worker:
 
         handler = HANDLERS[task["kind"]]
         ctx = Ctx(self.orch, self.llm, self.settings, self.sandbox, self.deployer, self.github, order,
-                  payments=self.payments, payload=task["payload"] or {})
+                  payments=self.payments, payload=task["payload"] or {}, tenant_db=self.tenant_db)
         await self.orch.log(order["id"], "task_started", task["kind"], {"task": task["id"], "attempt": task["attempts"]})
         try:
             outcome = await handler(ctx)
@@ -121,7 +123,7 @@ async def main() -> None:
         pool=pool, settings=settings, orch=orch, llm=llm, sandbox=make_sandbox(settings),
         deployer=VercelDeployer(settings) if settings.vercel_token else None,
         github=GitHubPublisher(settings) if settings.github_token and settings.github_owner else None,
-        payments=make_gateway(settings),
+        payments=make_gateway(settings), tenant_db=make_tenant_db(settings),
     )
     if settings.payment_provider == "stripe":
         try:
@@ -131,6 +133,11 @@ async def main() -> None:
                 log.info("stripe: %s", await ensure_stripe_webhook(settings, pool))
         except Exception:  # payments stay requestable; the webhook can be fixed without stopping agents
             log.exception("stripe: could not provision the webhook endpoint")
+    if worker.tenant_db is not None:
+        try:
+            log.info("tenant database: %s", await worker.tenant_db.selftest())
+        except Exception:  # sites still work; application orders will escalate with the same error
+            log.exception("tenant database: self-test failed")
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, worker.stopping.set)

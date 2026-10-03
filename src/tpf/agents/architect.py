@@ -7,7 +7,7 @@ from typing import Any
 from tpf.agents.base import SAFETY_NOTE, Ctx, Outcome
 from tpf.agents.reviewer import review
 from tpf.orchestrator.states import Ev
-from tpf.tools.template import TEMPLATE_RULES
+from tpf.tools.template import kind_of, rules_for
 
 SCHEMA = {
     "type": "object",
@@ -42,6 +42,20 @@ SCHEMA = {
             },
             "required": ["palette", "fonts", "tone"],
         },
+        "data_model": {"type": "array", "description": "Applications only: every database table.", "items": {
+            "type": "object",
+            "properties": {
+                "table": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+                "purpose": {"type": "string"},
+                "columns": {"type": "array", "items": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string"}, "type": {"type": "string"}, "note": {"type": "string"}},
+                    "required": ["name", "type"],
+                }},
+            },
+            "required": ["table", "purpose", "columns"],
+        }},
+        "admin": {"type": "string", "description": "Applications only: what the owner sees and does under /admin, screen by screen."},
         "notes": {"type": "string"},
     },
     "required": ["site_name", "routes", "components", "design"],
@@ -51,14 +65,24 @@ SYSTEM = (
     "You are the Architect at TPF Technology. From an approved spec, define the site's routes, shared "
     "components and a design direction the Developer will implement exactly. Colors must give text a "
     "contrast ratio of at least 4.5:1 on its background. Prefer system fonts or Google Fonts. "
-    + TEMPLATE_RULES + " " + SAFETY_NOTE
+)
+APP_NOTE = (
+    "This order is a web application. Besides the public routes, list the admin routes (/admin, /admin/login and "
+    "one per managed list), describe every database table in data_model (lowercase names, PostgreSQL column types, "
+    "an id and created_at on each, a status column where records move through states) and describe the admin "
+    "screens in admin. Keep it small: only the tables and screens the spec needs. "
 )
 
 REVIEW_CRITERIA = [
     "Every page in the spec maps to a route, and every route's sections cover the spec's sections for it",
     "Route paths are lowercase, unique, and '/' exists",
     "Text and background colors meet a 4.5:1 contrast ratio",
-    "Nothing requires a backend, accounts, payments or packages beyond next/react",
+]
+SITE_CRITERIA = ["Nothing requires a backend, accounts, payments or packages beyond next/react"]
+APP_CRITERIA = [
+    "data_model has a table for every kind of record in the spec, with the fields the spec lists",
+    "There is /admin, /admin/login and an admin route for every list the owner manages; public routes never expose admin data",
+    "Nothing requires visitor accounts, payments, file uploads, e-mail sending, external services or packages beyond next, react and postgres",
 ]
 
 
@@ -66,17 +90,20 @@ async def run(ctx: Ctx) -> Outcome:
     spec = await ctx.orch.latest_artifact(ctx.order_id, "spec")
     if spec is None:
         return Outcome(escalate="Нет утверждённого ТЗ для проектирования")
+    kind = kind_of(spec)
+    system = SYSTEM + (APP_NOTE if kind == "app" else "") + rules_for(kind) + " " + SAFETY_NOTE
+    criteria = REVIEW_CRITERIA + (APP_CRITERIA if kind == "app" else SITE_CRITERIA)
     base = f"Approved spec:\n{json.dumps(spec, ensure_ascii=False, indent=2)}\n\nDesign the site for this spec."
     issues: list[str] = []
     for _ in range(ctx.settings.max_review_rounds + 1):
         prompt = base + ("\n\nFix these reviewer issues:\n" + "\n".join(f"- {i}" for i in issues) if issues else "")
         arch: dict[str, Any] = await ctx.llm.structured(
             order_id=ctx.order_id, agent="architect", model_class="strong",
-            system=SYSTEM, prompt=prompt, schema=SCHEMA, max_tokens=8000,
+            system=system, prompt=prompt, schema=SCHEMA, max_tokens=8000,
         )
         verdict = await review(
             ctx, author="architect", artifact_name="architecture", artifact=arch,
-            criteria=REVIEW_CRITERIA, context=base,
+            criteria=criteria, context=base,
         )
         if verdict["approved"]:
             await ctx.orch.save_artifact(ctx.order_id, "architecture", arch, "architect")

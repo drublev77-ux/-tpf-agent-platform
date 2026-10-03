@@ -35,6 +35,7 @@ class Ctx:
     order: dict[str, Any]
     payments: Any = None  # tpf.payments.PaymentGateway, or None for manual invoicing
     payload: dict[str, Any] = field(default_factory=dict)  # the task's own input
+    tenant_db: Any = None  # tpf.tools.tenantdb.TenantDB, or None when applications are not enabled
 
     @property
     def order_id(self) -> int:

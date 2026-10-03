@@ -16,7 +16,7 @@ SCHEMA = {
     "properties": {
         "in_pilot_scope": {
             "type": "boolean",
-            "description": "true if the order is a website or landing page (static marketing/content site, optionally with a contact form)",
+            "description": "true if the order fits what the studio builds, as described in your instructions",
         },
         "scope_note": {"type": "string", "description": "why it is or is not in scope"},
         "questions": {
@@ -26,6 +26,11 @@ SCHEMA = {
         "spec": {
             "type": "object",
             "properties": {
+                "product_type": {
+                    "type": "string", "enum": ["site", "app"],
+                    "description": "'site': pages with fixed content (optionally a contact form). 'app': a web application "
+                                   "that stores data in a database and has an owner-only admin area.",
+                },
                 "title": {"type": "string"},
                 "summary": {"type": "string"},
                 "audience": {"type": "string"},
@@ -57,7 +62,7 @@ SCHEMA = {
                     "description": "Checkable statements, each verifiable by looking at the site",
                 },
             },
-            "required": ["title", "summary", "pages", "features", "acceptance_criteria", "client_content", "missing_content"],
+            "required": ["product_type", "title", "summary", "pages", "features", "acceptance_criteria", "client_content", "missing_content"],
         },
         "estimate": {
             "type": "object",
@@ -75,29 +80,58 @@ SCHEMA = {
     "required": ["in_pilot_scope", "questions"],
 }
 
-SYSTEM = (
-    "You are the Analyst at TPF Technology, a studio where AI agents build client software end to end. "
-    "The pilot builds websites and landing pages only, one page or several: a static Next.js site with no "
-    "backend, no user accounts, no payments, no online booking and no admin panel. The one dynamic feature "
-    "available is a contact or request form (name, contact, message) whose messages are e-mailed to the client; "
-    "offer it when the client wants visitors to write, leave a request or ask for a callback. Read the client's request and conversation and produce a precise spec and "
-    "an effort estimate in hours. Ask the client questions only when an answer would change the pages, "
-    "features or price; otherwise make a reasonable assumption and list it. "
+SCOPE_SITE = (
+    "WHAT THE STUDIO BUILDS. A website or landing page, one page or several (product_type 'site'): a static "
+    "Next.js site with fixed content, no user accounts, no payments, no online booking and no admin panel. Its one "
+    "dynamic feature is a contact or request form (name, contact, message) whose messages are e-mailed to the "
+    "client; offer it when the client wants visitors to write, leave a request or ask for a callback. "
+)
+SCOPE_APP = (
+    "A web application (product_type 'app'), when the client needs the site to store and manage data: public "
+    "pages and forms that write to a database (bookings, requests, orders without payment, sign-ups, reviews "
+    "awaiting moderation) or show data from it (a catalogue, a schedule, a price list, news), plus an admin area "
+    "under /admin where the owner, signed in with one password, views and edits that data (lists, statuses, "
+    "create, edit, delete). Choose 'app' only when the client needs data to be saved, managed or changed without "
+    "a developer; otherwise choose 'site', which is cheaper and faster. An application has no visitor accounts "
+    "or registration, no online payments, no file or photo uploads (images are fixed files or links), no e-mail "
+    "or SMS sending apart from the contact form, no integrations with outside services, no scheduled jobs and no "
+    "mobile app. In the spec of an application, list the admin area as a page, and state for every kind of record "
+    "which fields it has, who creates it (visitor or owner) and what the owner can do with it. "
+)
+SCOPE_END = (
+    "Anything outside this — a native mobile app, an online shop with payments, a Telegram bot, a system with "
+    "user accounts, integrations — is out of scope: set in_pilot_scope to false and say why in scope_note. "
+)
+RULES = (
+    "Read the client's request and conversation and produce a precise spec and an effort estimate in hours. Ask "
+    "the client questions only when an answer would change the pages, features or price; otherwise make a "
+    "reasonable assumption and list it. "
     "One thing you never assume is the client's own facts. Anything that will be published as a fact about "
     "the business — its name, phone, e-mail, address, opening hours, prices, menu or product items, people's "
     "names, social links, legal details — must come from the client. If the site needs such facts and the "
     "client has not given them, ask for all of them in one short list of questions before writing the spec. "
     "When you do write the spec, copy the facts the client gave into client_content verbatim and list every "
-    "fact still missing in missing_content; the site will show a visible placeholder for those. Design choices "
-    "This holds for every order, including ones the client calls a test, demo or draft: never plan to fill the "
-    "site with plausible sample data. Design choices (palette, layout, wording of headings) are yours to assume. Write the spec and questions "
-    "in the client's language. Estimate honestly: include design, content layout, responsive checks and "
-    "deployment. " + SAFETY_NOTE
+    "fact still missing in missing_content; the site will show a visible placeholder for those. This holds for "
+    "every order, including ones the client calls a test, demo or draft: never plan to fill the site with "
+    "plausible sample data. In an application, records the owner will enter later through the admin area are "
+    "not missing content: the lists simply start empty. Design choices (palette, layout, wording of headings) "
+    "are yours to assume. Write the spec and questions in the client's language. Estimate honestly: include "
+    "design, content layout, the database and admin area if any, responsive checks and deployment. "
 )
+
+
+def system_prompt(apps_enabled: bool) -> str:
+    return (
+        "You are the Analyst at TPF Technology, a studio where AI agents build client software end to end. "
+        + SCOPE_SITE + (SCOPE_APP if apps_enabled else "Applications with a database are not available: product_type is always 'site'. ")
+        + SCOPE_END + RULES + SAFETY_NOTE
+    )
+
 
 REVIEW_CRITERIA = [
     "Every page has a purpose and concrete sections; nothing essential from the client's request is missing",
-    "The spec fits the pilot: static website of one or several pages, no accounts, no payments; the only dynamic feature allowed is the contact form (name, contact, message) e-mailed to the client",
+    "The spec fits what the studio builds: a static website (product_type 'site', its only dynamic feature a contact form), or a web application (product_type 'app') with a database and an owner-only admin area; either way no visitor accounts, payments, uploads or integrations",
+    "product_type is 'app' only if the client needs data stored or managed; for an app, every kind of record has its fields and the owner's actions on it described",
     "Acceptance criteria are specific and checkable by looking at the site",
     "Assumptions are stated where the client did not decide",
     "client_content contains only facts found in the client conversation; every other fact the site needs is in missing_content",
@@ -134,7 +168,7 @@ async def run(ctx: Ctx) -> Outcome:
         )
         out: dict[str, Any] = await ctx.llm.structured(
             order_id=ctx.order_id, agent="analyst", model_class="strong",
-            system=SYSTEM, prompt=prompt, schema=SCHEMA, max_tokens=8000,
+            system=system_prompt(ctx.tenant_db is not None), prompt=prompt, schema=SCHEMA, max_tokens=8000,
         )
 
         if not out.get("in_pilot_scope", False):
@@ -144,6 +178,8 @@ async def run(ctx: Ctx) -> Outcome:
             await ctx.orch.save_artifact(ctx.order_id, "questions", {"questions": out["questions"]}, "analyst")
             return Outcome(Ev.CLARIFICATION_NEEDED, details="\n".join(f"- {q}" for q in out["questions"]))
 
+        if out.get("spec") and ctx.tenant_db is None:
+            out["spec"]["product_type"] = "site"
         if "spec" not in out or "estimate" not in out:
             issues = ["Spec and estimate are required: questions are no longer allowed."]
             continue

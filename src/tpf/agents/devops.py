@@ -4,7 +4,8 @@ from __future__ import annotations
 from tpf.agents.base import Ctx, Outcome
 from tpf.orchestrator.states import Ev
 from tpf.tools.deploy import Deployment, DeployError
-from tpf.tools.template import all_files
+from tpf.tools.template import all_files, kind_of
+from tpf.tools.tenantdb import TenantDBError
 
 
 def project_name(order_id: int) -> str:
@@ -17,9 +18,23 @@ def staging_project(order_id: int) -> str:
     return f"tpf-order-{order_id}-preview"
 
 
+async def _kind(ctx: Ctx) -> str:
+    return kind_of(await ctx.orch.latest_artifact(ctx.order_id, "spec"))
+
+
 async def _files(ctx: Ctx) -> list[dict[str, str]] | None:
     code = await ctx.orch.latest_artifact(ctx.order_id, "code")
-    return all_files(code["files"], ctx.form_endpoint) if code else None
+    return all_files(code["files"], ctx.form_endpoint, await _kind(ctx)) if code else None
+
+
+async def _database(ctx: Ctx, files: list[dict[str, str]], env: str, project: str) -> str | None:
+    """For an application, get its database ready before the deployment. Returns why it failed, or None."""
+    from tpf.agents.qa import prepare_database  # qa imports this module
+    try:
+        await prepare_database(ctx, files, env, project)
+    except (TenantDBError, DeployError) as e:
+        return str(e)
+    return None
 
 
 async def _reuse_qa_preview(ctx: Ctx) -> Deployment | None:
@@ -42,12 +57,17 @@ async def deploy_staging(ctx: Ctx) -> Outcome:
     files = await _files(ctx)
     if files is None:
         return Outcome(escalate="Нет кода для деплоя")
+    app = await _kind(ctx) == "app"
     dep = await _reuse_qa_preview(ctx)
     if dep is None:
+        if app and (problem := await _database(ctx, files, "stg", staging_project(ctx.order_id))):
+            return Outcome(escalate=f"База данных для проверки не готова: {problem}")
         try:
             dep = await ctx.deployer.deploy(staging_project(ctx.order_id), files, production=False)
         except DeployError as e:
             return Outcome(escalate=f"Деплой на стейджинг не удался: {e}")
+        if app and (problem := await ctx.deployer.health(dep.url)):
+            return Outcome(escalate=f"Приложение на стейджинге не работает с базой данных: {problem}")
     await ctx.orch.pool.execute("UPDATE orders SET staging_url = $2 WHERE id = $1", ctx.order_id, dep.url)
     await ctx.orch.save_artifact(ctx.order_id, "deployment", {"target": "staging", "id": dep.id, "url": dep.url}, "devops")
     return Outcome(Ev.STAGING_DEPLOYED, data={"url": dep.url}, details=dep.url)
@@ -59,10 +79,15 @@ async def deploy_production(ctx: Ctx) -> Outcome:
     files = await _files(ctx)
     if files is None:
         return Outcome(escalate="Нет кода для релиза")
+    app = await _kind(ctx) == "app"
+    if app and (problem := await _database(ctx, files, "prod", project_name(ctx.order_id))):
+        return Outcome(escalate=f"Рабочая база данных не готова: {problem}")
     try:
         dep = await ctx.deployer.deploy(project_name(ctx.order_id), files, production=True)
     except DeployError as e:
         return Outcome(escalate=f"Релиз не удался: {e}")
+    if app and (problem := await ctx.deployer.health(dep.url)):
+        return Outcome(escalate=f"Приложение выпущено, но не работает с базой данных: {problem}")
     await ctx.orch.pool.execute("UPDATE orders SET production_url = $2 WHERE id = $1", ctx.order_id, dep.url)
     await ctx.orch.save_artifact(ctx.order_id, "deployment", {"target": "production", "id": dep.id, "url": dep.url}, "devops")
 

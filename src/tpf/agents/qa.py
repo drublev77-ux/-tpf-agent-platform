@@ -15,7 +15,8 @@ from tpf.agents.devops import staging_project
 from tpf.orchestrator.states import Ev
 from tpf.tools.deploy import DeployError
 from tpf.tools.sandbox import RunResult
-from tpf.tools.template import all_files, materialize, route_to_page
+from tpf.tools.template import SCHEMA_PATH, all_files, kind_of, materialize, route_to_page
+from tpf.tools.tenantdb import TenantDBError
 
 BUILD_CMD = (
     "export NEXT_TELEMETRY_DISABLED=1; "
@@ -30,12 +31,38 @@ REVIEW_CODE_CHARS = 120_000
 VERCEL_BUILD_CMD = "npm run build && npm audit --omit=dev --audit-level=high"
 
 
-async def _build_on_vercel(ctx: Ctx, files: list[dict[str, str]], version: int, report: dict[str, Any]) -> RunResult:
+APP_CRITERIA = [
+    "Every SQL query goes through the sql tagged template with ${} parameters; no query text is built by string "
+    "concatenation and sql.unsafe is not used",
+    "Every page under /admin except /admin/login, every admin route handler and every server action that reads or "
+    "changes admin data calls `await requireAdmin()` before anything else; no public page or action exposes admin data",
+    "Every input is validated and trimmed on the server (length limits, allowed values) before it reaches the database",
+    "db/schema.sql creates every table and column the code queries, and is idempotent (IF NOT EXISTS)",
+    "Every page, layout or route handler that queries the database exports dynamic = 'force-dynamic'",
+    "No environment variable, password or raw database error is sent to the browser",
+    "Lists the owner fills in start empty with an empty-state text; no invented sample records are seeded",
+]
+
+
+async def prepare_database(ctx: Ctx, files: list[dict[str, str]], env: str, project: str) -> None:
+    """An application's database for this environment: created, brought to the code's schema, and handed
+    to the Vercel project as environment variables. Raises TenantDBError when the schema is refused."""
+    if ctx.tenant_db is None:
+        raise TenantDBError("applications are not enabled: TENANT_DATABASE_URL is not set")
+    db = await ctx.tenant_db.ensure(ctx.orch.pool, ctx.order_id, env)
+    schema = next((f["content"] for f in files if f["path"] == SCHEMA_PATH), "")
+    await ctx.tenant_db.apply_schema(db, schema)
+    if ctx.deployer is not None:
+        await ctx.deployer.set_env(project, db.env())
+
+
+async def _build_on_vercel(ctx: Ctx, files: list[dict[str, str]], version: int, report: dict[str, Any],
+                           kind: str = "site") -> RunResult:
     """Build the code as a Vercel preview. A green preview is kept for staging, so it is not built twice."""
     if ctx.deployer is None:
         return RunResult(1, "SANDBOX=vercel needs VERCEL_TOKEN")
     try:
-        dep = await ctx.deployer.deploy(staging_project(ctx.order_id), all_files(files, ctx.form_endpoint), production=False,
+        dep = await ctx.deployer.deploy(staging_project(ctx.order_id), all_files(files, ctx.form_endpoint, kind), production=False,
                                         build_command=VERCEL_BUILD_CMD)
     except DeployError as e:
         if getattr(e, "deployment_id", None) is None:
@@ -45,6 +72,10 @@ async def _build_on_vercel(ctx: Ctx, files: list[dict[str, str]], version: int, 
         # npm audit prints "found N vulnerabilities" / "Severity:" only when it is the step that failed.
         code = 30 if ("npm audit" in log and "Severity:" in log) else 20
         return RunResult(code, log)
+    if kind == "app":
+        problem = await ctx.deployer.health(dep.url)
+        if problem:
+            return RunResult(40, f"The application was built but does not answer with a working database: {problem}")
     report["preview"] = {"url": dep.url, "deployment_id": dep.id, "code_version": version}
     return RunResult(0, f"Vercel build ok: {dep.url}")
 
@@ -67,6 +98,7 @@ async def run(ctx: Ctx) -> Outcome:
     if not (spec and arch and code):
         return Outcome(escalate="Нет ТЗ, архитектуры или кода для проверки")
     files: list[dict[str, str]] = code["files"]
+    kind = kind_of(spec)
 
     report: dict[str, Any] = {}
 
@@ -79,12 +111,22 @@ async def run(ctx: Ctx) -> Outcome:
     version = await ctx.orch.pool.fetchval(
         "SELECT max(version) FROM artifacts WHERE order_id = $1 AND kind = 'code'", ctx.order_id
     )
-    if ctx.settings.sandbox == "vercel":
-        run_result = await _build_on_vercel(ctx, files, version, report)
+    schema_error = None
+    if kind == "app":
+        if ctx.tenant_db is None:
+            return Outcome(escalate="Заказ — приложение с базой данных, но TENANT_DATABASE_URL не задан")
+        try:
+            await prepare_database(ctx, files, "stg", staging_project(ctx.order_id))
+        except TenantDBError as e:
+            schema_error = str(e)
+    if schema_error:
+        run_result = RunResult(50, schema_error)
+    elif ctx.settings.sandbox == "vercel":
+        run_result = await _build_on_vercel(ctx, files, version, report, kind)
     else:
-        workdir = materialize(Path(ctx.settings.workspace_root) / f"order-{ctx.order_id}" / f"v{version}", files, ctx.form_endpoint)
+        workdir = materialize(Path(ctx.settings.workspace_root) / f"order-{ctx.order_id}" / f"v{version}", files, ctx.form_endpoint, kind)
         run_result = await ctx.sandbox.run(workdir, BUILD_CMD)
-    stage = {0: "ok", 10: "install", 20: "build", 30: "audit"}.get(run_result.exit_code, "sandbox")
+    stage = {0: "ok", 10: "install", 20: "build", 30: "audit", 40: "health", 50: "schema"}.get(run_result.exit_code, "sandbox")
     report["build"] = {
         "ok": run_result.exit_code in (0, 30) and not run_result.timed_out,
         "failed_at": None if run_result.ok else ("timeout" if run_result.timed_out else stage),
@@ -105,6 +147,7 @@ async def run(ctx: Ctx) -> Outcome:
                 "placeholder in square brackets",
                 "Implements every route and section in the architecture",
                 "Accessible: semantic HTML, alt text on images, labels on form fields",
+                *(APP_CRITERIA if kind == "app" else []),
             ],
             context=(f"Architecture:\n{json.dumps(arch, ensure_ascii=False)}\n\n"
                      f"Spec client_content (the only facts the client gave):\n"
