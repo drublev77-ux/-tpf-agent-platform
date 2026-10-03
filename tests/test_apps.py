@@ -256,3 +256,38 @@ def test_static_rules_for_bots():
     paths = {f["path"] for f in all_files(BOT_FILES, "x", "bot")}
     assert {"tpf/telegram.ts", "app/api/tpf-telegram/route.ts", "tpf/db.ts"} <= paths
     assert TOKEN_RE.match(BOT_TOKEN) and not TOKEN_RE.match("hello") and not TOKEN_RE.match("123:abc")
+
+
+async def test_developer_builds_a_project_in_steps_and_patches_on_fixes(env):
+    from tpf.llm.gateway import LLMError
+    first = {"files": [CODE["files"][0]], "remaining": [{"path": "app/page.tsx", "purpose": "home"}], "notes": "layout"}
+    second = {"files": [CODE["files"][1]], "remaining": [], "notes": "home"}
+    env.llm.queue("developer", first, second)
+    order, _ = await env.orch.create_order(client_name="A", client_email="a@example.com", request_text="site", language="en")
+    oid = order["id"]
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    code = await env.orch.latest_artifact(oid, "code")
+    assert [f["path"] for f in code["files"]] == ["app/layout.tsx", "app/page.tsx"]
+    assert env.llm.calls.count("developer") == 2
+
+    # A change request returns only the changed file; the rest of the project is kept. An answer that
+    # runs out of room is asked for again in a smaller piece instead of failing the task.
+    original = env.llm.structured
+    state = {"failed": False}
+
+    async def flaky(**kw):
+        if kw["agent"] == "developer" and not state["failed"]:
+            state["failed"] = True
+            raise LLMError("developer: output hit max_tokens=32000")
+        return await original(**kw)
+
+    env.llm.structured = flaky
+    env.llm.queue("developer", {"files": [{"path": "app/page.tsx", "content": "export default function P(){return <main>v2</main>}"}],
+                                "delete": [], "remaining": [], "notes": "v2"})
+    await env.orch.fire(oid, Ev.CHANGES_REQUESTED, actor="client", data={"comment": "change the heading"})
+    await env.drain()
+    code = await env.orch.latest_artifact(oid, "code")
+    by_path = {f["path"]: f["content"] for f in code["files"]}
+    assert "v2" in by_path["app/page.tsx"] and by_path["app/layout.tsx"] == CODE["files"][0]["content"]

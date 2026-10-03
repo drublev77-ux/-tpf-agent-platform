@@ -25,7 +25,7 @@ BUILD_CMD = (
     "npm run build || exit 20; "
     "npm audit --omit=dev --audit-level=high || exit 30"
 )
-REVIEW_CODE_CHARS = 120_000
+REVIEW_CODE_CHARS = 400_000
 
 # The same gates, run by Vercel's own isolated build when the worker has no Docker (SANDBOX=vercel).
 VERCEL_BUILD_CMD = "npm run build && npm audit --omit=dev --audit-level=high"

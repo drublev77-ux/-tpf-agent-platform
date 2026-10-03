@@ -7,6 +7,7 @@ import re
 from typing import Any
 
 from tpf.agents.base import SAFETY_NOTE, Ctx, Outcome
+from tpf.llm.gateway import LLMError
 from tpf.orchestrator.states import Ev
 from tpf.tools.tenantdb import check_schema_sql
 from tpf.tools.template import BOT_HANDLER_PATH, MAX_FILE_BYTES, SCHEMA_PATH, has_database, kind_of, route_to_page, rules_for, validate_path
@@ -18,11 +19,29 @@ SCHEMA = {
             "type": "object",
             "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
             "required": ["path", "content"],
-        }, "description": "The COMPLETE set of files you own; files not listed are deleted"},
-        "notes": {"type": "string", "description": "What changed and why, for the log"},
+        }, "description": "Files you are writing or changing in this step, each with its COMPLETE content. "
+                          "Files that already exist and are not listed stay as they are."},
+        "delete": {"type": "array", "items": {"type": "string"}, "description": "Paths of existing files to remove"},
+        "remaining": {"type": "array", "items": {
+            "type": "object",
+            "properties": {"path": {"type": "string"}, "purpose": {"type": "string"}},
+            "required": ["path", "purpose"],
+        }, "description": "Files still to be written in later steps. Empty when the project is complete."},
+        "notes": {"type": "string", "description": "What you wrote or changed and why, for the log"},
     },
-    "required": ["files", "notes"],
+    "required": ["files", "remaining", "notes"],
 }
+
+MAX_STEPS = 12        # calls for one version of the code, static-check repairs included
+STEP_TOKENS = 32000
+STEP_RULE = (
+    "You work in steps, because one answer cannot hold a whole project. In each step write at most about 1000 "
+    "lines of code in total: start with what other files depend on (db/schema.sql, lib/, shared components, "
+    "app/layout.tsx, app/globals.css), then the pages. List every file still to be written in `remaining`; you "
+    "will be called again with the files written so far until `remaining` is empty. Every file you return is "
+    "complete, never a fragment or a diff. Files written in earlier steps stay unless you return them again or "
+    "list them in `delete`. When you fix or change existing code, return only the files you change. "
+)
 
 SYSTEM = (
     "You are the Developer at TPF Technology. Implement the site exactly as the architecture describes: "
@@ -108,26 +127,66 @@ async def run(ctx: Ctx) -> Outcome:
     routes = [r["path"] for r in arch["routes"]]
     kind = kind_of(spec)
     system = (SYSTEM + (APP_NOTE if has_database(kind) else "") + (BOT_NOTE if kind == "bot" else "")
-              + rules_for(kind) + " " + SAFETY_NOTE)
+              + rules_for(kind) + " " + STEP_RULE + SAFETY_NOTE)
 
-    prompt = (
+    base = (
         f"Spec:\n{json.dumps(spec, ensure_ascii=False, indent=2)}\n\n"
         f"Architecture:\n{json.dumps(arch, ensure_ascii=False, indent=2)}\n\n"
-        + (f"Current code (modify it; return the complete updated file set):\n{json.dumps(previous, ensure_ascii=False)}\n\n" if previous else "")
-        + (f"{feedback}\n\n" if feedback else "")
-        + "Write the site."
     )
+    files: dict[str, str] = {f["path"]: f["content"] for f in (previous or {}).get("files", [])}
+    changing = bool(files)                    # a fix or a client change request, not a first version
+    remaining: list[dict[str, str]] = []
     problems: list[str] = []
-    for _ in range(2):
-        out: dict[str, Any] = await ctx.llm.structured(
-            order_id=ctx.order_id, agent="developer", model_class="code",
-            system=system,
-            prompt=prompt + ("\n\nYour previous output was rejected by static checks:\n" + "\n".join(problems) if problems else ""),
-            schema=SCHEMA, max_tokens={"bot": 64000, "app": 48000}.get(kind, 32000),
-        )
-        problems = check_files(out["files"], routes, kind)
+    too_long = False
+    notes: list[str] = []
+    repairs = 0
+    for step in range(MAX_STEPS):
+        current = [{"path": p, "content": c} for p, c in files.items()]
+        if problems:
+            task = "The code was rejected by static checks. Fix exactly these problems:\n" + "\n".join(problems)
+        elif step == 0:
+            if not changing:
+                task = (f"{feedback}\n\n" if feedback else "") + "Write the first step of the project."
+            elif feedback:
+                task = f"{feedback}\n\nChange the code accordingly."
+            else:
+                task = "Review the code against the spec and architecture and complete it."
+        else:
+            task = ("Continue: write the next files from this list, as many as fit in one step.\n"
+                    + json.dumps(remaining, ensure_ascii=False))
+        if too_long:
+            task += "\n\nYour previous answer was too long and was lost. Write at most two files in this step."
+        prompt = (base + (f"Files written so far:\n{json.dumps(current, ensure_ascii=False)}\n\n" if current else "") + task)
+        try:
+            out: dict[str, Any] = await ctx.llm.structured(
+                order_id=ctx.order_id, agent="developer", model_class="code",
+                system=system, prompt=prompt, schema=SCHEMA, max_tokens=STEP_TOKENS,
+            )
+        except LLMError as e:
+            if "max_tokens" not in str(e) or too_long:
+                raise
+            too_long = True
+            continue
+        too_long = False
+        for f in out.get("files", []):
+            files[f["path"]] = f["content"]
+        for path in out.get("delete") or []:
+            files.pop(path, None)
+        notes.append(str(out.get("notes", "")))
+        remaining = [r for r in out.get("remaining") or [] if r.get("path") not in files]
+        if remaining:
+            problems = []
+            continue
+        result = [{"path": p, "content": c} for p, c in files.items()]
+        problems = check_files(result, routes, kind)
         if not problems:
-            await ctx.orch.save_artifact(ctx.order_id, "code", {"files": out["files"]}, "developer")
-            await ctx.orch.log(ctx.order_id, "code_written", "developer", {"files": len(out["files"]), "notes": out["notes"]})
-            return Outcome(Ev.CODE_READY, data={"files": len(out["files"])})
-    return Outcome(escalate="Код не прошёл статические проверки: " + "; ".join(problems[:10]))
+            await ctx.orch.save_artifact(ctx.order_id, "code", {"files": result}, "developer")
+            await ctx.orch.log(ctx.order_id, "code_written", "developer",
+                               {"files": len(result), "steps": step + 1, "notes": "\n".join(n for n in notes if n)[:4000]})
+            return Outcome(Ev.CODE_READY, data={"files": len(result)})
+        repairs += 1
+        if repairs > 2:
+            break
+    if problems:
+        return Outcome(escalate="Код не прошёл статические проверки: " + "; ".join(problems[:10]))
+    return Outcome(escalate=f"Разработчик не закончил проект за {MAX_STEPS} шагов; осталось файлов: {len(remaining)}")
