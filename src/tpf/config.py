@@ -30,7 +30,15 @@ class Settings(BaseSettings):
     task_lease_sec: int = 1800
 
     # Commercial terms
-    hourly_rate: float = 40.0
+    hourly_rate: float = 40.0          # fallback for a product type without its own rate
+    # Rates per product type, set 20% below the market reference for comparable small-business work
+    # (October 2026): landing ~$900, small web application ~$3,000, Telegram bot with booking ~$2,500.
+    hourly_rate_site: float = 45.0
+    hourly_rate_app: float = 70.0
+    hourly_rate_bot: float = 50.0
+
+    def rate_for(self, product_type: str) -> float:
+        return float(getattr(self, f"hourly_rate_{product_type}", 0) or self.hourly_rate)
     currency: str = "USD"
     # Payments: off | stripe | manual (the operator confirms bank transfers in /admin)
     payment_provider: str = "off"

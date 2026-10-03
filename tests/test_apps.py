@@ -291,3 +291,10 @@ async def test_developer_builds_a_project_in_steps_and_patches_on_fixes(env):
     code = await env.orch.latest_artifact(oid, "code")
     by_path = {f["path"]: f["content"] for f in code["files"]}
     assert "v2" in by_path["app/page.tsx"] and by_path["app/layout.tsx"] == CODE["files"][0]["content"]
+
+
+def test_each_product_type_has_its_own_rate():
+    from tpf.config import Settings
+    s = Settings(database_url="postgresql://x/y")
+    assert (s.rate_for("site"), s.rate_for("app"), s.rate_for("bot")) == (45, 70, 50)
+    assert s.rate_for("something-new") == s.hourly_rate
