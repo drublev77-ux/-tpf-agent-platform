@@ -346,3 +346,7 @@ app.include_router(portal_router)
 from tpf.api.admin import router as admin_router  # noqa: E402
 
 app.include_router(admin_router)
+
+from tpf.api.forms import router as forms_router  # noqa: E402
+
+app.include_router(forms_router)

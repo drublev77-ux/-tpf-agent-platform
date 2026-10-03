@@ -170,7 +170,8 @@ async def test_client_gets_repo_access_without_moving_the_order(env):
 
 
 def test_portal_source_zip_and_repo_request(client):
-    import io, zipfile
+    import io
+    import zipfile
     from tpf.api.main import app
     oid, token = _order(client)
     orch = app.state.orch
@@ -194,3 +195,48 @@ def test_portal_source_zip_and_repo_request(client):
     assert (task["kind"], task["payload"]) == ("grant_repo_access", {"username": "anna-dev"})
     again = client.post(f"/portal/{oid}/repo-access", data={"t": token, "username": "anna-dev"}, follow_redirects=False)
     assert "err=busy" in again.headers["location"]
+
+
+# --- contact forms of built sites ----------------------------------------------------------------
+
+def test_site_template_ships_the_platform_contact_form():
+    from tpf.tools.template import TEMPLATE_RULES, all_files, form_endpoint
+
+    files = {f["path"]: f["content"] for f in all_files([{"path": "app/page.tsx", "content": "x"}], form_endpoint("https://tpf.example/", 7))}
+    assert 'FORM_ENDPOINT = "https://tpf.example/forms/7"' in files["tpf/config.ts"]
+    assert "fetch(FORM_ENDPOINT" in files["tpf/ContactForm.tsx"] and "@/tpf/ContactForm" in TEMPLATE_RULES
+
+
+def test_site_contact_form_reaches_the_owner(client, monkeypatch):
+    from tpf.api.main import app
+    from tpf.notifications import EmailNotifier
+
+    for k, v in {"EMAIL_PROVIDER": "brevo", "EMAIL_API_KEY": "k", "EMAIL_FROM": "TPF <a@b.co>"}.items():
+        monkeypatch.setenv(k, v)
+    get_settings.cache_clear()
+    sent: list[tuple[str, str, str]] = []
+
+    async def fake_send(self, to, subject, text, html):
+        sent.append((to, subject, text))
+    monkeypatch.setattr(EmailNotifier, "send", fake_send)
+
+    oid, _ = _order(client)
+    msg = {"name": "Пётр", "contact": "+7 900 000-00-00", "message": "Хочу забронировать столик на субботу", "page": "/contacts"}
+    assert client.post(f"/forms/{oid}", json=msg).status_code == 404            # the site is not built yet
+    orch = app.state.orch
+    client.portal.call(orch.pool.execute, "UPDATE orders SET state='delivered' WHERE id=$1", oid)
+    sent.clear()
+
+    pre = client.options(f"/forms/{oid}")
+    assert pre.status_code == 204 and pre.headers["access-control-allow-origin"] == "*"
+    assert client.post(f"/forms/{oid}", json={"name": "x"}).status_code == 422
+    assert client.post(f"/forms/{oid}", json=msg | {"website": "spam.example"}).json() == {"ok": True} and not sent  # bot
+
+    r = client.post(f"/forms/{oid}", json=msg)
+    assert r.status_code == 200 and r.headers["access-control-allow-origin"] == "*"
+    to, subject, text = sent[0]
+    assert to == "anna@example.com" and subject == "Новое сообщение с вашего сайта"
+    assert "Пётр" in text and "+7 900 000-00-00" in text and "столик на субботу" in text and "/contacts" in text
+    row = client.portal.call(orch.pool.fetchrow, "SELECT data, delivered FROM form_submissions WHERE order_id=$1", oid)
+    assert row["delivered"] and row["data"]["name"] == "Пётр"
+    assert client.post("/forms/999999", json=msg).status_code == 404

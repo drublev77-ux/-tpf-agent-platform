@@ -35,7 +35,7 @@ async def _build_on_vercel(ctx: Ctx, files: list[dict[str, str]], version: int, 
     if ctx.deployer is None:
         return RunResult(1, "SANDBOX=vercel needs VERCEL_TOKEN")
     try:
-        dep = await ctx.deployer.deploy(project_name(ctx.order_id), all_files(files), production=False,
+        dep = await ctx.deployer.deploy(project_name(ctx.order_id), all_files(files, ctx.form_endpoint), production=False,
                                         build_command=VERCEL_BUILD_CMD)
     except DeployError as e:
         if getattr(e, "deployment_id", None) is None:
@@ -82,7 +82,7 @@ async def run(ctx: Ctx) -> Outcome:
     if ctx.settings.sandbox == "vercel":
         run_result = await _build_on_vercel(ctx, files, version, report)
     else:
-        workdir = materialize(Path(ctx.settings.workspace_root) / f"order-{ctx.order_id}" / f"v{version}", files)
+        workdir = materialize(Path(ctx.settings.workspace_root) / f"order-{ctx.order_id}" / f"v{version}", files, ctx.form_endpoint)
         run_result = await ctx.sandbox.run(workdir, BUILD_CMD)
     stage = {0: "ok", 10: "install", 20: "build", 30: "audit"}.get(run_result.exit_code, "sandbox")
     report["build"] = {

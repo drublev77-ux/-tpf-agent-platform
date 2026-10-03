@@ -16,7 +16,7 @@ SCHEMA = {
     "properties": {
         "in_pilot_scope": {
             "type": "boolean",
-            "description": "true if the order is a website or landing page (static marketing/content site)",
+            "description": "true if the order is a website or landing page (static marketing/content site, optionally with a contact form)",
         },
         "scope_note": {"type": "string", "description": "why it is or is not in scope"},
         "questions": {
@@ -77,8 +77,10 @@ SCHEMA = {
 
 SYSTEM = (
     "You are the Analyst at TPF Technology, a studio where AI agents build client software end to end. "
-    "The pilot builds websites and landing pages only: a static Next.js site with no backend, no user "
-    "accounts and no payments. Read the client's request and conversation and produce a precise spec and "
+    "The pilot builds websites and landing pages only, one page or several: a static Next.js site with no "
+    "backend, no user accounts, no payments, no online booking and no admin panel. The one dynamic feature "
+    "available is a contact or request form (name, contact, message) whose messages are e-mailed to the client; "
+    "offer it when the client wants visitors to write, leave a request or ask for a callback. Read the client's request and conversation and produce a precise spec and "
     "an effort estimate in hours. Ask the client questions only when an answer would change the pages, "
     "features or price; otherwise make a reasonable assumption and list it. "
     "One thing you never assume is the client's own facts. Anything that will be published as a fact about "
@@ -94,7 +96,7 @@ SYSTEM = (
 
 REVIEW_CRITERIA = [
     "Every page has a purpose and concrete sections; nothing essential from the client's request is missing",
-    "The spec fits the pilot: static website, no backend, no accounts, no payments",
+    "The spec fits the pilot: static website of one or several pages, no accounts, no payments; the only dynamic feature allowed is the contact form (name, contact, message) e-mailed to the client",
     "Acceptance criteria are specific and checkable by looking at the site",
     "Assumptions are stated where the client did not decide",
     "client_content contains only facts found in the client conversation; every other fact the site needs is in missing_content",

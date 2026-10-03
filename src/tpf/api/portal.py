@@ -22,7 +22,8 @@ import asyncpg
 
 from tpf.orchestrator import queue
 from tpf.orchestrator.states import Ev, State, TransitionError
-from tpf.tools.template import all_files
+from tpf.config import get_settings
+from tpf.tools.template import all_files, form_endpoint
 
 router = APIRouter(include_in_schema=False)
 
@@ -304,7 +305,7 @@ async def portal_source(order_id: int, request: Request, t: str = "") -> Respons
         raise HTTPException(404, "not found")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        for f in all_files(code["files"]):
+        for f in all_files(code["files"], form_endpoint(get_settings().public_base_url, order_id)):
             z.writestr(f"tpf-order-{order_id}/{f['path'].lstrip('/')}", f["content"])
     return Response(buf.getvalue(), media_type="application/zip", headers={
         "Content-Disposition": f'attachment; filename="tpf-order-{order_id}.zip"', "Cache-Control": "no-store"})

@@ -41,6 +41,11 @@ class Ctx:
         return self.order["id"]
 
     @property
+    def form_endpoint(self) -> str:
+        """Where this order's site sends its contact form."""
+        return f"{self.settings.public_base_url.rstrip('/')}/forms/{self.order['id']}"
+
+    @property
     def client_language(self) -> str:
         return LANGUAGE_NAMES.get(self.order["language"], "English")
 

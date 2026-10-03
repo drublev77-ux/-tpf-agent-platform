@@ -13,7 +13,7 @@ def project_name(order_id: int) -> str:
 
 async def _files(ctx: Ctx) -> list[dict[str, str]] | None:
     code = await ctx.orch.latest_artifact(ctx.order_id, "code")
-    return all_files(code["files"]) if code else None
+    return all_files(code["files"], ctx.form_endpoint) if code else None
 
 
 async def _reuse_qa_preview(ctx: Ctx) -> Deployment | None:
