@@ -22,6 +22,7 @@ from tpf.orchestrator.states import TASK_FOR_STATE, TransitionError
 from tpf.tools.deploy import Deployer, VercelDeployer
 from tpf.tools.github import GitHubPublisher
 from tpf.tools.sandbox import Sandbox, make_sandbox
+from tpf.tools.telegram import TelegramAPI
 from tpf.tools.tenantdb import make_tenant_db
 
 log = logging.getLogger("tpf.worker")
@@ -33,11 +34,12 @@ class Worker:
     def __init__(
         self, *, pool: asyncpg.Pool, settings: Settings, orch: Orchestrator, llm: LLMGateway,
         sandbox: Sandbox, deployer: Deployer | None, github: GitHubPublisher | None,
-        payments: PaymentGateway | None = None, tenant_db: object | None = None,
+        payments: PaymentGateway | None = None, tenant_db: object | None = None, telegram: object | None = None,
     ) -> None:
         self.pool, self.settings, self.orch, self.llm = pool, settings, orch, llm
         self.sandbox, self.deployer, self.github, self.payments = sandbox, deployer, github, payments
         self.tenant_db = tenant_db
+        self.telegram = telegram or TelegramAPI()
         self.stopping = asyncio.Event()
 
     async def run_once(self) -> bool:
@@ -54,7 +56,7 @@ class Worker:
 
         handler = HANDLERS[task["kind"]]
         ctx = Ctx(self.orch, self.llm, self.settings, self.sandbox, self.deployer, self.github, order,
-                  payments=self.payments, payload=task["payload"] or {}, tenant_db=self.tenant_db)
+                  payments=self.payments, payload=task["payload"] or {}, tenant_db=self.tenant_db, telegram=self.telegram)
         await self.orch.log(order["id"], "task_started", task["kind"], {"task": task["id"], "attempt": task["attempts"]})
         try:
             outcome = await handler(ctx)

@@ -3,12 +3,13 @@ or client change requests."""
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from tpf.agents.base import SAFETY_NOTE, Ctx, Outcome
 from tpf.orchestrator.states import Ev
 from tpf.tools.tenantdb import check_schema_sql
-from tpf.tools.template import MAX_FILE_BYTES, SCHEMA_PATH, kind_of, route_to_page, rules_for, validate_path
+from tpf.tools.template import BOT_HANDLER_PATH, MAX_FILE_BYTES, SCHEMA_PATH, has_database, kind_of, route_to_page, rules_for, validate_path
 
 SCHEMA = {
     "type": "object",
@@ -39,6 +40,10 @@ APP_NOTE = (
     "architecture describes, with empty-state texts for lists that have no records yet. Records the owner will "
     "add through the admin area are not seeded with invented examples. "
 )
+BOT_NOTE = (
+    "This order is a Telegram bot: implement every command and dialog the architecture lists in lib/bot.ts, with "
+    "the exact wording given, and keep each user's place in a dialog in the database. "
+)
 
 
 def check_files(files: list[dict[str, str]], routes: list[str], kind: str = "site") -> list[str]:
@@ -54,11 +59,15 @@ def check_files(files: list[dict[str, str]], routes: list[str], kind: str = "sit
         if f["path"] in paths:
             problems.append(f"duplicate file: {f['path']}")
         paths.add(f["path"])
-    for required in ["app/layout.tsx", *(route_to_page(r) for r in routes), *([SCHEMA_PATH] if kind == "app" else [])]:
+    for required in ["app/layout.tsx", *(route_to_page(r) for r in routes), *([SCHEMA_PATH] if has_database(kind) else []), *([BOT_HANDLER_PATH] if kind == "bot" else [])]:
         if required not in paths:
             problems.append(f"missing required file: {required}")
-    if kind == "app":
+    if has_database(kind):
         for f in files:
+            if "api.telegram.org" in f["content"]:
+                problems.append(f"Telegram is called directly instead of through @/tpf/telegram: {f['path']}")
+            if kind == "bot" and f["path"] == BOT_HANDLER_PATH and not re.search(r"export\s+async\s+function\s+handleUpdate\b", f["content"]):
+                problems.append(f"{BOT_HANDLER_PATH} must export async function handleUpdate(update: TgUpdate)")
             if f["path"] == SCHEMA_PATH:
                 bad = check_schema_sql(f["content"])
                 if bad:
@@ -98,7 +107,8 @@ async def run(ctx: Ctx) -> Outcome:
     feedback = await _feedback(ctx)
     routes = [r["path"] for r in arch["routes"]]
     kind = kind_of(spec)
-    system = SYSTEM + (APP_NOTE if kind == "app" else "") + rules_for(kind) + " " + SAFETY_NOTE
+    system = (SYSTEM + (APP_NOTE if has_database(kind) else "") + (BOT_NOTE if kind == "bot" else "")
+              + rules_for(kind) + " " + SAFETY_NOTE)
 
     prompt = (
         f"Spec:\n{json.dumps(spec, ensure_ascii=False, indent=2)}\n\n"
@@ -113,7 +123,7 @@ async def run(ctx: Ctx) -> Outcome:
             order_id=ctx.order_id, agent="developer", model_class="code",
             system=system,
             prompt=prompt + ("\n\nYour previous output was rejected by static checks:\n" + "\n".join(problems) if problems else ""),
-            schema=SCHEMA, max_tokens=48000 if kind == "app" else 32000,
+            schema=SCHEMA, max_tokens=48000 if has_database(kind) else 32000,
         )
         problems = check_files(out["files"], routes, kind)
         if not problems:

@@ -143,3 +143,116 @@ def test_static_rules_for_applications():
     unsafe = APP_CODE["files"] + [{"path": "lib/q.ts", "content": "sql.unsafe('select 1')"}]
     assert any("sql.unsafe" in p for p in check_files(unsafe, routes, "app"))
     assert any("db/schema.sql" in p for p in check_files(CODE["files"], ["/"], "app"))
+
+
+# --- Telegram bots ---
+
+class FakeTelegram:
+    def __init__(self) -> None:
+        self.webhooks: list[tuple[str, str, str]] = []
+        self.bad_tokens: set[str] = set()
+
+    async def get_me(self, token):
+        from tpf.tools.telegram import TelegramError
+        if token in self.bad_tokens:
+            raise TelegramError("Telegram getMe: Unauthorized")
+        return "glina_test_bot"
+
+    async def set_webhook(self, token, url, secret):
+        self.webhooks.append((token, url, secret))
+
+
+BOT_TOKEN = "123456789:" + "A" * 35
+BOT_FILES = APP_CODE["files"] + [{"path": "lib/bot.ts", "content": "export async function handleUpdate(update: unknown): Promise<void> {}"}]
+
+
+@pytest.fixture
+async def bot_env(app_env):
+    env = app_env
+    env.llm.script["analyst"][0]["spec"] = APP_SPEC | {"product_type": "bot"}
+    env.llm.script["developer"] = [{"files": BOT_FILES, "notes": "bot"}]
+    env.worker.telegram = FakeTelegram()
+    return env
+
+
+async def enter_token(env, oid, token=BOT_TOKEN):
+    """What the portal does when the client submits the token form."""
+    from tpf.orchestrator import queue
+    await env.pool.execute(
+        "INSERT INTO bot_connections (order_id, token, username) VALUES ($1,$2,'glina_test_bot') "
+        "ON CONFLICT (order_id) DO UPDATE SET token = EXCLUDED.token, connected_env = NULL", oid, token)
+    async with env.pool.acquire() as conn:
+        await queue.enqueue(conn, oid, "connect_bot", {})
+
+
+async def test_bot_is_connected_to_review_then_to_production(bot_env):
+    env = bot_env
+    tg = env.worker.telegram
+    oid = await new_app_order(env)
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    order = await env.orch.get_order(oid)
+    assert State(order["state"]) is State.AWAITING_ACCEPTANCE and tg.webhooks == []   # no token yet: nothing to connect
+
+    await enter_token(env, oid)
+    await env.drain()
+    token, url, secret = tg.webhooks[-1]
+    assert token == BOT_TOKEN and url == order["staging_url"] + "/api/tpf-telegram"
+    stg = env.deployer.env[f"tpf-order-{oid}-preview"]
+    from tpf.tools.telegram import webhook_secret
+    assert secret == webhook_secret(stg["SESSION_SECRET"])
+    # The application can read the token the platform keeps for it, and cannot change it.
+    conn = await asyncpg.connect(stg["DATABASE_URL"])
+    assert await conn.fetchval("SELECT value FROM tpf_secrets WHERE key = 'bot_token'") == BOT_TOKEN
+    with pytest.raises(asyncpg.PostgresError):
+        await conn.execute("UPDATE tpf_secrets SET value = 'x'")
+    await conn.close()
+    assert "@glina_test_bot" in (await env.orch.messages(oid))[-1]["text"]
+
+    await env.orch.fire(oid, Ev.ACCEPTED, actor="client")
+    await env.drain()
+    order = await env.orch.get_order(oid)
+    assert order["state"] == State.DELIVERED
+    assert tg.webhooks[-1][1] == order["production_url"] + "/api/tpf-telegram"
+    assert await env.pool.fetchval("SELECT connected_env FROM bot_connections WHERE order_id = $1", oid) == "prod"
+
+
+async def test_token_entered_early_is_used_at_the_first_deployment(bot_env):
+    env = bot_env
+    oid = await new_app_order(env)
+    await env.drain()
+    await enter_token(env, oid)            # while the estimate is still waiting for approval
+    await env.drain()
+    assert env.worker.telegram.webhooks == []
+    assert "сохранён" in (await env.orch.messages(oid))[-1]["text"]
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    assert len(env.worker.telegram.webhooks) == 1
+
+
+async def test_refused_token_tells_the_client_and_keeps_the_order_moving(bot_env):
+    env = bot_env
+    env.worker.telegram.bad_tokens.add(BOT_TOKEN)
+    oid = await new_app_order(env)
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    await enter_token(env, oid)
+    await env.drain()
+    assert State((await env.orch.get_order(oid))["state"]) is State.AWAITING_ACCEPTANCE
+    assert "BotFather" in (await env.orch.messages(oid))[-1]["text"]
+
+
+def test_static_rules_for_bots():
+    from tpf.tools.telegram import TOKEN_RE
+    routes = ["/", "/admin", "/admin/login"]
+    assert check_files(BOT_FILES, routes, "bot") == []
+    assert any("lib/bot.ts" in p for p in check_files(APP_CODE["files"], routes, "bot"))
+    direct = BOT_FILES + [{"path": "lib/x.ts", "content": "fetch('https://api.telegram.org/bot' + t)"}]
+    assert any("directly" in p for p in check_files(direct, routes, "bot"))
+    assert check_schema_sql("CREATE TABLE IF NOT EXISTS tpf_secrets (key text);")
+    assert validate_path("app/api/tpf-telegram/route.ts", "bot")
+    paths = {f["path"] for f in all_files(BOT_FILES, "x", "bot")}
+    assert {"tpf/telegram.ts", "app/api/tpf-telegram/route.ts", "tpf/db.ts"} <= paths
+    assert TOKEN_RE.match(BOT_TOKEN) and not TOKEN_RE.match("hello") and not TOKEN_RE.match("123:abc")

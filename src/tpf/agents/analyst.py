@@ -27,9 +27,10 @@ SCHEMA = {
             "type": "object",
             "properties": {
                 "product_type": {
-                    "type": "string", "enum": ["site", "app"],
+                    "type": "string", "enum": ["site", "app", "bot"],
                     "description": "'site': pages with fixed content (optionally a contact form). 'app': a web application "
-                                   "that stores data in a database and has an owner-only admin area.",
+                                   "that stores data in a database and has an owner-only admin area. 'bot': a Telegram bot "
+                                   "with a database and a web admin area for its owner.",
                 },
                 "title": {"type": "string"},
                 "summary": {"type": "string"},
@@ -98,9 +99,23 @@ SCOPE_APP = (
     "mobile app. In the spec of an application, list the admin area as a page, and state for every kind of record "
     "which fields it has, who creates it (visitor or owner) and what the owner can do with it. "
 )
+SCOPE_BOT = (
+    "A Telegram bot (product_type 'bot'), when the client wants people to interact in Telegram: commands and a "
+    "menu of buttons, answers to frequent questions, a catalogue or schedule shown in the chat, step-by-step "
+    "dialogs that collect a request, booking or order without payment, notifications to the owner in Telegram "
+    "about new records, and messages from the owner to the bot's users. It comes with a small web admin area "
+    "where the owner, signed in with one password, sees users and records and edits the lists and texts the bot "
+    "shows. The bot answers by fixed rules, not by artificial intelligence; it has no payments, does not store "
+    "photos or files users send, does not moderate groups or channels and has no integrations with outside "
+    "services. In the spec of a bot, describe in pages the bot's commands and dialogs step by step (one entry "
+    "per command or dialog, its sections being the steps and the buttons shown) plus the admin area, and state "
+    "for every kind of record its fields and what the owner can do with it. The client creates the bot in "
+    "Telegram's @BotFather and enters its token on their order page later: never ask for the token in questions "
+    "and do not list it as missing content. "
+)
 SCOPE_END = (
-    "Anything outside this — a native mobile app, an online shop with payments, a Telegram bot, a system with "
-    "user accounts, integrations — is out of scope: set in_pilot_scope to false and say why in scope_note. "
+    "Anything outside this — a native mobile app, an online shop with payments, a bot for another messenger, a "
+    "system with user accounts, integrations — is out of scope: set in_pilot_scope to false and say why in scope_note. "
 )
 RULES = (
     "Read the client's request and conversation and produce a precise spec and an effort estimate in hours. Ask "
@@ -123,16 +138,16 @@ RULES = (
 def system_prompt(apps_enabled: bool) -> str:
     return (
         "You are the Analyst at TPF Technology, a studio where AI agents build client software end to end. "
-        + SCOPE_SITE + (SCOPE_APP if apps_enabled else "Applications with a database are not available: product_type is always 'site'. ")
+        + SCOPE_SITE + (SCOPE_APP + SCOPE_BOT if apps_enabled else "Applications with a database and Telegram bots are not available: product_type is always 'site'. ")
         + SCOPE_END + RULES + SAFETY_NOTE
     )
 
 
 REVIEW_CRITERIA = [
     "Every page has a purpose and concrete sections; nothing essential from the client's request is missing",
-    "The spec fits what the studio builds: a static website (product_type 'site', its only dynamic feature a contact form), or a web application (product_type 'app') with a database and an owner-only admin area; either way no visitor accounts, payments, uploads or integrations",
-    "product_type is 'app' only if the client needs data stored or managed; for an app, every kind of record has its fields and the owner's actions on it described",
-    "Acceptance criteria are specific and checkable by looking at the site",
+    "The spec fits what the studio builds: a static website (product_type 'site', its only dynamic feature a contact form), a web application (product_type 'app') with a database and an owner-only admin area, or a rule-based Telegram bot (product_type 'bot') with a database and a web admin area; in every case no visitor accounts, payments, uploads or integrations",
+    "product_type is 'app' only if the client needs data stored or managed and 'bot' only if the client asked for a Telegram bot; for an app or a bot, every kind of record has its fields and the owner's actions on it described; for a bot, every command and dialog is described step by step",
+    "Acceptance criteria are specific and checkable by looking at the site or by talking to the bot",
     "Assumptions are stated where the client did not decide",
     "client_content contains only facts found in the client conversation; every other fact the site needs is in missing_content",
     "The estimate covers every page and feature and its hours are plausible for the scope",

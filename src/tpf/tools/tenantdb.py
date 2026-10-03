@@ -51,6 +51,8 @@ def check_schema_sql(text: str) -> str | None:
     m = _FORBIDDEN.search(bare)
     if m:
         return f"db/schema.sql may only create and extend tables and indexes and insert seed rows; found: {m.group(0)!r}"
+    if re.search(r"\btpf_\w+", bare, re.I):
+        return "db/schema.sql must not create or change tables whose names start with tpf_: the platform owns them"
     if _QUALIFIED.search(bare):
         return "db/schema.sql must not use schema-qualified names"
     return None
@@ -112,6 +114,23 @@ class TenantDB:
         finally:
             await admin.close()
         return AppDatabase(role, self._url(role, password), row["session_secret"], row["admin_password"])
+
+    async def set_secrets(self, db: AppDatabase, values: dict[str, str]) -> None:
+        """Values the platform keeps for the application (a bot token): a table in the application's schema
+        that its role can read but not change."""
+        role = db.role
+        if not re.fullmatch(r"o\d+_(stg|prod)", role):
+            raise TenantDBError("unexpected role name")
+        admin = await self._connect(self.admin_url)
+        try:
+            await admin.execute(f"CREATE TABLE IF NOT EXISTS {role}.tpf_secrets (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            await admin.execute(f"GRANT SELECT ON {role}.tpf_secrets TO {role}")
+            for key, value in values.items():
+                await admin.execute(
+                    f"INSERT INTO {role}.tpf_secrets (key, value) VALUES ($1, $2) "
+                    "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", key, value)
+        finally:
+            await admin.close()
 
     async def apply_schema(self, db: AppDatabase, schema_sql: str) -> None:
         """Run the application's schema.sql as the application's own role, inside its own schema."""

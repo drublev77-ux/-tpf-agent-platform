@@ -190,6 +190,139 @@ export async function GET() {
 }
 '''
 
+# --- Telegram bots: an application whose main interface is a chat; Telegram calls the webhook below ---
+
+BOT_TELEGRAM = '''import "server-only";
+import { createHash } from "crypto";
+import { sql } from "@/tpf/db";
+
+// The bot's token is kept by the platform in a table this application can only read.
+let cached: { token: string; username: string; at: number } | null = null;
+
+async function secrets(): Promise<{ token: string; username: string }> {
+  if (cached && Date.now() - cached.at < 60_000) return cached;
+  const rows = await sql`select key, value from tpf_secrets where key in ('bot_token', 'bot_username')`;
+  const get = (k: string) => String(rows.find((r) => r.key === k)?.value ?? "");
+  cached = { token: get("bot_token"), username: get("bot_username"), at: Date.now() };
+  return cached;
+}
+
+/** The bot's @username without the @, or "" while the owner has not connected a bot yet. */
+export async function botUsername(): Promise<string> {
+  try {
+    return (await secrets()).username;
+  } catch {
+    return "";
+  }
+}
+
+/** The value Telegram sends in X-Telegram-Bot-Api-Secret-Token; the platform registers the same one. */
+export function webhookSecret(): string {
+  return createHash("sha256").update(`tg:${process.env.SESSION_SECRET ?? ""}`).digest("hex");
+}
+
+export type TgUser = { id: number; first_name?: string; last_name?: string; username?: string; language_code?: string };
+export type TgChat = { id: number; type: string };
+export type TgMessage = { message_id: number; chat: TgChat; from?: TgUser; text?: string; contact?: { phone_number: string } };
+export type TgCallbackQuery = { id: string; from: TgUser; message?: TgMessage; data?: string };
+export type TgUpdate = { update_id: number; message?: TgMessage; callback_query?: TgCallbackQuery };
+export type TgButton = { text: string; callback_data?: string; url?: string };
+export type TgExtra = { reply_markup?: unknown; parse_mode?: "HTML"; disable_web_page_preview?: boolean };
+
+/** Call any Bot API method. Returns the result, or null when Telegram refused (the reason is logged). */
+export async function tg<T = unknown>(method: string, params: Record<string, unknown> = {}): Promise<T | null> {
+  const { token } = await secrets();
+  if (!token) return null;
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(params),
+      signal: AbortSignal.timeout(8000),
+    });
+    const body = (await r.json()) as { ok: boolean; result?: T; description?: string };
+    if (!body.ok) console.error(`telegram ${method}: ${body.description}`);
+    return body.ok ? (body.result as T) : null;
+  } catch (e) {
+    console.error(`telegram ${method}: ${e instanceof Error ? e.name : "error"}`);
+    return null;
+  }
+}
+
+/** Send a text message. `buttons` is rows of inline buttons. */
+export function sendMessage(chatId: number, text: string, buttons?: TgButton[][], extra: TgExtra = {}) {
+  return tg<TgMessage>("sendMessage", {
+    chat_id: chatId, text: text.slice(0, 4096), ...(buttons ? { reply_markup: { inline_keyboard: buttons } } : {}), ...extra,
+  });
+}
+
+/** Replace the text and buttons of a message the bot sent earlier. */
+export function editMessage(chatId: number, messageId: number, text: string, buttons?: TgButton[][]) {
+  return tg("editMessageText", {
+    chat_id: chatId, message_id: messageId, text: text.slice(0, 4096),
+    ...(buttons ? { reply_markup: { inline_keyboard: buttons } } : {}),
+  });
+}
+
+/** Stop the spinner on a pressed inline button; `text` shows as a short toast. */
+export function answerCallback(id: string, text?: string) {
+  return tg("answerCallbackQuery", { callback_query_id: id, ...(text ? { text: text.slice(0, 200) } : {}) });
+}
+'''
+
+BOT_WEBHOOK = '''import { timingSafeEqual } from "crypto";
+import { handleUpdate } from "@/lib/bot";
+import { webhookSecret, type TgUpdate } from "@/tpf/telegram";
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 30;
+
+// Telegram delivers every message and button press here. Only requests carrying the secret the platform
+// registered with Telegram are accepted.
+export async function POST(request: Request) {
+  const given = Buffer.from(request.headers.get("x-telegram-bot-api-secret-token") ?? "");
+  const expected = Buffer.from(webhookSecret());
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+    return new Response("forbidden", { status: 403 });
+  }
+  try {
+    await handleUpdate((await request.json()) as TgUpdate);
+  } catch (e) {
+    // Answer 200 anyway: otherwise Telegram redelivers the same update again and again.
+    console.error("bot update failed:", e instanceof Error ? e.message : "error");
+  }
+  return Response.json({ ok: true });
+}
+'''
+
+BOT_WEBHOOK_PATH = "app/api/tpf-telegram/route.ts"
+BOT_HANDLER_PATH = "lib/bot.ts"
+
+BOT_RULES = (
+    "TELEGRAM BOT: this application's main interface is a Telegram bot. The platform owns the webhook "
+    "(app/api/tpf-telegram/route.ts) and `@/tpf/telegram`; you write lib/bot.ts, which must export "
+    "`async function handleUpdate(update: TgUpdate): Promise<void>` and handle `update.message` (text, commands "
+    "such as /start and /help, a shared contact) and `update.callback_query` (inline button presses; always call "
+    "`answerCallback(query.id)`). Talk to Telegram only through `import { sendMessage, editMessage, "
+    "answerCallback, tg, botUsername, type TgUpdate, type TgButton } from '@/tpf/telegram'`: "
+    "`sendMessage(chatId, text, buttons?)` where buttons is rows of `{ text, callback_data }` or `{ text, url }` "
+    "(callback_data at most 64 bytes); `tg(method, params)` for any other Bot API method. Never read or print the "
+    "bot token and never call api.telegram.org yourself. "
+    "The code runs on serverless functions: nothing is kept in memory between updates, so every step of a dialog "
+    "(which question the user is on, what they have answered so far) is stored in the database, keyed by the "
+    "Telegram chat id (BIGINT). Handle each update in a few seconds; no polling, timers or background work. "
+    "Unknown text gets a short hint with the main menu; /start always resets the dialog and shows the menu. Every "
+    "text the bot sends is plain text in the bot's language (no Markdown) unless you pass parse_mode HTML and "
+    "escape user input. Treat everything a user sends as untrusted: trim it, limit its length and store it through "
+    "${} parameters. Keep a users table (chat id, name, username, first seen) so the owner can see who uses the bot. "
+    "To notify the owner in Telegram about new records, let the owner link their own chat: the admin area shows a "
+    "one-time code, the owner sends `/link CODE` to the bot, and the bot stores that chat id as an owner chat; "
+    "send notifications only to linked owner chats. Messages to many users at once are sent from an admin server "
+    "action to at most 25 recipients per call, with a 'send next batch' button for the rest. "
+    "Table names starting with tpf_ belong to the platform: do not create, read or change them. "
+    "The web part is small: the home page '/' names the bot and links to it with "
+    "`https://t.me/${await botUsername()}` (show a neutral text while botUsername() is empty), and /admin lets the "
+    "owner see and manage the bot's data and edit the texts and lists the spec says the owner controls. "
+)
+
 HEALTH_PATH = "app/api/tpf-health/route.ts"
 SCHEMA_PATH = "db/schema.sql"
 
@@ -254,14 +387,14 @@ TEMPLATE_RULES = (
 
 def validate_path(path: str, kind: str = "site") -> str | None:
     """Return an error message, or None if the generated file path is acceptable."""
-    app = kind == "app"
+    app = has_database(kind)
     if not _SAFE_PATH.match(path) or ".." in path.split("/") or path.startswith("/"):
         return f"unsafe path: {path}"
     if not path.startswith(APP_PREFIXES if app else ALLOWED_PREFIXES):
         return f"path outside allowed folders: {path}"
     if not path.endswith(APP_SUFFIXES if app else ALLOWED_SUFFIXES):
         return f"file type not allowed: {path}"
-    if path.startswith("app/api/tpf-health/"):
+    if path.startswith(("app/api/tpf-health/", "app/api/tpf-telegram/")):
         return f"path reserved by the platform: {path}"
     if path.startswith("db/") and path != SCHEMA_PATH:
         return f"the only file allowed under db/ is {SCHEMA_PATH}: {path}"
@@ -270,6 +403,8 @@ def validate_path(path: str, kind: str = "site") -> str | None:
 
 def rules_for(kind: str) -> str:
     """The template rules an agent works under: a static site, or an application with a database."""
+    if kind == "bot":
+        return APP_RULES + BOT_RULES
     return (APP_RULES + CONTACT_FORM_RULES) if kind == "app" else TEMPLATE_RULES
 
 
@@ -285,12 +420,14 @@ def platform_files(form_endpoint: str = "", kind: str = "site") -> dict[str, str
         "tpf/ContactForm.tsx": CONTACT_FORM,
         "tpf/config.ts": f"export const FORM_ENDPOINT = {json.dumps(form_endpoint)};\n",
     }
-    if kind == "app":
+    if has_database(kind):
         files |= {
             "package.json": APP_PACKAGE, "next.config.mjs": APP_NEXT_CONFIG,
             "tpf/db.ts": APP_DB, "tpf/auth.ts": APP_AUTH, HEALTH_PATH: APP_HEALTH,
             ".env.example": "DATABASE_URL=postgres://user:password@host:6543/postgres\nSESSION_SECRET=\nADMIN_PASSWORD=\n",
         }
+    if kind == "bot":
+        files |= {"tpf/telegram.ts": BOT_TELEGRAM, BOT_WEBHOOK_PATH: BOT_WEBHOOK}
     return files
 
 
@@ -322,5 +459,11 @@ def all_files(files: list[dict[str, str]], form_endpoint: str = "", kind: str = 
 
 
 def kind_of(spec: dict | None) -> str:
-    """'app' for an order whose spec asks for an application with a database, else 'site'."""
-    return "app" if (spec or {}).get("product_type") == "app" else "site"
+    """What the order is: 'site' (static pages), 'app' (database and admin area) or 'bot' (a Telegram bot
+    with a database and admin area)."""
+    kind = (spec or {}).get("product_type")
+    return kind if kind in ("app", "bot") else "site"
+
+
+def has_database(kind: str) -> bool:
+    return kind in ("app", "bot")

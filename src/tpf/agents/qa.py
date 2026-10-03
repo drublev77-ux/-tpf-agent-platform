@@ -15,7 +15,7 @@ from tpf.agents.devops import staging_project
 from tpf.orchestrator.states import Ev
 from tpf.tools.deploy import DeployError
 from tpf.tools.sandbox import RunResult
-from tpf.tools.template import SCHEMA_PATH, all_files, kind_of, materialize, route_to_page
+from tpf.tools.template import SCHEMA_PATH, all_files, has_database, kind_of, materialize, route_to_page
 from tpf.tools.tenantdb import TenantDBError
 
 BUILD_CMD = (
@@ -41,6 +41,14 @@ APP_CRITERIA = [
     "Every page, layout or route handler that queries the database exports dynamic = 'force-dynamic'",
     "No environment variable, password or raw database error is sent to the browser",
     "Lists the owner fills in start empty with an empty-state text; no invented sample records are seeded",
+]
+BOT_CRITERIA = [
+    "lib/bot.ts implements every command and dialog in the architecture's bot list with the wording given, answers "
+    "every callback query with answerCallback, and replies to unknown text with a hint and the main menu",
+    "Each user's place in a dialog is stored in the database by chat id; nothing relies on memory between updates",
+    "Telegram is reached only through @/tpf/telegram; the bot token is never read, logged or shown",
+    "Notifications go only to owner chats linked with a one-time code; a message to many users sends at most 25 per call",
+    "Text from users is trimmed and length-limited before it is stored or sent back",
 ]
 
 
@@ -72,7 +80,7 @@ async def _build_on_vercel(ctx: Ctx, files: list[dict[str, str]], version: int, 
         # npm audit prints "found N vulnerabilities" / "Severity:" only when it is the step that failed.
         code = 30 if ("npm audit" in log and "Severity:" in log) else 20
         return RunResult(code, log)
-    if kind == "app":
+    if has_database(kind):
         problem = await ctx.deployer.health(dep.url)
         if problem:
             return RunResult(40, f"The application was built but does not answer with a working database: {problem}")
@@ -112,7 +120,7 @@ async def run(ctx: Ctx) -> Outcome:
         "SELECT max(version) FROM artifacts WHERE order_id = $1 AND kind = 'code'", ctx.order_id
     )
     schema_error = None
-    if kind == "app":
+    if has_database(kind):
         if ctx.tenant_db is None:
             return Outcome(escalate="Заказ — приложение с базой данных, но TENANT_DATABASE_URL не задан")
         try:
@@ -147,7 +155,8 @@ async def run(ctx: Ctx) -> Outcome:
                 "placeholder in square brackets",
                 "Implements every route and section in the architecture",
                 "Accessible: semantic HTML, alt text on images, labels on form fields",
-                *(APP_CRITERIA if kind == "app" else []),
+                *(APP_CRITERIA if has_database(kind) else []),
+                *(BOT_CRITERIA if kind == "bot" else []),
             ],
             context=(f"Architecture:\n{json.dumps(arch, ensure_ascii=False)}\n\n"
                      f"Spec client_content (the only facts the client gave):\n"

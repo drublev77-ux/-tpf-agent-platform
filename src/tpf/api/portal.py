@@ -23,13 +23,14 @@ import asyncpg
 from tpf.orchestrator import queue
 from tpf.orchestrator.states import Ev, State, TransitionError
 from tpf.config import get_settings
+from tpf.tools.telegram import TOKEN_RE, TelegramAPI, TelegramError
 from tpf.tools.template import all_files, form_endpoint, kind_of
 
 router = APIRouter(include_in_schema=False)
 
 T: dict[str, dict[str, str]] = {
     "ru": {
-        "admin": "Панель управления", "admin_note": "Здесь вы сами добавляете и меняете данные приложения. Пароль никому не передавайте.", "admin_stg_note": "Это проверочная версия: данные из неё в рабочую версию не переносятся, у рабочей будет свой пароль.", "password": "Пароль", "inbox": "Сообщения с формы вашего сайта", "inbox_note": "Каждое сообщение мы также пересылаем вам на почту. Здесь последние 50.", "missing": "Нужно от вас — пока на сайте заглушки", "source": "Исходный код", "zip": "Скачать ZIP", "gh_label": "Ваше имя пользователя на GitHub — пригласим в приватный репозиторий", "gh_btn": "Получить доступ", "title": "Заказ №{id}", "status": "Статус", "conversation": "Переписка", "you": "Вы", "studio": "TPF Technology",
+        "bot": "Telegram-бот", "bot_how": "Создайте бота в Telegram: откройте @BotFather, отправьте /newbot, задайте имя — он пришлёт токен вида 123456789:AA… Вставьте его сюда. Токен хранится у нас в закрытом виде; не пересылайте его в переписке.", "bot_token": "Токен бота", "bot_save": "Подключить бота", "bot_on": "Подключён бот", "bot_wait": "Токен сохранён. Бот заработает, когда будет готова версия для проверки.", "bot_stg": "Сейчас бот работает на проверочной версии.", "bot_change": "Заменить токен", "admin": "Панель управления", "admin_note": "Здесь вы сами добавляете и меняете данные приложения. Пароль никому не передавайте.", "admin_stg_note": "Это проверочная версия: данные из неё в рабочую версию не переносятся, у рабочей будет свой пароль.", "password": "Пароль", "inbox": "Сообщения с формы вашего сайта", "inbox_note": "Каждое сообщение мы также пересылаем вам на почту. Здесь последние 50.", "missing": "Нужно от вас — пока на сайте заглушки", "source": "Исходный код", "zip": "Скачать ZIP", "gh_label": "Ваше имя пользователя на GitHub — пригласим в приватный репозиторий", "gh_btn": "Получить доступ", "title": "Заказ №{id}", "status": "Статус", "conversation": "Переписка", "you": "Вы", "studio": "TPF Technology",
         "spec": "Техническое задание", "pages": "Страницы", "criteria": "Критерии приёмки", "estimate": "Смета",
         "hours": "Трудоёмкость", "price": "Стоимость", "duration": "Срок", "days": "дн.", "h": "ч",
         "pay_pre": "Предоплата", "pay_final": "Остаток перед запуском", "paid": "оплачено", "pay_now": "Оплатить",
@@ -40,7 +41,7 @@ T: dict[str, dict[str, str]] = {
         "err": "Не получилось: {why}", "open_link": "Открыть",
     },
     "en": {
-        "admin": "Admin area", "admin_note": "This is where you add and edit the application's data yourself. Keep the password private.", "admin_stg_note": "This is the review version: its data is not carried over to the live version, which gets its own password.", "password": "Password", "inbox": "Messages from your site's form", "inbox_note": "Each message is also e-mailed to you. The latest 50 are shown here.", "missing": "Needed from you — the site shows placeholders for now", "source": "Source code", "zip": "Download ZIP", "gh_label": "Your GitHub username — we will invite you to the private repository", "gh_btn": "Get access", "title": "Order #{id}", "status": "Status", "conversation": "Conversation", "you": "You", "studio": "TPF Technology",
+        "bot": "Telegram bot", "bot_how": "Create the bot in Telegram: open @BotFather, send /newbot, choose a name — it replies with a token like 123456789:AA… Paste it here. We store the token privately; do not send it in messages.", "bot_token": "Bot token", "bot_save": "Connect the bot", "bot_on": "Connected bot", "bot_wait": "The token is saved. The bot will start working when the review version is ready.", "bot_stg": "The bot is currently running on the review version.", "bot_change": "Replace the token", "admin": "Admin area", "admin_note": "This is where you add and edit the application's data yourself. Keep the password private.", "admin_stg_note": "This is the review version: its data is not carried over to the live version, which gets its own password.", "password": "Password", "inbox": "Messages from your site's form", "inbox_note": "Each message is also e-mailed to you. The latest 50 are shown here.", "missing": "Needed from you — the site shows placeholders for now", "source": "Source code", "zip": "Download ZIP", "gh_label": "Your GitHub username — we will invite you to the private repository", "gh_btn": "Get access", "title": "Order #{id}", "status": "Status", "conversation": "Conversation", "you": "You", "studio": "TPF Technology",
         "spec": "Specification", "pages": "Pages", "criteria": "Acceptance criteria", "estimate": "Estimate",
         "hours": "Effort", "price": "Price", "duration": "Timeline", "days": "days", "h": "h",
         "pay_pre": "Deposit", "pay_final": "Balance before release", "paid": "paid", "pay_now": "Pay now",
@@ -51,7 +52,7 @@ T: dict[str, dict[str, str]] = {
         "err": "Could not do that: {why}", "open_link": "Open",
     },
     "zh": {
-        "admin": "管理后台", "admin_note": "您可以在这里自行添加和修改应用数据。请勿泄露密码。", "admin_stg_note": "这是审核版本：其中的数据不会带到正式版本，正式版本会有单独的密码。", "password": "密码", "inbox": "您网站表单收到的留言", "inbox_note": "每条留言也会通过邮件发送给您。此处显示最近 50 条。", "missing": "需要您提供——网站目前显示占位符", "source": "源代码", "zip": "下载 ZIP", "gh_label": "您的 GitHub 用户名——我们将邀请您加入私有仓库", "gh_btn": "获取访问权限", "title": "订单 #{id}", "status": "状态", "conversation": "沟通记录", "you": "您", "studio": "TPF Technology",
+        "bot": "Telegram 机器人", "bot_how": "在 Telegram 中创建机器人：打开 @BotFather，发送 /newbot，设置名称——它会回复形如 123456789:AA… 的令牌。请粘贴到此处。令牌由我们保密存储；请勿在消息中发送。", "bot_token": "机器人令牌", "bot_save": "连接机器人", "bot_on": "已连接机器人", "bot_wait": "令牌已保存。审核版本准备好后机器人将开始工作。", "bot_stg": "机器人目前运行在审核版本上。", "bot_change": "更换令牌", "admin": "管理后台", "admin_note": "您可以在这里自行添加和修改应用数据。请勿泄露密码。", "admin_stg_note": "这是审核版本：其中的数据不会带到正式版本，正式版本会有单独的密码。", "password": "密码", "inbox": "您网站表单收到的留言", "inbox_note": "每条留言也会通过邮件发送给您。此处显示最近 50 条。", "missing": "需要您提供——网站目前显示占位符", "source": "源代码", "zip": "下载 ZIP", "gh_label": "您的 GitHub 用户名——我们将邀请您加入私有仓库", "gh_btn": "获取访问权限", "title": "订单 #{id}", "status": "状态", "conversation": "沟通记录", "you": "您", "studio": "TPF Technology",
         "spec": "需求规格书", "pages": "页面", "criteria": "验收标准", "estimate": "报价",
         "hours": "工作量", "price": "价格", "duration": "工期", "days": "天", "h": "小时",
         "pay_pre": "预付款", "pay_final": "上线前尾款", "paid": "已付", "pay_now": "立即付款",
@@ -86,20 +87,20 @@ STATUS: dict[str, dict[str, str]] = {
 
 DONE = {
     "ru": {"message": "ответ отправлен", "approved": "смета утверждена", "rejected": "замечания по смете отправлены",
-           "accepted": "работа принята", "changes": "правки отправлены", "repo": "запрос отправлен, приглашение придёт от GitHub"},
+           "accepted": "работа принята", "changes": "правки отправлены", "repo": "запрос отправлен, приглашение придёт от GitHub", "bot": "токен принят, подключаем бота"},
     "en": {"message": "reply sent", "approved": "estimate approved", "rejected": "estimate comments sent",
-           "accepted": "work accepted", "changes": "change request sent", "repo": "request sent, GitHub will deliver the invitation"},
+           "accepted": "work accepted", "changes": "change request sent", "repo": "request sent, GitHub will deliver the invitation", "bot": "token accepted, connecting the bot"},
     "zh": {"message": "回复已发送", "approved": "报价已确认", "rejected": "报价意见已发送",
-           "accepted": "已验收", "changes": "修改意见已发送", "repo": "请求已发送，GitHub 将发出邀请"},
+           "accepted": "已验收", "changes": "修改意见已发送", "repo": "请求已发送，GitHub 将发出邀请", "bot": "令牌已接受，正在连接机器人"},
 }
 
 ERR = {
     "ru": {"state": "сейчас это действие недоступно", "comment": "напишите, что нужно изменить", "empty": "пустое сообщение",
-           "gh": "имя пользователя GitHub указано неверно", "busy": "предыдущий запрос ещё выполняется"},
+           "gh": "имя пользователя GitHub указано неверно", "token": "Telegram не принял этот токен; скопируйте его из @BotFather ещё раз", "busy": "предыдущий запрос ещё выполняется"},
     "en": {"state": "this action is not available right now", "comment": "please tell us what to change", "empty": "the message is empty",
-           "gh": "that GitHub username is not valid", "busy": "the previous request is still running"},
+           "gh": "that GitHub username is not valid", "token": "Telegram did not accept this token; copy it from @BotFather again", "busy": "the previous request is still running"},
     "zh": {"state": "当前无法执行此操作", "comment": "请说明需要修改的内容", "empty": "消息为空",
-           "gh": "GitHub 用户名无效", "busy": "上一个请求仍在处理中"},
+           "gh": "GitHub 用户名无效", "token": "Telegram 未接受此令牌；请从 @BotFather 重新复制", "busy": "上一个请求仍在处理中"},
 }
 GH_USER = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$")
 
@@ -115,7 +116,7 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0}dt{color:va
 ul{margin:6px 0 0;padding-left:20px}.muted{color:var(--muted)}
 .btn{display:inline-block;min-height:44px;padding:11px 20px;border-radius:999px;border:0;background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:700;text-decoration:none;cursor:pointer}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}.btn:focus-visible,textarea:focus-visible{outline:2px solid var(--ok);outline-offset:2px}
-form{margin-top:12px}input[type=text],input:not([type]){width:100%;height:48px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}textarea{width:100%;min-height:96px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+form{margin-top:12px}input[type=text],input[type=password],input:not([type]){width:100%;height:48px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}textarea{width:100%;min-height:96px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
 label{display:block;font-size:14px;color:var(--muted);margin-bottom:6px}.row{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
 .notice{border-color:var(--ok)}.error{border-color:var(--warn)}a{color:var(--accent)}
 """
@@ -185,6 +186,8 @@ async def portal(order_id: int, request: Request, t: str = "", done: str = "", e
                 f'<input type="hidden" name="approved" value="0"><label for="c2">{tr["comment_req"]}</label>'
                 f'<textarea id="c2" name="comment" required></textarea><div class="row"><button class="btn ghost">{tr["changes"]}</button></div>')
             + "</section>")
+    if kind_of(spec) == "bot" and st not in (State.CANCELLED,):
+        parts.append(await _bot_block(o, order_id, t, tr))
     if st == State.AWAITING_ACCEPTANCE and order["staging_url"]:
         parts.append(await _admin_block(o, order_id, "stg", order["staging_url"], tr))
     if order["production_url"]:
@@ -309,6 +312,25 @@ async def portal_acceptance(order_id: int, request: Request) -> RedirectResponse
                       "accepted" if approved else "changes", comment)
 
 
+async def _bot_block(o: Any, order_id: int, t: str, tr: dict[str, str]) -> str:
+    """For a Telegram bot order: where the client enters the bot token, and which bot is connected."""
+    bot = await o.pool.fetchrow("SELECT username, connected_env FROM bot_connections WHERE order_id = $1", order_id)
+    field = (f'<label for="bt">{tr["bot_token"]}</label><input id="bt" name="token" type="password" required '
+             f'autocomplete="off" spellcheck="false" maxlength="80">')
+    if bot is None:
+        body = f'<p class="muted">{escape(tr["bot_how"])}</p>' + _form(
+            f"/portal/{order_id}/bot-token", t, field + f'<div class="row"><button class="btn">{tr["bot_save"]}</button></div>')
+    else:
+        name = escape(bot["username"])
+        status = tr["bot_wait"] if bot["connected_env"] is None else (tr["bot_stg"] if bot["connected_env"] == "stg" else "")
+        body = (f'<p>{tr["bot_on"]}: <a href="https://t.me/{name}" target="_blank" rel="noopener">@{name}</a></p>'
+                + (f'<p class="muted">{escape(status)}</p>' if status else "")
+                + f'<details><summary class="muted">{tr["bot_change"]}</summary>' + _form(
+                    f"/portal/{order_id}/bot-token", t, field + f'<div class="row"><button class="btn ghost">{tr["bot_save"]}</button></div>')
+                + "</details>")
+    return f'<section><h2>{tr["bot"]}</h2>{body}</section>'
+
+
 async def _admin_block(o: Any, order_id: int, env: str, site_url: str, tr: dict[str, str]) -> str:
     """For an application: where its admin area is and the owner's password. Empty for a plain site."""
     password = await o.pool.fetchval(
@@ -336,6 +358,34 @@ async def portal_source(order_id: int, request: Request, t: str = "") -> Respons
             z.writestr(f"tpf-order-{order_id}/{f['path'].lstrip('/')}", f["content"])
     return Response(buf.getvalue(), media_type="application/zip", headers={
         "Content-Disposition": f'attachment; filename="tpf-order-{order_id}.zip"', "Cache-Control": "no-store"})
+
+
+@router.post("/portal/{order_id}/bot-token")
+async def portal_bot_token(order_id: int, request: Request) -> RedirectResponse:
+    form = await _form_data(request)
+    order = await _load(request, order_id, form.get("t", ""))
+    o = request.app.state.orch
+    token = form.get("token", "").strip()
+    if kind_of(await o.latest_artifact(order_id, "spec")) != "bot" or order["state"] == State.CANCELLED:
+        return _back(order_id, form["t"], err="state")
+    if not TOKEN_RE.match(token):
+        return _back(order_id, form["t"], err="token")
+    telegram = getattr(request.app.state, "telegram", None) or TelegramAPI()
+    try:
+        username = await telegram.get_me(token)
+    except TelegramError:
+        return _back(order_id, form["t"], err="token")
+    await o.pool.execute(
+        "INSERT INTO bot_connections (order_id, token, username) VALUES ($1, $2, $3) "
+        "ON CONFLICT (order_id) DO UPDATE SET token = EXCLUDED.token, username = EXCLUDED.username, "
+        "connected_env = NULL, updated_at = now()", order_id, token, username)
+    await o.log(order_id, "bot_token_entered", "client", {"username": username}, kind="client")
+    try:
+        async with o.pool.acquire() as conn:
+            await queue.enqueue(conn, order_id, "connect_bot", {})
+    except asyncpg.UniqueViolationError:
+        pass  # agents are working on the order right now: the next deployment connects the bot
+    return _back(order_id, form["t"], done="bot")
 
 
 @router.post("/portal/{order_id}/repo-access")
