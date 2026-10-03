@@ -130,7 +130,7 @@ class TenantDB:
 
     async def selftest(self) -> str:
         """Create a throwaway role and schema, use them the way an application would, and remove them."""
-        role, password = "o0_stg", secrets.token_hex(20)
+        role, password = f"o0{secrets.randbelow(10**6)}_stg", secrets.token_hex(20)   # unique: workers may start together
         admin = await self._connect(self.admin_url)
         try:
             await admin.execute(f"DROP SCHEMA IF EXISTS {role} CASCADE")
