@@ -41,7 +41,9 @@ class VercelDeployer:
     def __init__(self, settings: Settings) -> None:
         if not settings.vercel_token:
             raise DeployError("VERCEL_TOKEN is not set")
-        self.params = {"teamId": settings.vercel_team_id} if settings.vercel_team_id else {}
+        # A token scoped to a team is refused without the team; accept its id (team_…) or its slug.
+        team = settings.vercel_team_id.strip()
+        self.params = ({"teamId": team} if team.startswith("team_") else {"slug": team}) if team else {}
         self.client = httpx.AsyncClient(
             base_url=self.API, timeout=120,
             headers={"Authorization": f"Bearer {settings.vercel_token}"},
