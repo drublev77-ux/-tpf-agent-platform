@@ -110,18 +110,49 @@ APP_NEXT_CONFIG = "/** @type {import('next').NextConfig} */\nconst nextConfig = 
 APP_DB = '''import "server-only";
 import postgres from "postgres";
 
-// One small pool per server instance. The database is reached through a transaction pooler, hence prepare: false.
-// The connection's role sees only this application's own schema.
+type Sql = ReturnType<typeof postgres>;
+
+// The database is reached through a transaction pooler, hence prepare: false. The connection's role sees
+// only this application's own schema.
+//
+// Serverless instances are frozen between requests, and a connection left open across a freeze can be dead
+// without the driver knowing: the next query on it would hang forever. So connections are reused only while
+// the instance is busy; after a few idle seconds the next query starts from fresh connections.
+const IDLE_MS = 5000;
+
 declare global {
   // eslint-disable-next-line no-var
-  var __tpfSql: ReturnType<typeof postgres> | undefined;
+  var __tpfDb: { sql: Sql; used: number } | undefined;
 }
 
-export const sql =
-  globalThis.__tpfSql ??
-  (globalThis.__tpfSql = postgres(process.env.DATABASE_URL ?? "postgres://missing:missing@127.0.0.1:1/missing", {
-    prepare: false, max: 3, idle_timeout: 20, connect_timeout: 10,
-  }));
+function connect(): Sql {
+  return postgres(process.env.DATABASE_URL ?? "postgres://missing:missing@127.0.0.1:1/missing", {
+    prepare: false, max: 5, idle_timeout: 10, connect_timeout: 10, fetch_types: false,
+  });
+}
+
+function current(): Sql {
+  const now = Date.now();
+  const held = globalThis.__tpfDb;
+  if (held && now - held.used < IDLE_MS) {
+    held.used = now;
+    return held.sql;
+  }
+  if (held) void held.sql.end({ timeout: 5 }).catch(() => {});
+  const fresh = connect();
+  globalThis.__tpfDb = { sql: fresh, used: now };
+  return fresh;
+}
+
+/** The `postgres` tagged template: sql`select ... where id = ${id}`, sql.begin(...), sql(values). */
+export const sql: Sql = new Proxy(function () {} as unknown as Sql, {
+  apply: (_target, _self, args) => Reflect.apply(current() as unknown as (...a: unknown[]) => unknown, undefined, args),
+  get: (_target, prop) => {
+    const live = current() as unknown as Record<string | symbol, unknown>;
+    const value = live[prop];
+    return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(live) : value;
+  },
+});
 '''
 
 APP_AUTH = '''import "server-only";
@@ -424,6 +455,7 @@ def platform_files(form_endpoint: str = "", kind: str = "site") -> dict[str, str
         files |= {
             "package.json": APP_PACKAGE, "next.config.mjs": APP_NEXT_CONFIG,
             "tpf/db.ts": APP_DB, "tpf/auth.ts": APP_AUTH, HEALTH_PATH: APP_HEALTH,
+            "vercel.json": '{ "regions": ["fra1"] }\n',   # next to the database, not across an ocean from it
             ".env.example": "DATABASE_URL=postgres://user:password@host:6543/postgres\nSESSION_SECRET=\nADMIN_PASSWORD=\n",
         }
     if kind == "bot":
