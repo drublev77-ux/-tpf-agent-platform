@@ -72,3 +72,45 @@ def test_public_site_and_intake_limit(client, monkeypatch):
     order = {"client_name": "A", "client_email": "a@example.com", "request_text": "Нужен лендинг для кофейни."}
     assert client.post("/orders", json=order).status_code == 201
     assert client.post("/orders", json=order).status_code == 429
+
+
+def test_operator_console(client, monkeypatch):
+    import re
+    import httpx
+    from tpf.api import admin
+    from tpf.notifications import EmailNotifier
+
+    for k, v in {"EMAIL_PROVIDER": "brevo", "EMAIL_API_KEY": "k", "EMAIL_FROM": "TPF <a@b.co>", "OPERATOR_EMAIL": "ops@b.co",
+                 "PUBLIC_BASE_URL": "https://testserver"}.items():
+        monkeypatch.setenv(k, v)
+    get_settings.cache_clear()
+    sent: list[str] = []
+
+    async def fake_send(self, to, subject, text, html):
+        sent.append(text)
+    monkeypatch.setattr(EmailNotifier, "send", fake_send)
+
+    oid = client.post("/orders", json={"client_name": "A", "client_email": "a@example.com",
+                                       "request_text": "Нужен лендинг для кофейни."}).json()["order"]["id"]
+    sent.clear()
+    assert "Вход оператора" in client.get("/admin").text                      # signed out: no orders shown
+    assert client.get(f"/admin/order/{oid}").status_code == 401
+    assert client.post(f"/admin/order/{oid}/cancel", data={"sure": "1"}).status_code == 401
+    assert "err=link" in client.get("/admin/enter?s=1.bad", follow_redirects=False).headers["location"]
+
+    assert "sent=1" in client.post("/admin/login", follow_redirects=False).headers["location"]
+    assert "err=wait" in client.post("/admin/login", follow_redirects=False).headers["location"]   # throttled
+    link = re.search(r"https://testserver(/admin/enter\?s=\S+)", sent[0])[1]
+    secure = httpx.Client  # TestClient speaks http; the session cookie is Secure, so carry it by hand
+    r = client.get(link, follow_redirects=False)
+    cookie = r.cookies.get(admin.COOKIE) or re.search(r"tpf_admin=([^;]+)", r.headers["set-cookie"])[1]
+    auth = {"Cookie": f"{admin.COOKIE}={cookie}"}
+    assert secure and f"№{oid}" in client.get("/admin", headers=auth).text
+
+    page = client.get(f"/admin/order/{oid}", headers=auth).text
+    assert "Отменить заказ" in page and "a@example.com" in page
+    assert client.post(f"/admin/order/{oid}/cancel", data={"sure": "1"}, headers=auth | {"Origin": "https://evil.example"}).status_code == 403
+    r = client.post(f"/admin/order/{oid}/cancel", data={"sure": "1"}, headers=auth, follow_redirects=False)
+    assert "done=" in r.headers["location"]
+    assert client.get(f"/orders/{oid}", headers={"X-Order-Token": "x"}).status_code == 404
+    assert "Отменён" in client.get(f"/admin/order/{oid}", headers=auth).text

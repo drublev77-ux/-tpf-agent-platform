@@ -330,3 +330,7 @@ async def brand() -> FileResponse:
 from tpf.api.portal import router as portal_router  # noqa: E402  (after app: the portal reads app.state)
 
 app.include_router(portal_router)
+
+from tpf.api.admin import router as admin_router  # noqa: E402
+
+app.include_router(admin_router)

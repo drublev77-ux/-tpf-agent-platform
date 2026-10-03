@@ -88,7 +88,10 @@ class VercelDeployer:
             d = r.json()
             state = d.get("readyState") or d.get("status")
             if state == "READY":
-                return Deployment(d["id"], "https://" + d["url"], state)
+                host = d["url"]
+                if d.get("target") == "production" and d.get("alias"):
+                    host = min(d["alias"], key=len)  # the stable project address, not the per-build one
+                return Deployment(d["id"], "https://" + host, state)
             if state in ("ERROR", "CANCELED"):
                 raise DeployError(
                     f"deployment {deployment_id} ended in {state}",
