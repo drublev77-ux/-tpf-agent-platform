@@ -51,6 +51,7 @@ h2{font-size:clamp(30px,4.2vw,52px);line-height:1.12;letter-spacing:-.01em}
 .card{padding:clamp(24px,3vw,40px);min-height:260px;background:var(--panel);display:flex;flex-direction:column;gap:18px}
 .card h3{font-size:22px}.card p{color:var(--muted)}
 .price{min-height:0}.price .sum{font-family:Unbounded,'Noto Sans SC',sans-serif;font-size:clamp(26px,3vw,34px);color:var(--accent);font-variant-numeric:tabular-nums}
+.price .alt{margin-top:-10px;color:var(--soft);font-family:'JetBrains Mono',monospace;font-size:15px}
 .pr-note{margin-top:20px;color:var(--muted);font-size:15px;max-width:70ch}
 .agents{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
 .agent{display:flex;flex-direction:column;gap:12px;padding:26px 22px;background:var(--panel);border:1px solid var(--line2);border-radius:20px}
@@ -212,14 +213,14 @@ var I18N = {
     ],
     pr_kicker: 'ЦЕНЫ', pr_title: 'Сколько это стоит', pr_lead: 'Цена зависит от объёма работ. Смету вы получаете бесплатно и до оплаты; половина суммы — перед стартом, половина — перед запуском.',
     prices: [
-      { title: 'Лендинг', sum: 'от $720', text: 'Одна страница с формой заявки: дизайн, тексты по вашим данным, адаптация под телефон, публикация.' },
-      { title: 'Сайт из нескольких страниц', sum: 'от $900', text: 'От трёх страниц: услуги, цены, контакты, форма заявки с отправкой вам на почту.' },
-      { title: 'Веб‑приложение', sum: 'от $2 400', text: 'Сайт с базой данных и админкой: записи, заявки, каталог, расписание — вы сами управляете данными.' },
-      { title: 'Простой Telegram‑бот', sum: 'от $800', text: 'Меню кнопками, ответы на частые вопросы, контакты, приём заявок.' },
-      { title: 'Telegram‑бот с записью', sum: 'от $2 000', text: 'Пошаговая запись или заказ, уведомления владельцу, веб‑админка для управления данными.' },
+      { title: 'Лендинг', sum: 'от $576', alt: '≈ 48 000 ₽', text: 'Одна страница с формой заявки: дизайн, тексты по вашим данным, адаптация под телефон, публикация.' },
+      { title: 'Сайт из нескольких страниц', sum: 'от $720', alt: '≈ 60 000 ₽', text: 'От трёх страниц: услуги, цены, контакты, форма заявки с отправкой вам на почту.' },
+      { title: 'Веб‑приложение', sum: 'от $1 904', alt: '≈ 158 000 ₽', text: 'Сайт с базой данных и админкой: записи, заявки, каталог, расписание — вы сами управляете данными.' },
+      { title: 'Простой Telegram‑бот', sum: 'от $544', alt: '≈ 45 000 ₽', text: 'Меню кнопками, ответы на частые вопросы, контакты, приём заявок.' },
+      { title: 'Telegram‑бот с записью', sum: 'от $1 360', alt: '≈ 113 000 ₽', text: 'Пошаговая запись или заказ, уведомления владельцу, веб‑админка для управления данными.' },
       { title: 'Другой проект', sum: 'по смете', text: 'Опишите задачу — рассчитаем объём и стоимость в течение часа.' }
     ],
-    pr_note: 'Цены указаны в долларах США и не включают платные сторонние сервисы, если они понадобятся (например, собственный домен).',
+    pr_note: 'Оплата в долларах США; суммы в рублях — ориентир по курсу на октябрь 2026 года. В цену не входят платные сторонние сервисы, если они понадобятся (например, собственный домен).',
     ag_kicker: '02 / ИИ‑АГЕНТЫ', ag_title: 'Полностью автономные ИИ‑агенты выполняют заказы клиентов',
     ag_lead: 'Агенты сами принимают заказ, пишут ТЗ, проектируют, разрабатывают, тестируют и сдают результат — 24/7, без ручных этапов. Инженеры TPF следят за качеством и подключаются только при необходимости.',
     agents: [
@@ -414,7 +415,7 @@ function render() {
     c.append(svg, el('h3', s.title), el('p', s.text)); return c; });
   fill(document.getElementById('prices-grid'), t.prices, function (p) {
     var c = el('div', null, 'card price');
-    c.append(el('h3', p.title), el('div', p.sum, 'sum'), el('p', p.text)); return c; });
+    c.append(el('h3', p.title), el('div', p.sum, 'sum')); if (p.alt) c.append(el('div', p.alt, 'alt')); c.append(el('p', p.text)); return c; });
   fill(document.getElementById('agents'), t.agents, function (a, i) {
     var c = el('div', null, 'agent'), top = el('div', null, 'top');
     top.append(el('span', 'AGENT_0' + (i + 1)), el('i'));

@@ -37,8 +37,15 @@ class Settings(BaseSettings):
     hourly_rate_app: float = 70.0
     hourly_rate_bot: float = 50.0
 
-    def rate_for(self, product_type: str) -> float:
-        return float(getattr(self, f"hourly_rate_{product_type}", 0) or self.hourly_rate)
+    # Orders in Russian are priced against the Russian-speaking market, which is cheaper: landing ~60 000 RUB,
+    # simple bot ~65 000 RUB, bot with booking ~140 000 RUB, small application ~200 000 RUB (USD at ~83 RUB).
+    hourly_rate_ru_site: float = 36.0
+    hourly_rate_ru_app: float = 56.0
+    hourly_rate_ru_bot: float = 34.0
+
+    def rate_for(self, product_type: str, language: str = "") -> float:
+        regional = getattr(self, f"hourly_rate_{language}_{product_type}", 0) if language else 0
+        return float(regional or getattr(self, f"hourly_rate_{product_type}", 0) or self.hourly_rate)
     currency: str = "USD"
     # Payments: off | stripe | manual (the operator confirms bank transfers in /admin)
     payment_provider: str = "off"

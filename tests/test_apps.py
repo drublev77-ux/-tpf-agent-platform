@@ -298,3 +298,5 @@ def test_each_product_type_has_its_own_rate():
     s = Settings(database_url="postgresql://x/y")
     assert (s.rate_for("site"), s.rate_for("app"), s.rate_for("bot")) == (45, 70, 50)
     assert s.rate_for("something-new") == s.hourly_rate
+    assert (s.rate_for("site", "ru"), s.rate_for("app", "ru"), s.rate_for("bot", "ru")) == (36, 56, 34)
+    assert s.rate_for("site", "en") == 45 and s.rate_for("bot", "zh") == 50

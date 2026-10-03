@@ -103,6 +103,7 @@ def settings(tmp_path) -> Settings:
         database_url=TEST_DB, admin_token="test-admin", order_token_budget=100_000,
         max_check_attempts=3, max_review_rounds=2, task_max_retries=2, hourly_rate=40,
         hourly_rate_site=40, hourly_rate_app=40, hourly_rate_bot=40,
+        hourly_rate_ru_site=0, hourly_rate_ru_app=0, hourly_rate_ru_bot=0,
         currency="USD", workspace_root=str(tmp_path), sandbox="local",
     )
 

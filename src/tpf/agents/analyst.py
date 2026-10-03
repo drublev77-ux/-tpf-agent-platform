@@ -211,7 +211,7 @@ async def run(ctx: Ctx) -> Outcome:
         return Outcome(escalate="Ревьюер не принял ТЗ после всех попыток: " + "; ".join(issues))
 
     hours = math.ceil(sum(float(i["hours"]) for i in out["estimate"]["items"]))
-    rate = s.rate_for(out["spec"].get("product_type", "site"))
+    rate = s.rate_for(out["spec"].get("product_type", "site"), ctx.order["language"])
     price = round(hours * rate, 2)                # price is computed by code, never by the model
     estimate = {
         **out["estimate"], "total_hours": hours, "hourly_rate": rate,
