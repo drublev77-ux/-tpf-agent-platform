@@ -32,7 +32,7 @@ async def test_order_goes_from_request_to_delivery(env):
     await env.drain()
     assert await state(env, oid) is State.AWAITING_ACCEPTANCE
     order = await env.orch.get_order(oid)
-    assert order["staging_url"] == f"https://tpf-order-{oid}-preview1.vercel.app"
+    assert order["staging_url"] == f"https://tpf-order-{oid}-preview-preview1.vercel.app"
 
     await env.orch.fire(oid, Ev.ACCEPTED, actor="client")
     await env.drain()

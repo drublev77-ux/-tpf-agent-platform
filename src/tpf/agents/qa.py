@@ -11,7 +11,7 @@ from typing import Any
 
 from tpf.agents.base import Ctx, Outcome
 from tpf.agents.reviewer import review
-from tpf.agents.devops import project_name
+from tpf.agents.devops import staging_project
 from tpf.orchestrator.states import Ev
 from tpf.tools.deploy import DeployError
 from tpf.tools.sandbox import RunResult
@@ -35,7 +35,7 @@ async def _build_on_vercel(ctx: Ctx, files: list[dict[str, str]], version: int, 
     if ctx.deployer is None:
         return RunResult(1, "SANDBOX=vercel needs VERCEL_TOKEN")
     try:
-        dep = await ctx.deployer.deploy(project_name(ctx.order_id), all_files(files, ctx.form_endpoint), production=False,
+        dep = await ctx.deployer.deploy(staging_project(ctx.order_id), all_files(files, ctx.form_endpoint), production=False,
                                         build_command=VERCEL_BUILD_CMD)
     except DeployError as e:
         if getattr(e, "deployment_id", None) is None:

@@ -11,6 +11,12 @@ def project_name(order_id: int) -> str:
     return f"tpf-order-{order_id}"
 
 
+def staging_project(order_id: int) -> str:
+    """Review builds live in their own Vercel project: the first deployment of a project takes its
+    public address, and the final address must stay empty until the client has accepted and paid."""
+    return f"tpf-order-{order_id}-preview"
+
+
 async def _files(ctx: Ctx) -> list[dict[str, str]] | None:
     code = await ctx.orch.latest_artifact(ctx.order_id, "code")
     return all_files(code["files"], ctx.form_endpoint) if code else None
@@ -39,7 +45,7 @@ async def deploy_staging(ctx: Ctx) -> Outcome:
     dep = await _reuse_qa_preview(ctx)
     if dep is None:
         try:
-            dep = await ctx.deployer.deploy(project_name(ctx.order_id), files, production=False)
+            dep = await ctx.deployer.deploy(staging_project(ctx.order_id), files, production=False)
         except DeployError as e:
             return Outcome(escalate=f"Деплой на стейджинг не удался: {e}")
     await ctx.orch.pool.execute("UPDATE orders SET staging_url = $2 WHERE id = $1", ctx.order_id, dep.url)
