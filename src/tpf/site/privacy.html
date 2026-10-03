@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Политика обработки данных — TPF Technology</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500&family=Manrope:wght@400;600&family=Noto+Sans+SC:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07090C;--line:#16202A;--line2:#2A3844;--ink:#E6EDF2;--soft:#B7C3CC;--accent:#5CE1F0}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.65 Manrope,'Noto Sans SC',system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:32px 20px 80px}a{color:var(--accent)}
+header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:40px}
+.logo{font-family:Unbounded,sans-serif;font-weight:500;font-size:18px;color:var(--ink);text-decoration:none}.logo span{color:var(--accent)}
+.langs{display:flex;gap:2px;padding:3px;border:1px solid var(--line2);border-radius:999px}
+.langs button{height:38px;min-width:46px;padding:0 12px;border:0;border-radius:999px;background:transparent;color:var(--soft);font:500 13px ui-monospace,Menlo,monospace;cursor:pointer;white-space:nowrap}
+.langs button[aria-pressed=true]{background:var(--accent);color:#04161A}.langs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1{font-family:Unbounded,'Noto Sans SC',sans-serif;font-weight:500;font-size:clamp(28px,5vw,40px);line-height:1.15;margin:0 0 8px}
+h2{font-size:20px;margin:36px 0 8px}p,li{color:var(--soft)}ul{padding-left:22px}.date{color:#8D9AA5;font-size:15px}
+</style>
+</head>
+<body><main>
+<header><a class="logo" href="/">TPF<span>technology</span></a><div class="langs" id="langs" role="group"></div></header>
+<article id="doc"></article>
+</main>
+<script>
+var MAIL = '<a href="mailto:orders@tpf-technology.com">orders@tpf-technology.com</a>';
+var DOC = {
+ru: { title: 'Политика обработки данных', date: 'Действует с 3 октября 2026 года', s: [
+ ['Кто мы', ['Сайт tpf-technology.com и платформа заказов принадлежат TPF Technology. По любым вопросам о ваших данных пишите на ' + MAIL + '.']],
+ ['Какие данные мы получаем', ['Только то, что вы сами указываете в форме заявки и в переписке по заказу:', ['имя и адрес электронной почты;', 'описание задачи, ваши ответы и комментарии по заказу;', 'имя пользователя GitHub — если вы просите доступ к репозиторию с кодом.'], 'Мы не используем рекламные и аналитические трекеры и не ставим рекламные cookie. Сайт запоминает в вашем браузере только выбранный язык.']],
+ ['Зачем мы их используем', [['чтобы подготовить ТЗ и смету, выполнить заказ и передать вам результат;', 'чтобы сообщать о ходе заказа по электронной почте;', 'чтобы принимать оплату.'], 'Мы не продаём ваши данные и не рассылаем рекламу без вашего согласия.']],
+ ['Кто ещё обрабатывает данные', ['Для работы платформы мы пользуемся сервисами, которые обрабатывают данные по нашему поручению:', ['Anthropic — ИИ‑агенты, которые готовят ТЗ и пишут код: им передаётся текст заявки и переписка по заказу;', 'Stripe — приём платежей: данные карты вводятся на стороне Stripe и нам не передаются;', 'Brevo и ImprovMX — отправка и пересылка электронной почты;', 'Vercel, Supabase, Railway и GitHub — хостинг сайтов, база данных, серверы и хранение исходного кода.'], 'Эти компании могут находиться за пределами вашей страны.']],
+ ['Сколько мы храним данные', ['Данные заказа хранятся, пока он выполняется и пока действуют наши обязательства по нему, включая требования бухгалтерского учёта. По вашей просьбе мы удалим данные раньше, если закон не требует их хранить.']],
+ ['Ваши права', ['Вы можете запросить копию своих данных, попросить исправить или удалить их и отозвать согласие на обработку. Напишите на ' + MAIL + ' — мы ответим в течение 30 дней.']],
+ ['Изменения', ['Если политика изменится, новая версия появится на этой странице с новой датой.']]
+]},
+en: { title: 'Privacy policy', date: 'Effective 3 October 2026', s: [
+ ['Who we are', ['The website tpf-technology.com and the order platform are run by TPF Technology. For any question about your data, write to ' + MAIL + '.']],
+ ['What data we receive', ['Only what you give us in the request form and in the order conversation:', ['your name and email address;', 'the task description, your replies and comments on the order;', 'your GitHub username, if you ask for access to the code repository.'], 'We use no advertising or analytics trackers and set no advertising cookies. The site stores only your chosen language in your browser.']],
+ ['Why we use it', [['to prepare the spec and estimate, carry out the order and hand over the result;', 'to keep you informed about the order by email;', 'to take payment.'], 'We do not sell your data and do not send marketing without your consent.']],
+ ['Who else processes the data', ['To run the platform we use services that process data on our behalf:', ['Anthropic — the AI agents that write the spec and the code: they receive the request text and the order conversation;', 'Stripe — payments: card details are entered on Stripe’s side and never reach us;', 'Brevo and ImprovMX — sending and forwarding email;', 'Vercel, Supabase, Railway and GitHub — site hosting, database, servers and source code storage.'], 'These companies may be located outside your country.']],
+ ['How long we keep it', ['Order data is kept while the order is in progress and while our obligations for it last, including accounting requirements. On request we delete it earlier unless the law requires us to keep it.']],
+ ['Your rights', ['You can ask for a copy of your data, ask us to correct or delete it, and withdraw your consent. Write to ' + MAIL + ' — we reply within 30 days.']],
+ ['Changes', ['If this policy changes, the new version will appear on this page with a new date.']]
+]},
+zh: { title: '隐私政策', date: '自 2026 年 10 月 3 日起生效', s: [
+ ['我们是谁', ['网站 tpf-technology.com 及订单平台由 TPF Technology 运营。有关您数据的任何问题，请发送邮件至 ' + MAIL + '。']],
+ ['我们收集哪些数据', ['仅限您在需求表单和订单沟通中主动提供的内容：', ['姓名和电子邮箱；', '需求描述、您对订单的回复和意见；', 'GitHub 用户名——当您申请访问代码仓库时。'], '我们不使用广告或分析跟踪器，也不设置广告 Cookie。网站仅在您的浏览器中保存所选语言。']],
+ ['用途', [['准备规格书和报价、完成订单并向您交付成果；', '通过电子邮件向您通报订单进展；', '收取款项。'], '我们不会出售您的数据，未经您同意也不会发送营销信息。']],
+ ['还有谁处理数据', ['为运行平台，我们使用代表我们处理数据的服务：', ['Anthropic——撰写规格书和代码的 AI 智能体：会接收需求文本和订单沟通内容；', 'Stripe——支付：银行卡信息在 Stripe 一侧输入，不会传给我们；', 'Brevo 与 ImprovMX——电子邮件的发送与转发；', 'Vercel、Supabase、Railway 和 GitHub——网站托管、数据库、服务器及源代码存储。'], '这些公司可能位于您所在国家之外。']],
+ ['保存期限', ['订单数据在订单进行期间以及我们对其负有义务期间（包括会计要求）予以保存。除法律要求保留外，我们会应您的请求提前删除。']],
+ ['您的权利', ['您可以索取数据副本、要求更正或删除数据，并撤回同意。请发送邮件至 ' + MAIL + '，我们将在 30 天内答复。']],
+ ['变更', ['如本政策发生变更，新版本将连同新日期发布在本页面。']]
+]}
+};
+var LANGS = [['ru','RU'],['en','EN'],['zh','中文']], lang = 'ru';
+try { var saved = localStorage.getItem('tpf_lang'); if (DOC[saved]) lang = saved; else if (/^zh/i.test(navigator.language)) lang = 'zh'; else if (!/^(ru|be|uk|kk)/i.test(navigator.language)) lang = 'en'; } catch (e) {}
+function render() {
+  var d = DOC[lang], html = '<h1>' + d.title + '</h1><p class="date">' + d.date + '</p>';
+  d.s.forEach(function (sec) {
+    html += '<h2>' + sec[0] + '</h2>';
+    sec[1].forEach(function (b) { html += Array.isArray(b) ? '<ul>' + b.map(function (i) { return '<li>' + i + '</li>'; }).join('') + '</ul>' : '<p>' + b + '</p>'; });
+  });
+  document.getElementById('doc').innerHTML = html;   // static texts defined above, no user input
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang; document.title = d.title + ' — TPF Technology';
+  var box = document.getElementById('langs'); box.textContent = '';
+  LANGS.forEach(function (l) { var b = document.createElement('button'); b.type = 'button'; b.textContent = l[1]; b.setAttribute('aria-pressed', String(l[0] === lang));
+    b.onclick = function () { lang = l[0]; try { localStorage.setItem('tpf_lang', lang); } catch (e) {} render(); }; box.appendChild(b); });
+}
+render();
+</script>
+</body>
+</html>

@@ -69,6 +69,12 @@ h2{font-size:clamp(30px,4.2vw,52px);line-height:1.12;letter-spacing:-.01em}
 .why>div:first-child{display:flex;flex-direction:column;gap:22px}.why h2{font-size:clamp(28px,3.4vw,44px)}.why p{color:var(--muted);font-size:17px}
 .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px;align-content:center}
 .stats b{display:block;font:500 clamp(32px,3.6vw,44px) Unbounded,sans-serif;color:var(--accent)}.stats span{color:var(--soft)}
+.case{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:clamp(20px,3vw,40px);align-items:center;padding:clamp(16px,2.4vw,28px);background:var(--panel);border:1px solid var(--line);border-radius:28px;color:var(--ink)}
+.case:hover{border-color:var(--line2);color:var(--ink)}.case img{width:100%;height:auto;border-radius:16px;border:1px solid var(--line);display:block}
+.case>div{display:flex;flex-direction:column;gap:14px}.casetag{font-size:13px;color:var(--accent);letter-spacing:.08em}.case h3{font-size:clamp(22px,2.4vw,30px)}.case p{color:var(--muted)}
+.facts{margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:8px;font:13px 'JetBrains Mono','Noto Sans SC',monospace}.facts span{padding:7px 12px;border:1px solid var(--line2);border-radius:999px}
+.case .open{color:var(--accent);font-weight:600}
+@media(max-width:820px){.case{grid-template-columns:1fr}}
 .contact{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:clamp(32px,6vw,80px)}
 .contact>div{display:flex;flex-direction:column;gap:26px}.contact h2{font-size:clamp(32px,4.4vw,56px);line-height:1.08}
 form{display:flex;flex-direction:column;gap:20px;padding:clamp(24px,3.5vw,48px);background:var(--panel);border:1px solid var(--line);border-radius:28px}
@@ -95,7 +101,7 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 <svg width="30" height="30" viewBox="0 0 32 32" fill="none" stroke="#5CE1F0" stroke-width="1.6" aria-hidden="true"><polygon points="16,2 29,9.5 29,22.5 16,30 3,22.5 3,9.5"></polygon><circle cx="16" cy="16" r="3"></circle><line x1="16" y1="2" x2="16" y2="13"></line><line x1="3" y1="22.5" x2="13.4" y2="17.5"></line><line x1="29" y1="22.5" x2="18.6" y2="17.5"></line></svg>
 <div>TPF<span>technology</span></div></a>
 <nav>
-<a href="#services" data-t="nav_services"></a><a href="#process" data-t="nav_agents"></a><a href="#stack" data-t="nav_stack"></a><a href="#contact" data-t="nav_contact"></a>
+<a href="#services" data-t="nav_services"></a><a href="#process" data-t="nav_agents"></a><a href="#stack" data-t="nav_stack"></a><a href="#cases" data-t="nav_cases"></a><a href="#contact" data-t="nav_contact"></a>
 </nav>
 <div class="right">
 <div class="langs" role="group" id="langs"></div>
@@ -144,9 +150,19 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 </div>
 </section>
 
+<section id="cases">
+<div class="head"><div><div class="kicker" data-t="cs_kicker"></div><h2 data-t="cs_title"></h2></div><p data-t="cs_lead"></p></div>
+<a class="case" href="https://tpf-order-1.vercel.app" target="_blank" rel="noopener">
+<img src="/case-zerno.jpg" id="caseimg" alt="" width="960" height="600">
+<div><div class="mono casetag" data-t="case1_tag"></div><h3 data-t="case1_title"></h3><p data-t="case1_text"></p>
+<ul class="facts" data-list="case1_facts"></ul><span class="open" data-t="case1_open"></span></div>
+</a>
+</section>
+
 <section id="contact">
 <div class="contact">
-<div><div class="kicker" data-t="ct_kicker"></div><h2 data-t="ct_title"></h2><p class="lead" style="color:var(--muted)" data-t="ct_lead"></p></div>
+<div><div class="kicker" data-t="ct_kicker"></div><h2 data-t="ct_title"></h2><p class="lead" style="color:var(--muted)" data-t="ct_lead"></p>
+<a href="mailto:orders@tpf-technology.com" style="font-size:18px">orders@tpf-technology.com</a></div>
 <form id="form" novalidate>
 <div class="two">
 <label><span data-t="f_name"></span><input name="name" type="text" autocomplete="name" required maxlength="200" data-ph="f_name_ph"></label>
@@ -157,7 +173,7 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 <label class="hp" aria-hidden="true">Website<input name="website" type="text" tabindex="-1" autocomplete="off"></label>
 <button class="btn fill" type="submit" id="submit" data-t="f_submit"></button>
 <div id="msg" role="status" aria-live="polite"></div>
-<p class="small" data-t="f_consent"></p>
+<p class="small"><span data-t="f_consent"></span> <a href="/privacy" data-t="privacy"></a></p>
 </form>
 </div>
 </section>
@@ -166,7 +182,7 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 <footer>
 <img src="/brand.jpg" alt="TPF Technology" loading="lazy" width="240" height="94">
 <span data-t="footer"></span>
-<div><a href="#services" data-t="nav_services"></a><a href="#process" data-t="nav_agents"></a><a href="#contact" data-t="nav_contact"></a></div>
+<div><a href="#services" data-t="nav_services"></a><a href="#process" data-t="nav_agents"></a><a href="#contact" data-t="nav_contact"></a><a href="/privacy" data-t="privacy"></a></div>
 </footer>
 
 <script>
@@ -211,7 +227,7 @@ var I18N = {
     stats: [ { num: '[N]+', label: 'реализованных проектов' }, { num: '[N] лет', label: 'опыта команды' }, { num: '100%', label: 'прав на код — у вас' }, { num: '24/7', label: 'мониторинг после запуска' } ],
     cs_kicker: '05 / ПРОЕКТЫ', cs_title: 'Избранные работы', cs_all: 'Все проекты →', shot: '[СКРИНШОТ ПРОЕКТА]',
     case_tags: ['МОБИЛЬНОЕ ПРИЛОЖЕНИЕ', 'ВЕБ‑ПЛАТФОРМА', 'AI‑РЕШЕНИЕ'], case_title: '[Название проекта]', case_text: '[Короткое описание задачи и результата]',
-    ct_kicker: '05 / КОНТАКТЫ', ct_title: 'Расскажите о вашей идее', ct_lead: 'Ответим в течение рабочего дня, предложим решение и оценим сроки — бесплатно.',
+    ct_kicker: '06 / КОНТАКТЫ', ct_title: 'Расскажите о вашей идее', ct_lead: 'Ответим в течение рабочего дня, предложим решение и оценим сроки — бесплатно.',
     email: '[EMAIL]', phone: '[ТЕЛЕФОН]', addr: '[Город, адрес]',
     f_name: 'Имя', f_name_ph: 'Как к вам обращаться', f_contact: 'Телефон или e‑mail', f_contact_ph: 'Для обратной связи', f_type: 'Тип проекта',
     types: ['Разработка ПО', 'Веб‑разработка', 'Мобильное приложение', 'AI & ML решение', 'Облако / DevOps', 'Кибербезопасность'],
@@ -258,7 +274,7 @@ var I18N = {
     stats: [ { num: '[N]+', label: 'projects delivered' }, { num: '[N] yrs', label: 'of team experience' }, { num: '100%', label: 'code ownership is yours' }, { num: '24/7', label: 'post‑launch monitoring' } ],
     cs_kicker: '05 / PROJECTS', cs_title: 'Selected work', cs_all: 'All projects →', shot: '[PROJECT SCREENSHOT]',
     case_tags: ['MOBILE APP', 'WEB PLATFORM', 'AI SOLUTION'], case_title: '[Project name]', case_text: '[Short description of the task and result]',
-    ct_kicker: '05 / CONTACT', ct_title: 'Tell us about your idea', ct_lead: 'We reply within one business day, propose a solution and estimate the timeline — free of charge.',
+    ct_kicker: '06 / CONTACT', ct_title: 'Tell us about your idea', ct_lead: 'We reply within one business day, propose a solution and estimate the timeline — free of charge.',
     email: '[EMAIL]', phone: '[PHONE]', addr: '[City, address]',
     f_name: 'Name', f_name_ph: 'How should we address you', f_contact: 'Phone or email', f_contact_ph: 'So we can get back to you', f_type: 'Project type',
     types: ['Software development', 'Web development', 'Mobile app', 'AI & ML solution', 'Cloud / DevOps', 'Cybersecurity'],
@@ -305,7 +321,7 @@ var I18N = {
     stats: [ { num: '[N]+', label: '已完成项目' }, { num: '[N] 年', label: '团队经验' }, { num: '100%', label: '代码归您所有' }, { num: '24/7', label: '上线后监控' } ],
     cs_kicker: '05 / 项目', cs_title: '精选案例', cs_all: '全部项目 →', shot: '[项目截图]',
     case_tags: ['移动应用', 'WEB 平台', 'AI 解决方案'], case_title: '[项目名称]', case_text: '[任务与成果简介]',
-    ct_kicker: '05 / 联系我们', ct_title: '告诉我们您的想法', ct_lead: '我们将在一个工作日内回复，免费提供解决方案与工期评估。',
+    ct_kicker: '06 / 联系我们', ct_title: '告诉我们您的想法', ct_lead: '我们将在一个工作日内回复，免费提供解决方案与工期评估。',
     email: '[邮箱]', phone: '[电话]', addr: '[城市，地址]',
     f_name: '姓名', f_name_ph: '如何称呼您', f_contact: '电话或邮箱', f_contact_ph: '便于我们联系您', f_type: '项目类型',
     types: ['软件开发', '网站开发', '移动应用', 'AI 与机器学习', '云 / DevOps', '网络安全'],
@@ -315,13 +331,13 @@ var I18N = {
 };
 
 var EXTRA = {
-  ru: { f_email: 'E‑mail', f_consent: 'Нажимая кнопку, вы соглашаетесь на обработку указанных данных для ответа на заявку.',
+  ru: { cs_lead: 'Каждый проект проходит весь путь на нашей платформе: заявка, ТЗ и смета, разработка, проверки, запуск.', case1_tag: 'ЛЕНДИНГ', case1_title: 'Кофейня «Зерно»', case1_text: 'Одностраничный сайт: первый экран, меню с ценами, адрес и часы работы, звонок в одно касание. От заявки до рабочей версии — силами ИИ‑агентов, с автоматическими проверками сборки, безопасности и критериев приёмки.', case1_facts: ['Next.js', 'Адаптивная вёрстка', 'Исходный код у клиента'], case1_open: 'Открыть сайт →', case1_alt: 'Главный экран сайта кофейни «Зерно»', privacy: 'Политика обработки данных', f_email: 'E‑mail', f_consent: 'Нажимая кнопку, вы соглашаетесь на обработку указанных данных для ответа на заявку.',
         sending: 'Отправляем…', ok: 'Заявка принята. Мы отправили подтверждение на вашу почту. Статус заказа: ', ok_link: 'страница заказа',
         e_fields: 'Заполните имя, e‑mail и опишите задачу (не меньше 10 символов).', e_busy: 'Сейчас слишком много заявок. Попробуйте через час.', e_fail: 'Не получилось отправить. Попробуйте ещё раз чуть позже.' },
-  en: { f_email: 'Email', f_consent: 'By clicking the button, you agree that we process these details to answer your request.',
+  en: { cs_lead: 'Every project runs end to end on our platform: request, spec and estimate, development, checks, launch.', case1_tag: 'LANDING PAGE', case1_title: 'Zerno coffee shop', case1_text: 'A one‑page site: hero, menu with prices, address and opening hours, one‑tap call. From request to live version by AI agents, with automated build, security and acceptance checks.', case1_facts: ['Next.js', 'Responsive layout', 'Client owns the source'], case1_open: 'Open the site →', case1_alt: 'Home screen of the Zerno coffee shop website', privacy: 'Privacy policy', f_email: 'Email', f_consent: 'By clicking the button, you agree that we process these details to answer your request.',
         sending: 'Sending…', ok: 'Request received. We have emailed you a confirmation. Order status: ', ok_link: 'your order page',
         e_fields: 'Please fill in your name, email and describe the task (at least 10 characters).', e_busy: 'Too many requests right now. Please try again in an hour.', e_fail: 'Could not send. Please try again a little later.' },
-  zh: { f_email: '邮箱', f_consent: '点击按钮即表示您同意我们为回复需求而处理上述信息。',
+  zh: { cs_lead: '每个项目都在我们的平台上全流程完成：需求、规格书与报价、开发、检查、上线。', case1_tag: '落地页', case1_title: '“Zerno”咖啡馆', case1_text: '单页网站：首屏、带价格的菜单、地址与营业时间、一键拨号。从需求到正式上线均由 AI 智能体完成，并自动检查构建、安全与验收标准。', case1_facts: ['Next.js', '响应式布局', '源代码归客户所有'], case1_open: '打开网站 →', case1_alt: '“Zerno”咖啡馆网站首页', privacy: '隐私政策', f_email: '邮箱', f_consent: '点击按钮即表示您同意我们为回复需求而处理上述信息。',
         sending: '正在提交…', ok: '需求已收到，确认邮件已发送至您的邮箱。订单状态：', ok_link: '订单页面',
         e_fields: '请填写姓名、邮箱并描述需求（不少于 10 个字符）。', e_busy: '当前请求过多，请一小时后再试。', e_fail: '提交失败，请稍后再试。' }
 };
@@ -345,6 +361,7 @@ function render() {
   document.querySelectorAll('[data-ph]').forEach(function (n) { n.placeholder = t[n.dataset.ph] || ''; });
   document.querySelectorAll('[data-list]').forEach(function (n) { fill(n, t[n.dataset.list], function (s) { return el('span', s); }); });
   document.getElementById('heroimg').alt = t.img_alt;
+  document.getElementById('caseimg').alt = t.case1_alt;
   document.getElementById('langs').setAttribute('aria-label', t.lang_label);
   fill(document.getElementById('langs'), LANGS, function (l) {
     var b = el('button', l[1]); b.type = 'button'; b.setAttribute('aria-pressed', String(l[0] === lang));

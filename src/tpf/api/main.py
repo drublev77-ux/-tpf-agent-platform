@@ -321,6 +321,18 @@ async def site() -> FileResponse:
                         headers={"Cache-Control": "public, max-age=300"})
 
 
+@app.get("/privacy", include_in_schema=False)
+async def privacy() -> FileResponse:
+    return FileResponse(SITE_DIR / "privacy.html", media_type="text/html; charset=utf-8",
+                        headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/case-zerno.jpg", include_in_schema=False)
+async def case_zerno() -> FileResponse:
+    return FileResponse(SITE_DIR / "case-zerno.jpg", media_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/brand.jpg", include_in_schema=False)
 async def brand() -> FileResponse:
     return FileResponse(SITE_DIR / "brand.jpg", media_type="image/jpeg",
