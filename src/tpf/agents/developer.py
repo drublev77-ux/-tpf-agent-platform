@@ -32,11 +32,12 @@ SCHEMA = {
     "required": ["files", "remaining", "notes"],
 }
 
-MAX_STEPS = 12        # calls for one version of the code, static-check repairs included
-STEP_TOKENS = 32000
+MAX_STEPS = 24        # calls for one version of the code, static-check repairs included
+STEP_TOKENS = 64000   # a ceiling, not a target: steps are kept small by STEP_RULE
 STEP_RULE = (
-    "You work in steps, because one answer cannot hold a whole project. In each step write at most about 1000 "
-    "lines of code in total: start with what other files depend on (db/schema.sql, lib/, shared components, "
+    "You work in steps, because one answer cannot hold a whole project. In each step write at most four files and "
+    "about 600 lines of code in total, and keep every file under about 350 lines: split long logic into several "
+    "modules (for a bot, lib/bot.ts only routes updates to handlers in lib/bot/*.ts). Start with what other files depend on (db/schema.sql, lib/, shared components, "
     "app/layout.tsx, app/globals.css), then the pages. List every file still to be written in `remaining`; you "
     "will be called again with the files written so far until `remaining` is empty. Every file you return is "
     "complete, never a fragment or a diff. Files written in earlier steps stay unless you return them again or "
@@ -136,6 +137,14 @@ async def run(ctx: Ctx) -> Outcome:
     files: dict[str, str] = {f["path"]: f["content"] for f in (previous or {}).get("files", [])}
     changing = bool(files)                    # a fix or a client change request, not a first version
     remaining: list[dict[str, str]] = []
+    # Work in progress survives a retry or a worker restart: steps already written are not paid for twice.
+    base_version = await ctx.orch.pool.fetchval(
+        "SELECT coalesce(max(version), 0) FROM artifacts WHERE order_id = $1 AND kind = 'code'", ctx.order_id)
+    draft = await ctx.orch.latest_artifact(ctx.order_id, "code_draft")
+    resumed = bool(draft and draft.get("base") == base_version and draft.get("feedback") == feedback)
+    if resumed:
+        files = {f["path"]: f["content"] for f in draft["files"]}
+        remaining = draft["remaining"]
     problems: list[str] = []
     too_long = False
     notes: list[str] = []
@@ -144,18 +153,20 @@ async def run(ctx: Ctx) -> Outcome:
         current = [{"path": p, "content": c} for p, c in files.items()]
         if problems:
             task = "The code was rejected by static checks. Fix exactly these problems:\n" + "\n".join(problems)
-        elif step == 0:
+        elif step == 0 and not resumed:
             if not changing:
                 task = (f"{feedback}\n\n" if feedback else "") + "Write the first step of the project."
             elif feedback:
                 task = f"{feedback}\n\nChange the code accordingly."
             else:
                 task = "Review the code against the spec and architecture and complete it."
-        else:
+        elif remaining:
             task = ("Continue: write the next files from this list, as many as fit in one step.\n"
                     + json.dumps(remaining, ensure_ascii=False))
+        else:
+            task = "Check that the project is complete; write anything still missing."
         if too_long:
-            task += "\n\nYour previous answer was too long and was lost. Write at most two files in this step."
+            task += "\n\nYour previous answer was too long and was lost. Write exactly one file in this step."
         prompt = (base + (f"Files written so far:\n{json.dumps(current, ensure_ascii=False)}\n\n" if current else "") + task)
         try:
             out: dict[str, Any] = await ctx.llm.structured(
@@ -176,6 +187,9 @@ async def run(ctx: Ctx) -> Outcome:
         remaining = [r for r in out.get("remaining") or [] if r.get("path") not in files]
         if remaining:
             problems = []
+            await ctx.orch.save_artifact(ctx.order_id, "code_draft", {
+                "base": base_version, "feedback": feedback, "remaining": remaining,
+                "files": [{"path": p, "content": c} for p, c in files.items()]}, "developer")
             continue
         result = [{"path": p, "content": c} for p, c in files.items()]
         problems = check_files(result, routes, kind)
