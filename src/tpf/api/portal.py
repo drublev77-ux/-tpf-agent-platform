@@ -29,7 +29,7 @@ router = APIRouter(include_in_schema=False)
 
 T: dict[str, dict[str, str]] = {
     "ru": {
-        "missing": "Нужно от вас — пока на сайте заглушки", "source": "Исходный код", "zip": "Скачать ZIP", "gh_label": "Ваше имя пользователя на GitHub — пригласим в приватный репозиторий", "gh_btn": "Получить доступ", "title": "Заказ №{id}", "status": "Статус", "conversation": "Переписка", "you": "Вы", "studio": "TPF Technology",
+        "inbox": "Сообщения с формы вашего сайта", "inbox_note": "Каждое сообщение мы также пересылаем вам на почту. Здесь последние 50.", "missing": "Нужно от вас — пока на сайте заглушки", "source": "Исходный код", "zip": "Скачать ZIP", "gh_label": "Ваше имя пользователя на GitHub — пригласим в приватный репозиторий", "gh_btn": "Получить доступ", "title": "Заказ №{id}", "status": "Статус", "conversation": "Переписка", "you": "Вы", "studio": "TPF Technology",
         "spec": "Техническое задание", "pages": "Страницы", "criteria": "Критерии приёмки", "estimate": "Смета",
         "hours": "Трудоёмкость", "price": "Стоимость", "duration": "Срок", "days": "дн.", "h": "ч",
         "pay_pre": "Предоплата", "pay_final": "Остаток перед запуском", "paid": "оплачено", "pay_now": "Оплатить",
@@ -40,7 +40,7 @@ T: dict[str, dict[str, str]] = {
         "err": "Не получилось: {why}", "open_link": "Открыть",
     },
     "en": {
-        "missing": "Needed from you — the site shows placeholders for now", "source": "Source code", "zip": "Download ZIP", "gh_label": "Your GitHub username — we will invite you to the private repository", "gh_btn": "Get access", "title": "Order #{id}", "status": "Status", "conversation": "Conversation", "you": "You", "studio": "TPF Technology",
+        "inbox": "Messages from your site's form", "inbox_note": "Each message is also e-mailed to you. The latest 50 are shown here.", "missing": "Needed from you — the site shows placeholders for now", "source": "Source code", "zip": "Download ZIP", "gh_label": "Your GitHub username — we will invite you to the private repository", "gh_btn": "Get access", "title": "Order #{id}", "status": "Status", "conversation": "Conversation", "you": "You", "studio": "TPF Technology",
         "spec": "Specification", "pages": "Pages", "criteria": "Acceptance criteria", "estimate": "Estimate",
         "hours": "Effort", "price": "Price", "duration": "Timeline", "days": "days", "h": "h",
         "pay_pre": "Deposit", "pay_final": "Balance before release", "paid": "paid", "pay_now": "Pay now",
@@ -51,7 +51,7 @@ T: dict[str, dict[str, str]] = {
         "err": "Could not do that: {why}", "open_link": "Open",
     },
     "zh": {
-        "missing": "需要您提供——网站目前显示占位符", "source": "源代码", "zip": "下载 ZIP", "gh_label": "您的 GitHub 用户名——我们将邀请您加入私有仓库", "gh_btn": "获取访问权限", "title": "订单 #{id}", "status": "状态", "conversation": "沟通记录", "you": "您", "studio": "TPF Technology",
+        "inbox": "您网站表单收到的留言", "inbox_note": "每条留言也会通过邮件发送给您。此处显示最近 50 条。", "missing": "需要您提供——网站目前显示占位符", "source": "源代码", "zip": "下载 ZIP", "gh_label": "您的 GitHub 用户名——我们将邀请您加入私有仓库", "gh_btn": "获取访问权限", "title": "订单 #{id}", "status": "状态", "conversation": "沟通记录", "you": "您", "studio": "TPF Technology",
         "spec": "需求规格书", "pages": "页面", "criteria": "验收标准", "estimate": "报价",
         "hours": "工作量", "price": "价格", "duration": "工期", "days": "天", "h": "小时",
         "pay_pre": "预付款", "pay_final": "上线前尾款", "paid": "已付", "pay_now": "立即付款",
@@ -197,6 +197,15 @@ async def portal(order_id: int, request: Request, t: str = "", done: str = "", e
                    f'<div class="row"><button class="btn ghost">{tr["gh_btn"]}</button></div>') if published else ""
         parts.append(f'<section><h2>{tr["source"]}</h2>'
                      f'<a class="btn" href="{base}/source.zip?t={quote(t)}">{tr["zip"]}</a>{gh}</section>')
+
+    if st == State.DELIVERED:
+        inbox = await o.pool.fetch(
+            "SELECT created_at, data FROM form_submissions WHERE order_id = $1 ORDER BY id DESC LIMIT 50", order_id)
+        if inbox:
+            rows_html = "".join(
+                f'<div class="msg"><div class="who">{f["created_at"]:%Y-%m-%d %H:%M} · {escape(str(f["data"].get("name", "")))} · '
+                f'{escape(str(f["data"].get("contact", "")))}</div>{escape(str(f["data"].get("message", "")))}</div>' for f in inbox)
+            parts.append(f'<section><h2>{tr["inbox"]}</h2><p class="muted">{tr["inbox_note"]}</p>{rows_html}</section>')
 
     # --- estimate and payments ---
     if estimate:

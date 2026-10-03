@@ -240,3 +240,6 @@ def test_site_contact_form_reaches_the_owner(client, monkeypatch):
     row = client.portal.call(orch.pool.fetchrow, "SELECT data, delivered FROM form_submissions WHERE order_id=$1", oid)
     assert row["delivered"] and row["data"]["name"] == "Пётр"
     assert client.post("/forms/999999", json=msg).status_code == 404
+    token = client.portal.call(orch.pool.fetchval, "SELECT client_token FROM orders WHERE id=$1", oid)
+    page = client.get(f"/portal/{oid}", params={"t": token}).text
+    assert "Сообщения с формы вашего сайта" in page and "столик на субботу" in page and "spam.example" not in page

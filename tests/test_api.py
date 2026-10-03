@@ -114,3 +114,15 @@ def test_operator_console(client, monkeypatch):
     assert "done=" in r.headers["location"]
     assert client.get(f"/orders/{oid}", headers={"X-Order-Token": "x"}).status_code == 404
     assert "Отменён" in client.get(f"/admin/order/{oid}", headers=auth).text
+
+    # an order entered by hand (a marketplace or messenger lead)
+    assert "Новый заказ вручную" in client.get("/admin", headers=auth).text
+    lead = {"client_name": "Li Wei", "client_email": "li@example.com", "language": "zh", "channel": "wechat",
+            "request_text": "我们需要一个咖啡店的落地页，包含菜单和地址。"}
+    assert client.post("/admin/orders/new", data=lead).status_code == 401
+    bad = client.post("/admin/orders/new", data=lead | {"client_email": "nope"}, headers=auth, follow_redirects=False)
+    assert bad.headers["location"].startswith("/admin?err=")
+    made = client.post("/admin/orders/new", data=lead, headers=auth, follow_redirects=False)
+    new_id = int(re.search(r"/admin/order/(\d+)", made.headers["location"])[1])
+    page = client.get(f"/admin/order/{new_id}", headers=auth).text
+    assert "Li Wei" in page and "zh · wechat" in page and new_id != oid

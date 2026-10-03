@@ -5,10 +5,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import re
 import time
 from html import escape
 from typing import Any
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -29,6 +30,8 @@ main{max-width:980px}dd{min-width:0;overflow-wrap:anywhere}table{width:100%;bord
 th{color:var(--muted);font-weight:500;border-top:0}td.n{white-space:nowrap}.tag{display:inline-block;padding:3px 10px;border-radius:999px;border:1px solid var(--line);font-size:13px;white-space:nowrap}
 .tag.warn{border-color:var(--warn);color:var(--warn)}.tag.act{border-color:var(--accent);color:var(--accent)}.tag.ok{border-color:var(--ok);color:var(--ok)}
 .scroll{overflow-x:auto}.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start}.actions form{margin:0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 16px}
+input[type=email],select{width:100%;height:48px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
 .btn.warn{background:transparent;color:var(--warn);border:1px solid var(--warn)}code{font-family:ui-monospace,Menlo,monospace;font-size:13px;word-break:break-word}
 """
 NEEDS_OPERATOR = {State.PAUSED}
@@ -123,7 +126,22 @@ async def admin_home(request: Request, sent: str = "", err: str = "") -> HTMLRes
     head = f'<h1>Заказы</h1><p class="muted">Всего: {len(rows)}' + (f' · <span style="color:var(--warn)">ждут вас: {paused}</span>' if paused else "") + "</p>"
     table = (f'<section class="scroll"><table><thead><tr><th>Заказ</th><th>Статус</th><th>Клиент</th><th>Заявка</th><th>Сумма</th><th>Обновлён (UTC)</th></tr></thead>'
              f'<tbody>{body}</tbody></table></section>') if rows else '<section><p class="muted">Заказов пока нет.</p></section>'
-    return _page("Заказы", head + table + '<div class="row">' + _post("/admin/logout", "Выйти", "ghost") + "</div>")
+    form = (
+        '<section><h2>Новый заказ вручную</h2><p class="muted">Для заявок с бирж, из мессенджеров и по телефону. Клиент получит '
+        'письмо с подтверждением и ссылкой на кабинет, агенты начнут работу сразу.</p>'
+        '<form method="post" action="/admin/orders/new">'
+        '<div class="grid2"><div><label for="n">Имя клиента</label><input id="n" name="client_name" required maxlength="200"></div>'
+        '<div><label for="e">E-mail клиента</label><input id="e" name="client_email" type="email" required maxlength="200"></div>'
+        '<div><label for="l">Язык клиента</label><select id="l" name="language"><option value="ru">Русский</option>'
+        '<option value="en">English</option><option value="zh">中文</option></select></div>'
+        '<div><label for="c">Откуда заявка</label><select id="c" name="channel"><option value="crm">Биржа или другое</option>'
+        '<option value="telegram">Telegram</option><option value="whatsapp">WhatsApp</option><option value="wechat">WeChat</option>'
+        '<option value="email">Почта</option><option value="site">Сайт</option></select></div></div>'
+        '<label for="t" style="margin-top:12px">Текст заявки — словами клиента, со всеми данными, которые он дал</label>'
+        '<textarea id="t" name="request_text" required minlength="10" maxlength="20000"></textarea>'
+        '<div class="row"><button class="btn">Создать заказ</button></div></form></section>')
+    note = f'<section class="error" role="alert">Не получилось: {escape(err)}</section>' if err else ""
+    return _page("Заказы", head + note + table + form + '<div class="row">' + _post("/admin/logout", "Выйти", "ghost") + "</div>")
 
 
 @router.post("/admin/login")
@@ -162,6 +180,25 @@ async def admin_logout() -> RedirectResponse:
     r = RedirectResponse("/admin", status_code=303)
     r.delete_cookie(COOKIE, path="/admin")
     return r
+
+
+CHANNELS = {"site", "telegram", "whatsapp", "wechat", "email", "crm"}
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+@router.post("/admin/orders/new")
+async def admin_new_order(request: Request) -> RedirectResponse:
+    """An order the operator enters by hand: a request that came from a marketplace, a messenger or a call."""
+    _require(request)
+    form = {k: v[0].strip() for k, v in parse_qs((await request.body()).decode("utf-8", "replace")).items()}
+    name, email, text = form.get("client_name", "")[:200], form.get("client_email", "")[:200], form.get("request_text", "")[:20000]
+    language = form.get("language") if form.get("language") in ("ru", "en", "zh") else "ru"
+    channel = form.get("channel") if form.get("channel") in CHANNELS else "crm"
+    if not name or not EMAIL_RE.match(email) or len(text) < 10:
+        return RedirectResponse("/admin?" + urlencode({"err": "нужны имя, корректный e-mail и текст заявки от 10 символов"}), status_code=303)
+    order, _ = await request.app.state.orch.create_order(
+        client_name=name, client_email=email, request_text=text, channel=channel, language=language)
+    return _go(order["id"], done="заказ создан, клиенту отправлено подтверждение")
 
 
 # --- one order --------------------------------------------------------------------------------
@@ -218,6 +255,14 @@ async def admin_order(order_id: int, request: Request, done: str = "", err: str 
             f'<td>{escape(p["provider"])}</td><td class="n">{_dt(p["paid_at"])}</td></tr>'
             for p in pays) + "</tbody></table></section>")
 
+    forms = await o.pool.fetch(
+        "SELECT created_at, data, delivered FROM form_submissions WHERE order_id = $1 ORDER BY id DESC LIMIT 20", order_id)
+    if forms:
+        parts.append('<section class="scroll"><h2>Сообщения с формы сайта (последние 20)</h2><table><tbody>' + "".join(
+            f'<tr><td class="n">{_dt(f["created_at"])}</td><td>{escape(f["data"].get("name", ""))}<div class="muted">{escape(f["data"].get("contact", ""))}</div></td>'
+            f'<td style="white-space:pre-line">{escape(f["data"].get("message", ""))}</td>'
+            f'<td class="n">{"доставлено" if f["delivered"] else "письмо не ушло"}</td></tr>' for f in forms) + "</tbody></table></section>")
+
     events: list[dict[str, Any]] = [dict(r) for r in await o.pool.fetch(
         "SELECT created_at, kind, name, actor, from_state, to_state, data FROM events WHERE order_id = $1 ORDER BY id DESC LIMIT 40", order_id)]
     if events:
@@ -234,7 +279,6 @@ async def admin_order(order_id: int, request: Request, done: str = "", err: str 
 
 
 def _go(order_id: int, **q: str) -> RedirectResponse:
-    from urllib.parse import urlencode
     return RedirectResponse(f"/admin/order/{order_id}?{urlencode(q)}", status_code=303)
 
 
