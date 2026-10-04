@@ -132,6 +132,22 @@ class TenantDB:
         finally:
             await admin.close()
 
+    async def ensure_payments_table(self, db: AppDatabase) -> None:
+        """Where a shop notes which provider payment belongs to which order, so that the payment can be checked
+        with the provider later. The shop may add rows and read them, never change or delete them."""
+        role = db.role
+        if not re.fullmatch(r"o\d+_(stg|prod)", role):
+            raise TenantDBError("unexpected role name")
+        admin = await self._connect(self.admin_url)
+        try:
+            await admin.execute(
+                f"CREATE TABLE IF NOT EXISTS {role}.tpf_payments (payment_id TEXT PRIMARY KEY, provider TEXT NOT NULL, "
+                "reference TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now())")
+            await admin.execute(f"CREATE INDEX IF NOT EXISTS tpf_payments_reference ON {role}.tpf_payments (reference)")
+            await admin.execute(f"GRANT SELECT, INSERT ON {role}.tpf_payments TO {role}")
+        finally:
+            await admin.close()
+
     async def get_secrets(self, db: AppDatabase) -> dict[str, str]:
         admin = await self._connect(self.admin_url)
         try:

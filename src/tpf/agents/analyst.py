@@ -31,7 +31,7 @@ SCHEMA = {
                     "description": "'site': pages with fixed content (optionally a contact form). 'app': a web application "
                                    "that stores data in a database and has an owner-only admin area. 'bot': a Telegram bot "
                                    "with a database and a web admin area for its owner. 'shop': an online shop "
-                                   "with a catalogue, cart and card payments through the owner's Stripe account.",
+                                   "with a catalogue, cart and card payments into the owner's own account with a payment provider.",
                 },
                 "title": {"type": "string"},
                 "summary": {"type": "string"},
@@ -117,14 +117,17 @@ SCOPE_BOT = (
 SCOPE_SHOP = (
     "An online shop (product_type 'shop'), when the client sells goods or services online: a catalogue of "
     "products with prices, a cart, a checkout that takes the customer's contact and delivery details, card "
-    "payment through the client's own Stripe account (the money goes straight to the client), and an admin area "
+    "payment into the client's own account with a payment provider (the money goes straight to the client): "
+    "Stripe for international sales, YooKassa for a business in Russia, bePaid for a business in Belarus; and an admin area "
     "where the owner manages products and orders and gets an e-mail about each paid order. The shop sells in one "
     "currency. It has no customer accounts, discount codes, subscriptions, delivery-cost calculation by courier "
-    "services, marketplace integrations or product photo uploads (the owner pastes image links). If the client "
-    "cannot use Stripe, the shop takes orders without online payment and the owner arranges payment personally: "
-    "say so in assumptions. In the spec state the currency, what a product has, what the checkout asks, the "
+    "services, marketplace integrations or product photo uploads (the owner pastes image links). Name in "
+    "assumptions the provider that fits where the client's business is and what currency it sells in (roubles: "
+    "YooKassa; Belarusian roubles: bePaid; otherwise Stripe). If the client can use none of the three, or wants "
+    "another provider, the shop takes orders without online payment and the owner arranges payment personally: "
+    "say so in assumptions. A shop paid through YooKassa does not send fiscal receipts: say so in out_of_scope. In the spec state the currency, what a product has, what the checkout asks, the "
     "delivery or pickup options as fixed text or fixed prices the owner sets, and the order statuses. The client "
-    "enters the Stripe key on their order page later: never ask for it in questions and do not list it as "
+    "enters the provider's keys on their order page later: never ask for it in questions and do not list it as "
     "missing content. Products the owner will add through the admin area are not missing content. "
 )
 SCOPE_MOBILE = (

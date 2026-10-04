@@ -243,3 +243,57 @@ def test_site_contact_form_reaches_the_owner(client, monkeypatch):
     token = client.portal.call(orch.pool.fetchval, "SELECT client_token FROM orders WHERE id=$1", oid)
     page = client.get(f"/portal/{oid}", params={"t": token}).text
     assert "Сообщения с формы вашего сайта" in page and "столик на субботу" in page and "spam.example" not in page
+
+
+def test_shop_owner_chooses_a_payment_provider_on_the_order_page(client):
+    from tests.test_apps import BEPAID_KEY, TEST_KEY, YK_LIVE, YK_TEST, FakeShopStripe
+    from tpf.api.main import app
+    from tpf.tools.shop_pay import ShopPayError
+
+    class FakeShopPay:
+        def __init__(self):
+            self.checked, self.bad = [], set()
+
+        async def check(self, provider, shop_id, key):
+            self.checked.append((provider, shop_id))
+            if key in self.bad:
+                raise ShopPayError("refused")
+
+    oid, token = _order(client)
+    orch = app.state.orch
+    app.state.shop_stripe, app.state.shop_pay = FakeShopStripe(), FakeShopPay()
+    post = lambda **data: client.post(f"/portal/{oid}/payment-key", data={"t": token} | data, follow_redirects=False).headers["location"]  # noqa: E731
+    row = lambda: dict(client.portal.call(orch.pool.fetchrow, "SELECT provider, account_id, mode, secret_key FROM payment_connections WHERE order_id=$1", oid))  # noqa: E731
+    try:
+        assert "err=state" in post(provider="yookassa", shop_id="100500", key=YK_TEST)      # not a shop
+        client.portal.call(orch.save_artifact, oid, "spec", {"product_type": "shop", "title": "Shop", "summary": "s"}, "analyst")
+        client.portal.call(orch.pool.execute, "UPDATE tasks SET status='done' WHERE order_id=$1", oid)
+        page = client.get(f"/portal/{oid}", params={"t": token}).text
+        assert all(name in page for name in ("Stripe", "ЮKassa", "bePaid")) and f"/portal/{oid}/payment-key" in page
+
+        # Keys that do not look like the chosen provider's never reach the provider.
+        for bad in ({"provider": "yookassa", "shop_id": "", "key": YK_TEST}, {"provider": "yookassa", "shop_id": "100500", "key": TEST_KEY},
+                    {"provider": "bepaid", "shop_id": "x1", "key": BEPAID_KEY}, {"provider": "paypal", "shop_id": "1", "key": BEPAID_KEY},
+                    {"provider": "stripe", "shop_id": "", "key": YK_TEST}):
+            assert "err=key" in post(**bad)
+        assert app.state.shop_pay.checked == []
+        app.state.shop_pay.bad.add(YK_LIVE)
+        assert "err=key" in post(provider="yookassa", shop_id="100500", key=YK_LIVE)        # the provider itself refuses
+
+        assert "done=pay" in post(provider="yookassa", shop_id="100500", key=YK_TEST)
+        assert row() == {"provider": "yookassa", "account_id": "100500", "mode": "test", "secret_key": YK_TEST}
+        page = client.get(f"/portal/{oid}", params={"t": token}).text
+        assert "Подключено: ЮKassa." in page and YK_TEST not in page
+
+        client.portal.call(orch.pool.execute, "UPDATE tasks SET status='done' WHERE order_id=$1", oid)
+        assert "done=pay" in post(provider="bepaid", shop_id="361", key=BEPAID_KEY)
+        assert row() == {"provider": "bepaid", "account_id": "361", "mode": "live", "secret_key": BEPAID_KEY}
+
+        # The old address of the form and a form without a provider still mean Stripe.
+        client.portal.call(orch.pool.execute, "UPDATE tasks SET status='done' WHERE order_id=$1", oid)
+        r = client.post(f"/portal/{oid}/stripe-key", data={"t": token, "key": TEST_KEY}, follow_redirects=False)
+        assert "done=pay" in r.headers["location"] and row() == {"provider": "stripe", "account_id": "", "mode": "test", "secret_key": TEST_KEY}
+        events = client.portal.call(orch.pool.fetch, "SELECT data FROM events WHERE order_id=$1 AND name='payment_key_entered'", oid)
+        assert len(events) == 3 and not any(k in str(dict(e)) for e in events for k in (YK_TEST, BEPAID_KEY, TEST_KEY))
+    finally:
+        del app.state.shop_stripe, app.state.shop_pay

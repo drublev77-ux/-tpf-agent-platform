@@ -6,6 +6,9 @@ import json
 import re
 from pathlib import Path
 
+from tpf.tools.shop_payments_ts import (SHOP_PAY_NOTIFY, SHOP_PAY_NOTIFY_PATH, SHOP_PAY_RETURN, SHOP_PAY_RETURN_PATH,
+                                         SHOP_PAYMENTS)
+
 TEMPLATE_FILES: dict[str, str] = {
     "package.json": json.dumps({
         "name": "tpf-site",
@@ -375,98 +378,8 @@ export async function notifyOwner(subject: string, text: string, contact = "—"
 }
 '''
 
-# --- online shops: an application that takes card payments through the owner's own Stripe account ---
-
-SHOP_PAYMENTS = '''import "server-only";
-import { createHmac, timingSafeEqual } from "crypto";
-import { sql } from "@/tpf/db";
-
-// The owner's Stripe keys are kept by the platform in a table this application can only read.
-let cached: { key: string; webhookSecret: string; at: number } | null = null;
-
-async function secrets(): Promise<{ key: string; webhookSecret: string }> {
-  if (cached && Date.now() - cached.at < 60_000) return cached;
-  let key = "", webhookSecret = "";
-  try {
-    const rows = await sql`select key, value from tpf_secrets where key in ('stripe_secret_key', 'stripe_webhook_secret')`;
-    key = String(rows.find((r) => r.key === "stripe_secret_key")?.value ?? "");
-    webhookSecret = String(rows.find((r) => r.key === "stripe_webhook_secret")?.value ?? "");
-  } catch {
-    // the owner has not connected Stripe yet
-  }
-  cached = { key, webhookSecret, at: Date.now() };
-  return cached;
-}
-
-/** True once the owner has connected Stripe. Until then the shop takes orders without online payment. */
-export async function paymentsEnabled(): Promise<boolean> {
-  const s = await secrets();
-  return Boolean(s.key && s.webhookSecret);
-}
-
-export type CheckoutLine = { name: string; unitAmount: number; quantity: number };
-export type Checkout = { url: string; sessionId: string };
-export type Payment = { sessionId: string; amountTotal: number; currency: string; email: string };
-
-/**
- * Start a Stripe Checkout payment and return the page to send the customer to, or null if it could not be
- * started. `reference` is your own order's unguessable token; it comes back in onPaid(). `unitAmount` is an
- * integer in the currency's smallest unit (cents). Amounts must come from your database, never from the browser.
- */
-export async function createCheckout(opts: {
-  reference: string; lines: CheckoutLine[]; currency: string; successUrl: string; cancelUrl: string; customerEmail?: string;
-}): Promise<Checkout | null> {
-  const { key } = await secrets();
-  if (!key || opts.lines.length === 0) return null;
-  const form = new URLSearchParams({
-    mode: "payment", client_reference_id: opts.reference, success_url: opts.successUrl, cancel_url: opts.cancelUrl,
-    "metadata[reference]": opts.reference,
-  });
-  if (opts.customerEmail) form.set("customer_email", opts.customerEmail);
-  opts.lines.forEach((line, i) => {
-    if (!Number.isInteger(line.unitAmount) || line.unitAmount < 0 || !Number.isInteger(line.quantity) || line.quantity < 1) {
-      throw new Error("createCheckout: unitAmount and quantity must be whole numbers");
-    }
-    form.set(`line_items[${i}][quantity]`, String(line.quantity));
-    form.set(`line_items[${i}][price_data][currency]`, opts.currency.toLowerCase());
-    form.set(`line_items[${i}][price_data][unit_amount]`, String(line.unitAmount));
-    form.set(`line_items[${i}][price_data][product_data][name]`, line.name.slice(0, 250));
-  });
-  try {
-    const r = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-      method: "POST", body: form, signal: AbortSignal.timeout(15000),
-      headers: { authorization: `Bearer ${key}`, "content-type": "application/x-www-form-urlencoded" },
-    });
-    const body = (await r.json()) as { id?: string; url?: string; error?: { message?: string } };
-    if (!r.ok || !body.url || !body.id) {
-      console.error("stripe checkout:", body.error?.message ?? r.status);
-      return null;
-    }
-    return { url: body.url, sessionId: body.id };
-  } catch (e) {
-    console.error("stripe checkout:", e instanceof Error ? e.name : "error");
-    return null;
-  }
-}
-
-/** Used by the platform's webhook route: the event, if Stripe really sent it. */
-export async function verifyStripeEvent(payload: string, header: string): Promise<Record<string, unknown> | null> {
-  const { webhookSecret } = await secrets();
-  if (!webhookSecret) return null;
-  const parts = new Map(header.split(",").map((p) => p.split("=") as [string, string]));
-  const timestamp = parts.get("t") ?? "";
-  const given = header.split(",").filter((p) => p.startsWith("v1=")).map((p) => p.slice(3));
-  if (!timestamp || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return null;
-  const expected = Buffer.from(createHmac("sha256", webhookSecret).update(`${timestamp}.${payload}`).digest("hex"));
-  const ok = given.some((sig) => { const g = Buffer.from(sig); return g.length === expected.length && timingSafeEqual(g, expected); });
-  if (!ok) return null;
-  try {
-    return JSON.parse(payload) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-'''
+# --- online shops: an application that takes card payments through the owner's own account with a payment
+# provider (Stripe, YooKassa or bePaid). The payment module itself is in shop_payments_ts.py. ---
 
 SHOP_WEBHOOK = '''import { onPaid } from "@/lib/payments";
 import { verifyStripeEvent, type Payment } from "@/tpf/payments";
@@ -510,10 +423,12 @@ NOTIFY_RULES = (
 )
 
 SHOP_RULES = (
-    "ONLINE SHOP: this application sells products and takes card payments through the owner's own Stripe account. "
+    "ONLINE SHOP: this application sells products and takes card payments through the owner's own account with "
+    "a payment provider — Stripe, YooKassa or bePaid, whichever the owner connects. Your code is the same for "
+    "all of them and never names one. "
     "The platform owns the payment plumbing: `import { paymentsEnabled, createCheckout, type Payment } from "
-    "'@/tpf/payments'` and the webhook app/api/tpf-stripe/route.ts; you write lib/payments.ts, which must export "
-    "`async function onPaid(reference: string, payment: Payment): Promise<void>`. "
+    "'@/tpf/payments'` and the routes app/api/tpf-stripe, app/api/tpf-pay and app/api/tpf-pay-return; you write "
+    "lib/payments.ts, which must export `async function onPaid(reference: string, payment: Payment): Promise<void>`. "
     "Money is always an integer in the currency's smallest unit (cents) in the database and in code; format it "
     "only when displaying. The shop has one currency, taken from the spec. "
     "Catalogue: products (name, description, price, image URL, active flag, optional stock) come from the database "
@@ -530,12 +445,13 @@ SHOP_RULES = (
     "cart and shows a page saying the shop will contact the customer about payment. "
     "The success page (/order/[token]) shows the order's status from the database; it never marks an order paid. "
     "Only onPaid marks it paid: `update orders set status = 'paid', ... where token = ${reference} and status = "
-    "'pending'`, and only when that update changed a row does it reduce stock and call notifyOwner — Stripe may "
-    "deliver the same payment twice, so onPaid must be safe to repeat. If the paid amount differs from the "
+    "'pending'`, and only when that update changed a row does it reduce stock and call notifyOwner — the platform "
+    "may report the same payment twice, so onPaid must be safe to repeat. If the paid amount differs from the "
     "order's total, do not mark it paid: record the mismatch on the order and notify the owner. "
     "Admin: products (create, edit, deactivate), orders (list, details, status: new, pending, paid, shipped, "
-    "completed, cancelled). Refunds are made by the owner in Stripe, not here. "
-    "Never read or print Stripe keys and never call api.stripe.com yourself. Not available: customer accounts, "
+    "completed, cancelled). Refunds are made by the owner in the payment provider's own dashboard, not here. "
+    "Never read or print payment keys and never call a payment provider's API yourself. Texts for customers say "
+    "'card payment', not a provider's name. Not available: customer accounts, "
     "discount codes, delivery-price calculation by outside services, subscriptions, saved cards. "
 )
 
@@ -688,7 +604,8 @@ def validate_path(path: str, kind: str = "site") -> str | None:
         return f"path outside allowed folders: {path}"
     if not path.endswith(APP_SUFFIXES if app else ALLOWED_SUFFIXES):
         return f"file type not allowed: {path}"
-    if path.startswith(("app/api/tpf-health/", "app/api/tpf-telegram/", "app/api/tpf-stripe/", "app/tpf-icon/")) \
+    if path.startswith(("app/api/tpf-health/", "app/api/tpf-telegram/", "app/api/tpf-stripe/", "app/api/tpf-pay/",
+                        "app/api/tpf-pay-return/", "app/tpf-icon/")) \
             or path in ("app/manifest.ts", "public/sw.js", "public/offline.html"):
         return f"path reserved by the platform: {path}"
     if path.startswith("db/") and path != SCHEMA_PATH:
@@ -738,7 +655,8 @@ def platform_files(form_endpoint: str = "", kind: str = "site") -> dict[str, str
     if kind == "bot":
         files |= {"tpf/telegram.ts": BOT_TELEGRAM, BOT_WEBHOOK_PATH: BOT_WEBHOOK}
     if kind == "shop":
-        files |= {"tpf/payments.ts": SHOP_PAYMENTS, SHOP_WEBHOOK_PATH: SHOP_WEBHOOK}
+        files |= {"tpf/payments.ts": SHOP_PAYMENTS, SHOP_WEBHOOK_PATH: SHOP_WEBHOOK,
+                  SHOP_PAY_NOTIFY_PATH: SHOP_PAY_NOTIFY, SHOP_PAY_RETURN_PATH: SHOP_PAY_RETURN}
     if installable(kind):
         files |= {"public/sw.js": PWA_SW, "public/offline.html": PWA_OFFLINE, "tpf/Pwa.tsx": PWA_COMPONENT,
                   "app/manifest.ts": PWA_MANIFEST, "app/tpf-icon/[size]/route.tsx": PWA_ICON}

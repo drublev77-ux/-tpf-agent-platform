@@ -119,7 +119,7 @@ BOT_CRITERIA = [
 SHOP_CRITERIA = [
     "There are routes for the catalogue, a product, the cart, the checkout and the order status page by token, and admin routes for products and orders",
     "Prices and totals are integers in minor units; orders carry a random token, a status and an order_items snapshot",
-    "Card payment is the only online payment and goes through the platform's Stripe helper; nothing needs customer accounts, discount codes or outside delivery services",
+    "Card payment is the only online payment and goes through the platform's payment helper, with no provider named in the design; nothing needs customer accounts, discount codes or outside delivery services",
 ]
 
 

@@ -62,8 +62,8 @@ SHOP_CRITERIA = [
     "An order is marked paid only in onPaid, with an update guarded by status = 'pending' so a repeated payment event changes nothing; "
     "stock changes and the owner's notification happen only when that update changed a row; a wrong amount is not accepted as paid",
     "The order status page is found by a random token, not a sequential id, and shows nothing about other orders",
-    "Checkout works without Stripe connected: the order is saved as 'new' and the customer is told the shop will contact them",
-    "Money is stored as integers in minor units and formatted only for display; Stripe is reached only through @/tpf/payments",
+    "Checkout works without payments connected: the order is saved as 'new' and the customer is told the shop will contact them",
+    "Money is stored as integers in minor units and formatted only for display; payment providers are reached only through @/tpf/payments and no provider is named in the code or texts",
 ]
 
 

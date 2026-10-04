@@ -9,6 +9,7 @@ from typing import Any
 from tpf.agents.base import SAFETY_NOTE, Ctx, Outcome
 from tpf.llm.gateway import LLMError
 from tpf.orchestrator.states import Ev
+from tpf.tools.shop_payments_ts import PAYMENT_HOSTS
 from tpf.tools.tenantdb import check_schema_sql
 from tpf.tools.template import PWA_CONFIG_PATH, SHOP_HANDLER_PATH, installable, BOT_HANDLER_PATH, MAX_FILE_BYTES, SCHEMA_PATH, has_database, kind_of, route_to_page, rules_for, validate_path
 
@@ -62,7 +63,7 @@ APP_NOTE = (
 )
 SHOP_NOTE = (
     "This order is an online shop: implement the catalogue, cart, checkout, order status page and admin area as "
-    "the architecture describes, with payment through the platform's Stripe helper and onPaid in lib/payments.ts. "
+    "the architecture describes, with payment through the platform's payment helper and onPaid in lib/payments.ts. "
 )
 BOT_NOTE = (
     "This order is a Telegram bot: implement every command and dialog the architecture lists in lib/bot.ts, with "
@@ -103,8 +104,8 @@ def check_files(files: list[dict[str, str]], routes: list[str], kind: str = "sit
         for f in files:
             if "api.telegram.org" in f["content"]:
                 problems.append(f"Telegram is called directly instead of through @/tpf/telegram: {f['path']}")
-            if "api.stripe.com" in f["content"]:
-                problems.append(f"Stripe is called directly instead of through @/tpf/payments: {f['path']}")
+            if any(host in f["content"] for host in PAYMENT_HOSTS):
+                problems.append(f"a payment provider is called directly instead of through @/tpf/payments: {f['path']}")
             if kind == "shop" and f["path"] == SHOP_HANDLER_PATH and not re.search(r"export\s+async\s+function\s+onPaid\b", f["content"]):
                 problems.append(f"{SHOP_HANDLER_PATH} must export async function onPaid(reference, payment)")
             if kind == "bot" and f["path"] == BOT_HANDLER_PATH and not re.search(r"export\s+async\s+function\s+handleUpdate\b", f["content"]):

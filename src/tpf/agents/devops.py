@@ -5,6 +5,7 @@ from tpf.agents.base import Ctx, Outcome
 from tpf.orchestrator.states import Ev, State
 from tpf.tools.deploy import Deployment, DeployError
 from tpf.tools.telegram import TelegramError, webhook_secret
+from tpf.tools.shop_pay import NAMES as PAY_NAMES, NOTIFY_PATH, effective_mode
 from tpf.tools.shop_stripe import StripeKeyError
 from tpf.tools.template import BOT_WEBHOOK_PATH, SHOP_WEBHOOK_PATH, all_files, has_database, kind_of
 from tpf.tools.tenantdb import TenantDBError
@@ -60,24 +61,38 @@ async def connect_bot_to(ctx: Ctx, env: str, site_url: str) -> str | None:
 
 
 async def connect_shop_to(ctx: Ctx, env: str, site_url: str) -> str | None:
-    """Give the shop at this deployment its owner's Stripe key and a webhook for payments. Returns the key's
-    mode ('test' or 'live'), or None when nothing was connected: the owner has not entered a key, or the key
-    is a live one and this is the review build. Raises StripeKeyError when Stripe refuses the key."""
-    row = await ctx.orch.pool.fetchrow("SELECT secret_key, mode FROM payment_connections WHERE order_id = $1", ctx.order_id)
+    """Give the shop at this deployment its owner's payment keys (and, for Stripe, a webhook). Returns the mode
+    payments now run in ('test' or 'live'), or None when nothing was connected: the owner has not entered a
+    key, or the key is a live one and this is the review build. Raises StripeKeyError when Stripe refuses the key."""
+    row = await ctx.orch.pool.fetchrow(
+        "SELECT secret_key, mode, provider, account_id FROM payment_connections WHERE order_id = $1", ctx.order_id)
     if row is None or ctx.tenant_db is None:
         return None
-    if env == "stg" and row["mode"] == "live":
+    provider = row["provider"]
+    if env == "stg" and effective_mode(provider, row["mode"], env) == "live":
         # The review build is for trying things out and its orders are thrown away: a live key there would
         # charge real cards for them. It waits for the release; the review build keeps whatever it had.
         await ctx.orch.log(ctx.order_id, "payments_held", "devops", {"env": env, "mode": "live"}, kind="tool")
         return None
     key = row["secret_key"]
     db = await ctx.tenant_db.ensure(ctx.orch.pool, ctx.order_id, env)
+    if provider != "stripe":
+        # YooKassa and bePaid: nothing to register with the provider. The shop checks every payment with the
+        # provider itself, and notes its payments in a table the platform makes for it.
+        mode = effective_mode(provider, row["mode"], env)
+        await ctx.tenant_db.ensure_payments_table(db)
+        await ctx.tenant_db.set_secrets(db, {
+            "pay_provider": provider, f"{provider}_shop_id": row["account_id"], f"{provider}_secret_key": key,
+            **({"bepaid_test": "1" if mode == "test" else "0"} if provider == "bepaid" else {})})
+        await ctx.orch.pool.execute(
+            "UPDATE payment_connections SET connected_env = $2, updated_at = now() WHERE order_id = $1", ctx.order_id, env)
+        await ctx.orch.log(ctx.order_id, "payments_connected", "devops", {"env": env, "mode": mode, "provider": provider}, kind="tool")
+        return mode
     known = await ctx.tenant_db.get_secrets(db)
     same_key = known.get("stripe_secret_key") == key
     hook = site_url.rstrip("/") + "/" + SHOP_WEBHOOK_PATH.removeprefix("app/").removesuffix("/route.ts")
     endpoint_id, secret = await ctx.shop_stripe.ensure_webhook(key, hook, known.get("stripe_webhook_id", "") if same_key else "")
-    values = {"stripe_secret_key": key, "stripe_webhook_id": endpoint_id}
+    values = {"pay_provider": "stripe", "stripe_secret_key": key, "stripe_webhook_id": endpoint_id}
     if secret:
         values["stripe_webhook_secret"] = secret
     await ctx.tenant_db.set_secrets(db, values)
@@ -97,7 +112,7 @@ async def _connect_after_deploy(ctx: Ctx, env: str, url: str) -> None:
     try:
         await connect(ctx, env, url)
     except Exception as e:  # noqa: BLE001
-        what = "Telegram-бота" if kind == "bot" else "Stripe магазина"
+        what = "Telegram-бота" if kind == "bot" else "приём оплаты магазина"
         await ctx.orch.log(ctx.order_id, f"{kind}_connect_failed", "devops", {"env": env, "error": str(e)[:300]}, kind="tool")
         await ctx.orch.notify_operator(ctx.order, f"Заказ #{ctx.order_id}: не удалось подключить {what} ({env}): {e}")
 
@@ -275,6 +290,45 @@ PAY_TEXT = {
 }
 
 
+OTHER_PAY_TEXT = {
+    "connected_test": {
+        "ru": "{name}: приём оплаты подключён к магазину заказа №{id} в тестовом режиме — деньги не списываются. Оплату можно проверить тестовой картой из документации {name}.",
+        "en": "{name}: payments are connected to the shop of order #{id} in test mode — no money moves. Try a payment with a test card from the {name} documentation.",
+        "zh": "{name}：订单 #{id} 的商店已以测试模式接通付款——不会实际扣款。可使用 {name} 文档中的测试卡测试付款。",
+    },
+    "connected_live": {
+        "ru": "{name}: приём оплаты подключён к магазину заказа №{id} в рабочем режиме — покупатели платят настоящими картами, деньги поступают на ваш счёт в {name}.",
+        "en": "{name}: payments are connected to the shop of order #{id} in live mode — customers pay with real cards and the money goes to your {name} account.",
+        "zh": "{name}：订单 #{id} 的商店已以正式模式接通付款——顾客使用真实银行卡付款，款项进入您的 {name} 账户。",
+    },
+    "saved": {
+        "ru": "Ключи {name} для заказа №{id} сохранены. Мы подключим оплату, как только будет готова версия для проверки.",
+        "en": "The {name} keys for order #{id} are saved. We will connect payments as soon as the review version is ready.",
+        "zh": "订单 #{id} 的 {name} 密钥已保存。审核版本准备好后我们会立即接通付款。",
+    },
+    "held": {
+        "ru": "Рабочий ключ {name} для заказа №{id} сохранён. К версии для проверки мы его не подключаем, чтобы при проверке не списывались настоящие деньги: оплата заработает сразу после запуска магазина. Чтобы попробовать оплату уже сейчас, введите на странице заказа ключ тестового магазина (test_…), а перед запуском снова замените его на рабочий.",
+        "en": "The live {name} key for order #{id} is saved. We do not connect it to the review version, so that reviewing the shop cannot charge real money: payments will start working as soon as the shop is released. To try a payment now, enter the key of your test shop (test_…) on your order page and switch back to the live one before release.",
+        "zh": "订单 #{id} 的 {name} 正式密钥已保存。为避免审核时产生真实扣款，我们不会把它连接到审核版本：商店上线后付款将立即生效。如需现在测试付款，请在订单页面输入测试商店的密钥（test_…），上线前再换回正式密钥。",
+    },
+    "notify": {
+        "ru": " Чтобы оплата засчитывалась, даже если покупатель закрыл страницу, не вернувшись в магазин, добавьте в кабинете ЮKassa («Интеграция → HTTP-уведомления») адрес {hook} и событие payment.succeeded.",
+        "en": " So that a payment counts even when the customer closes the page without returning to the shop, add the address {hook} with the event payment.succeeded in your YooKassa dashboard (Integration → HTTP notifications).",
+        "zh": " 为确保顾客未返回商店就关闭页面时付款仍能记入，请在 YooKassa 后台（集成 → HTTP 通知）添加地址 {hook} 并选择事件 payment.succeeded。",
+    },
+}
+
+
+def _pay_text(kind: str, provider: str, lang: str, order_id: int, site_url: str = "") -> str:
+    """What to tell the owner about their payment keys, in the words of the provider they chose."""
+    if provider == "stripe":
+        return PAY_TEXT[kind][lang].format(id=order_id)
+    text = OTHER_PAY_TEXT[kind][lang].format(id=order_id, name=PAY_NAMES[provider])
+    if provider == "yookassa" and kind == "connected_live" and site_url:
+        text += OTHER_PAY_TEXT["notify"][lang].format(hook=site_url.rstrip("/") + NOTIFY_PATH)
+    return text
+
+
 def _live_target(ctx: Ctx) -> tuple[str, str] | None:
     """Which deployment a newly entered token or key should be connected to right now, if any."""
     state = ctx.order["state"]
@@ -289,9 +343,13 @@ async def connect_payments(ctx: Ctx) -> Outcome:
     """Side task (does not move the order): the owner entered or replaced the shop's Stripe key."""
     lang = ctx.order["language"] if ctx.order["language"] in ("ru", "en", "zh") else "en"
     target = _live_target(ctx)
-    live = await ctx.orch.pool.fetchval("SELECT mode FROM payment_connections WHERE order_id = $1", ctx.order_id) == "live"
+    row = await ctx.orch.pool.fetchrow("SELECT mode, provider FROM payment_connections WHERE order_id = $1", ctx.order_id)
+    if row is None:
+        return Outcome(data={"result": "no_key"})
+    provider = row["provider"]
+    live = effective_mode(provider, row["mode"], "stg") == "live"    # a key that must not reach the review build
     if target is None or (live and target[0] == "stg"):
-        await ctx.orch.notify_client(ctx.order, PAY_TEXT["held" if live else "saved"][lang].format(id=ctx.order_id))
+        await ctx.orch.notify_client(ctx.order, _pay_text("held" if live else "saved", provider, lang, ctx.order_id))
         return Outcome(data={"result": "held" if live else "saved"})
     try:
         mode = await connect_shop_to(ctx, *target)
@@ -299,5 +357,5 @@ async def connect_payments(ctx: Ctx) -> Outcome:
         await ctx.orch.log(ctx.order_id, "shop_connect_failed", "devops", {"env": target[0], "error": str(e)[:300]}, kind="tool")
         await ctx.orch.notify_client(ctx.order, PAY_TEXT["failed"][lang].format(id=ctx.order_id))
         return Outcome(data={"result": "failed"})
-    await ctx.orch.notify_client(ctx.order, PAY_TEXT[f"connected_{mode}"][lang].format(id=ctx.order_id))
-    return Outcome(data={"result": "connected", "env": target[0], "mode": mode})
+    await ctx.orch.notify_client(ctx.order, _pay_text(f"connected_{mode}", provider, lang, ctx.order_id, target[1]))
+    return Outcome(data={"result": "connected", "env": target[0], "mode": mode, "provider": provider})

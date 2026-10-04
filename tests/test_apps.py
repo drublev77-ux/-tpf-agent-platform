@@ -375,7 +375,7 @@ async def test_shop_payments_follow_the_order_from_review_to_production(shop_env
     await env.drain()
     assert stripe.calls[-1] == (TEST_KEY, order["staging_url"] + "/api/tpf-stripe", "")
     stg = await shop_secrets(env, oid, "stg")
-    assert stg == {"stripe_secret_key": TEST_KEY, "stripe_webhook_id": "we_1", "stripe_webhook_secret": "whsec_1"}
+    assert stg == {"pay_provider": "stripe", "stripe_secret_key": TEST_KEY, "stripe_webhook_id": "we_1", "stripe_webhook_secret": "whsec_1"}
     assert "4242" in (await env.orch.messages(oid))[-1]["text"]
 
     # A change request redeploys the review build: the same endpoint is moved, its secret is kept.
@@ -502,3 +502,144 @@ def test_admin_cookie_matches_the_template_signature():
     from tpf.agents.qa import admin_cookie
     exp, sig = admin_cookie("secret").split(".")
     assert sig == hmac.new(b"secret", f"admin:{exp}".encode(), hashlib.sha256).hexdigest() and int(exp) > 0
+
+
+# --- shops paid through YooKassa (Russia) or bePaid (Belarus) ---
+
+YK_TEST, YK_LIVE, BEPAID_KEY = "test_" + "y" * 40, "live_" + "y" * 40, "b" * 64
+
+
+async def enter_provider_key(env, oid, provider, shop_id, key):
+    """What the portal does when the owner submits the payment form with YooKassa or bePaid chosen."""
+    from tpf.orchestrator import queue
+    from tpf.tools.shop_pay import mode_of
+    await env.pool.execute(
+        "INSERT INTO payment_connections (order_id, secret_key, mode, provider, account_id) VALUES ($1,$2,$3,$4,$5) "
+        "ON CONFLICT (order_id) DO UPDATE SET secret_key = EXCLUDED.secret_key, mode = EXCLUDED.mode, "
+        "provider = EXCLUDED.provider, account_id = EXCLUDED.account_id, connected_env = NULL",
+        oid, key, mode_of(provider, key), provider, shop_id)
+    async with env.pool.acquire() as conn:
+        await queue.enqueue(conn, oid, "connect_payments", {})
+
+
+async def test_yookassa_shop_test_key_for_review_live_key_for_release(shop_env):
+    env = shop_env
+    oid = await new_app_order(env)
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    await enter_provider_key(env, oid, "yookassa", "100500", YK_TEST)
+    await env.drain()
+    assert await shop_secrets(env, oid, "stg") == {"pay_provider": "yookassa", "yookassa_shop_id": "100500", "yookassa_secret_key": YK_TEST}
+    assert env.worker.shop_stripe.calls == []                       # nothing is registered with anyone
+    said = (await env.orch.messages(oid))[-1]["text"]
+    assert "ЮKassa" in said and "тестовом режиме" in said and "4242" not in said
+
+    # The shop may note its payments and read them back, and nothing more.
+    conn = await asyncpg.connect(env.deployer.env[f"tpf-order-{oid}-preview"]["DATABASE_URL"])
+    await conn.execute("INSERT INTO tpf_payments (payment_id, provider, reference) VALUES ('p1', 'yookassa', 'ref-1')")
+    assert await conn.fetchval("SELECT reference FROM tpf_payments WHERE payment_id = 'p1'") == "ref-1"
+    for forbidden in ("UPDATE tpf_payments SET reference = 'x'", "DELETE FROM tpf_payments", "DROP TABLE tpf_payments"):
+        with pytest.raises(asyncpg.PostgresError):
+            await conn.execute(forbidden)
+    await conn.close()
+
+    await enter_provider_key(env, oid, "yookassa", "100501", YK_LIVE)   # the live shop's key, still under review
+    await env.drain()
+    assert (await shop_secrets(env, oid, "stg"))["yookassa_secret_key"] == YK_TEST
+    assert "после запуска" in (await env.orch.messages(oid))[-1]["text"]
+
+    await env.orch.fire(oid, Ev.ACCEPTED, actor="client")
+    await env.drain()
+    order = await env.orch.get_order(oid)
+    assert order["state"] == State.DELIVERED
+    assert await shop_secrets(env, oid, "prod") == {"pay_provider": "yookassa", "yookassa_shop_id": "100501", "yookassa_secret_key": YK_LIVE}
+    assert await env.pool.fetchval("SELECT provider || ':' || mode || ':' || connected_env FROM payment_connections WHERE order_id = $1", oid) == "yookassa:live:prod"
+
+    # Entered again after release, the owner is told where YooKassa should send its notifications.
+    await enter_provider_key(env, oid, "yookassa", "100501", YK_LIVE)
+    await env.drain()
+    said = (await env.orch.messages(oid))[-1]["text"]
+    assert order["production_url"] + "/api/tpf-pay" in said and "payment.succeeded" in said
+
+
+async def test_bepaid_shop_pays_in_test_mode_under_review_and_for_real_after_release(shop_env):
+    from tpf.api.portal import T, _pay_block
+    env = shop_env
+    oid = await new_app_order(env)
+    await env.drain()
+    await enter_provider_key(env, oid, "bepaid", "361", BEPAID_KEY)   # before anything is deployed
+    await env.drain()
+    assert "bePaid" in (await env.orch.messages(oid))[-1]["text"] and "сохранены" in (await env.orch.messages(oid))[-1]["text"]
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    stg = await shop_secrets(env, oid, "stg")                         # the same key, marked as test for the review build
+    assert stg == {"pay_provider": "bepaid", "bepaid_shop_id": "361", "bepaid_secret_key": BEPAID_KEY, "bepaid_test": "1"}
+    block = await _pay_block(env.orch, oid, "t", T["ru"])
+    assert "bePaid" in block and "Тестовый режим" in block and BEPAID_KEY not in block
+
+    await env.orch.fire(oid, Ev.ACCEPTED, actor="client")
+    await env.drain()
+    assert (await env.orch.get_order(oid))["state"] == State.DELIVERED
+    assert (await shop_secrets(env, oid, "prod"))["bepaid_test"] == "0"
+    assert "Рабочий режим" in await _pay_block(env.orch, oid, "t", T["ru"])
+
+    # Switching the provider later replaces which one the shop uses.
+    await enter_provider_key(env, oid, "stripe", "", LIVE_KEY)
+    await env.drain()
+    prod = await shop_secrets(env, oid, "prod")
+    assert prod["pay_provider"] == "stripe" and prod["stripe_secret_key"] == LIVE_KEY
+
+
+async def test_provider_credentials_are_checked_without_leaking_them():
+    import base64
+    import httpx
+    from tpf.tools.shop_pay import ShopPay, ShopPayError, effective_mode, mode_of, valid
+    seen: list[tuple[str, str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        user, _, password = base64.b64decode(request.headers["authorization"].split()[1]).decode().partition(":")
+        seen.append((request.method, str(request.url), user))
+        if request.url.host == "api.yookassa.ru":
+            return httpx.Response(200 if password == YK_TEST else 401, json={"account_id": user, "test": True})
+        body = __import__("json").loads(request.content)
+        assert body["checkout"]["test"] is True and request.headers["x-api-version"] == "2"   # the probe never asks for real money
+        return httpx.Response(201 if password == BEPAID_KEY else 401, json={"checkout": {"token": "t"}})
+
+    api = ShopPay(httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    await api.check("yookassa", "100500", YK_TEST)
+    await api.check("bepaid", "361", BEPAID_KEY)
+    assert seen == [("GET", "https://api.yookassa.ru/v3/me", "100500"), ("POST", "https://checkout.bepaid.by/ctp/api/checkouts", "361")]
+    for provider, shop, key in (("yookassa", "100500", YK_LIVE), ("bepaid", "361", "c" * 64)):
+        with pytest.raises(ShopPayError) as e:
+            await api.check(provider, shop, key)
+        assert key not in str(e.value)
+    # bePaid answering 422 means the keys are fine and only the probe order was not: accepted.
+    await ShopPay(httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(422, json={})))).check("bepaid", "361", BEPAID_KEY)
+    down = ShopPay(httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(503, json={}))))
+    with pytest.raises(ShopPayError):
+        await down.check("bepaid", "361", BEPAID_KEY)
+
+    assert valid("yookassa", "100500", YK_TEST) and valid("bepaid", "361", BEPAID_KEY)
+    assert not valid("yookassa", "100500", "sk_test_" + "a" * 24) and not valid("yookassa", "", YK_TEST)
+    assert not valid("bepaid", "abc", BEPAID_KEY) and not valid("stripe", "1", YK_TEST) and not valid("paypal", "1", BEPAID_KEY)
+    assert (mode_of("yookassa", YK_TEST), mode_of("yookassa", YK_LIVE), mode_of("bepaid", BEPAID_KEY)) == ("test", "live", "live")
+    assert (effective_mode("bepaid", "live", "stg"), effective_mode("bepaid", "live", "prod")) == ("test", "live")
+    assert effective_mode("yookassa", "live", "stg") == "live" and effective_mode("stripe", "test", "prod") == "test"
+
+
+def test_shop_template_carries_all_three_providers_and_keeps_them_out_of_generated_code():
+    from tpf.tools.template import rules_for
+    files = {f["path"]: f["content"] for f in all_files(SHOP_FILES, "x", "shop")}
+    assert {"tpf/payments.ts", "app/api/tpf-stripe/route.ts", "app/api/tpf-pay/route.ts", "app/api/tpf-pay-return/route.ts"} <= set(files)
+    assert all(host in files["tpf/payments.ts"] for host in ("api.stripe.com", "api.yookassa.ru", "checkout.bepaid.by"))
+    assert "app/api/tpf-pay/route.ts" not in {f["path"] for f in all_files(APP_CODE["files"], "x", "app")}
+    for path in ("app/api/tpf-pay/route.ts", "app/api/tpf-pay-return/route.ts", "app/api/tpf-stripe/route.ts"):
+        assert validate_path(path, "shop")
+    routes = ["/", "/admin", "/admin/login"]
+    for host in ("api.yookassa.ru", "checkout.bepaid.by", "api.stripe.com"):
+        direct = SHOP_FILES + [{"path": "lib/x.ts", "content": f"fetch('https://{host}/v3/payments')"}]
+        assert any("payment provider" in p for p in check_files(direct, routes, "shop"))
+    assert check_schema_sql("CREATE TABLE IF NOT EXISTS tpf_payments (id int);")      # the platform's table, not the developer's
+    rules = rules_for("shop")
+    assert "YooKassa" in rules and "never names one" in rules and "app/api/tpf-pay-return" in rules
