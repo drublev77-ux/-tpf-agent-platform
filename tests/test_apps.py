@@ -474,3 +474,29 @@ def test_use_server_modules_may_only_export_async_functions():
         assert any("use server" in p for p in check_files(CODE["files"] + [broken], ["/"], "site")), bad
     assert check_files(CODE["files"] + [ok], ["/"], "site") == []
     assert check_files(CODE["files"] + [{"path": "lib/c.ts", "content": "export const A = 1;"}], ["/"], "site") == []
+
+
+async def test_pages_that_crash_when_opened_send_the_code_back(app_env):
+    """With Vercel as the build sandbox, QA opens every page of the built application as the owner."""
+    env = app_env
+    env.settings.sandbox = "vercel"
+    env.deployer.smoke_problems = [["/admin: server error 500"]]
+    env.llm.script["developer"] = [APP_CODE, {"files": [], "remaining": [], "notes": "fixed"}]
+    oid = await new_app_order(env)
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    assert State((await env.orch.get_order(oid))["state"]) is State.AWAITING_ACCEPTANCE
+    names = [e["name"] for e in await env.orch.events(oid) if e["kind"] == "transition"]
+    assert names.count("checks_failed") == 1
+    url, routes, signed_in = env.deployer.smoked[0]
+    assert routes == ["/", "/admin", "/admin/login"] and signed_in
+
+
+def test_admin_cookie_matches_the_template_signature():
+    import hashlib
+    import hmac
+
+    from tpf.agents.qa import admin_cookie
+    exp, sig = admin_cookie("secret").split(".")
+    assert sig == hmac.new(b"secret", f"admin:{exp}".encode(), hashlib.sha256).hexdigest() and int(exp) > 0

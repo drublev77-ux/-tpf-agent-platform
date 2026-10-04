@@ -80,9 +80,15 @@ class FakeDeployer:
         self.env: dict[str, dict[str, str]] = {}
         self.health_problems: list[str | None] = []
         self.health_checks: list[str] = []
+        self.smoked: list[tuple] = []
+        self.smoke_problems: list[list[str]] = []
 
     async def set_env(self, project, env):
         self.env.setdefault(project, {}).update(env)
+
+    async def smoke(self, url, routes, admin_cookie=""):
+        self.smoked.append((url, list(routes), bool(admin_cookie)))
+        return self.smoke_problems.pop(0) if self.smoke_problems else []
 
     async def health(self, url, path="/api/tpf-health"):
         self.health_checks.append(url)

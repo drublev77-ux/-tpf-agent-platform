@@ -5,7 +5,10 @@ and the reviewer confirms the code meets the spec's acceptance criteria.
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -64,7 +67,13 @@ SHOP_CRITERIA = [
 ]
 
 
-async def prepare_database(ctx: Ctx, files: list[dict[str, str]], env: str, project: str) -> None:
+def admin_cookie(session_secret: str, ttl_sec: int = 600) -> str:
+    """A short-lived owner session, signed the way tpf/auth.ts signs it: lets the platform open admin pages."""
+    exp = int(time.time()) + ttl_sec
+    return f"{exp}.{hmac.new(session_secret.encode(), f'admin:{exp}'.encode(), hashlib.sha256).hexdigest()}"
+
+
+async def prepare_database(ctx: Ctx, files: list[dict[str, str]], env: str, project: str) -> Any:
     """An application's database for this environment: created, brought to the code's schema, and handed
     to the Vercel project as environment variables. Raises TenantDBError when the schema is refused."""
     if ctx.tenant_db is None:
@@ -74,10 +83,11 @@ async def prepare_database(ctx: Ctx, files: list[dict[str, str]], env: str, proj
     await ctx.tenant_db.apply_schema(db, schema)
     if ctx.deployer is not None:
         await ctx.deployer.set_env(project, db.env())
+    return db
 
 
 async def _build_on_vercel(ctx: Ctx, files: list[dict[str, str]], version: int, report: dict[str, Any],
-                           kind: str = "site") -> RunResult:
+                           kind: str = "site", routes: list[str] | None = None, cookie: str = "") -> RunResult:
     """Build the code as a Vercel preview. A green preview is kept for staging, so it is not built twice."""
     if ctx.deployer is None:
         return RunResult(1, "SANDBOX=vercel needs VERCEL_TOKEN")
@@ -96,6 +106,10 @@ async def _build_on_vercel(ctx: Ctx, files: list[dict[str, str]], version: int, 
         problem = await ctx.deployer.health(dep.url)
         if problem:
             return RunResult(40, f"The application was built but does not answer with a working database: {problem}")
+        broken = await ctx.deployer.smoke(dep.url, [r for r in (routes or []) if "[" not in r], cookie)
+        if broken:
+            return RunResult(40, "The application was built, but these pages fail when opened (signed in as the owner):\n"
+                             + "\n".join(broken) + "\nFind what throws while each page renders and fix it.")
     report["preview"] = {"url": dep.url, "deployment_id": dep.id, "code_version": version}
     return RunResult(0, f"Vercel build ok: {dep.url}")
 
@@ -132,17 +146,19 @@ async def run(ctx: Ctx) -> Outcome:
         "SELECT max(version) FROM artifacts WHERE order_id = $1 AND kind = 'code'", ctx.order_id
     )
     schema_error = None
+    cookie = ""
     if has_database(kind):
         if ctx.tenant_db is None:
             return Outcome(escalate="Заказ — приложение с базой данных, но TENANT_DATABASE_URL не задан")
         try:
-            await prepare_database(ctx, files, "stg", staging_project(ctx.order_id))
+            db = await prepare_database(ctx, files, "stg", staging_project(ctx.order_id))
+            cookie = admin_cookie(db.session_secret)
         except TenantDBError as e:
             schema_error = str(e)
     if schema_error:
         run_result = RunResult(50, schema_error)
     elif ctx.settings.sandbox == "vercel":
-        run_result = await _build_on_vercel(ctx, files, version, report, kind)
+        run_result = await _build_on_vercel(ctx, files, version, report, kind, [r["path"] for r in arch["routes"]], cookie)
     else:
         workdir = materialize(Path(ctx.settings.workspace_root) / f"order-{ctx.order_id}" / f"v{version}", files, ctx.form_endpoint, kind)
         run_result = await ctx.sandbox.run(workdir, BUILD_CMD)

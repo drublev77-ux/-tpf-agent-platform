@@ -94,6 +94,24 @@ class VercelDeployer:
                 await asyncio.sleep(4)
         return last
 
+    async def smoke(self, url: str, routes: list[str], admin_cookie: str = "") -> list[str]:
+        """Open every page of a deployed application the way a browser would, signed in as the owner, and
+        return what is broken: a page that answers with a server error or does not answer at all."""
+        problems: list[str] = []
+        cookies = {"tpf_admin": admin_cookie} if admin_cookie else None
+        async with httpx.AsyncClient(timeout=25, follow_redirects=False, cookies=cookies) as http:
+            for route in routes:
+                try:
+                    r = await http.get(url.rstrip("/") + route)
+                except httpx.HTTPError as e:
+                    problems.append(f"{route}: no answer ({type(e).__name__})")
+                    continue
+                if r.status_code >= 500:
+                    problems.append(f"{route}: server error {r.status_code}")
+                elif route.startswith("/admin") and route != "/admin/login" and r.status_code in (301, 302, 303, 307, 308):
+                    problems.append(f"{route}: redirects to {r.headers.get('location', '?')} although the owner is signed in")
+        return problems
+
     async def _make_public(self, project: str) -> None:
         """New Vercel projects hide previews behind a Vercel login; the client must see staging."""
         if project in self._public:

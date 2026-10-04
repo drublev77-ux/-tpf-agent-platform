@@ -127,7 +127,7 @@ declare global {
 
 function connect(): Sql {
   return postgres(process.env.DATABASE_URL ?? "postgres://missing:missing@127.0.0.1:1/missing", {
-    prepare: false, max: 5, idle_timeout: 10, connect_timeout: 10, fetch_types: false,
+    prepare: false, max: 5, idle_timeout: 10, connect_timeout: 10,   // fetch_types stays on: arrays need it
   });
 }
 
