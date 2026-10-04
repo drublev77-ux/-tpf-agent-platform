@@ -286,7 +286,8 @@ async def stripe_webhook(request: Request) -> dict[str, str]:
 
 
 PAGE = """<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TPF Technology</title><style>body{{margin:0;min-height:100vh;display:grid;place-items:center;background:#07090C;color:#E6EDF2;
+<title>TPF Technology</title><script>window.si = window.si || function () {{ (window.siq = window.siq || []).push(arguments); }};</script>
+<script defer src="/_vercel/speed-insights/script.js"></script><style>body{{margin:0;min-height:100vh;display:grid;place-items:center;background:#07090C;color:#E6EDF2;
 font-family:system-ui,sans-serif;text-align:center;padding:24px}}h1{{font-size:28px;margin:0 0 12px}}p{{color:#B7C3CC;margin:0}}b{{color:#5CE1F0}}</style>
 </head><body><main><h1>{title}</h1><p>{text}</p></main></body></html>"""
 
