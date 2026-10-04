@@ -110,7 +110,10 @@ def check_files(files: list[dict[str, str]], routes: list[str], kind: str = "sit
                 problems.append(f"{SHOP_HANDLER_PATH} must export async function onPaid(reference, payment)")
             if kind == "shop" and f["path"] == SHOP_HANDLER_PATH:
                 # A real payment was once refused by a shop whose onPaid read a guessed field through a cast.
-                if "amountTotal" not in f["content"]:
+                for needed in ("createCheckOrder", "isPaid", "removeCheckOrder"):
+                    if not re.search(r"export\s+async\s+function\s+" + needed + r"\b", f["content"]):
+                        problems.append(f"{SHOP_HANDLER_PATH} must export async function {needed} for the platform's payment check")
+                if not re.search(r"payment\s*\.\s*amountTotal|\{[^}]*\bamountTotal\b[^}]*\}\s*=\s*payment\b", f["content"]):
                     problems.append(f"{SHOP_HANDLER_PATH} must compare payment.amountTotal with the order's total")
                 if re.search(r"\bas\s+(unknown|any)\b", f["content"]):
                     problems.append(f"{SHOP_HANDLER_PATH} must use the Payment fields as typed, without `as unknown` or `as any`")

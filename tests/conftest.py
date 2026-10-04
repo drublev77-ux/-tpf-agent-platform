@@ -80,6 +80,8 @@ class FakeDeployer:
         self.env: dict[str, dict[str, str]] = {}
         self.health_problems: list[str | None] = []
         self.health_checks: list[str] = []
+        self.payment_checks: list[tuple[str, str]] = []
+        self.payment_problems: list[list[str]] = []
         self.smoked: list[tuple] = []
         self.smoke_problems: list[list[str]] = []
 
@@ -89,6 +91,10 @@ class FakeDeployer:
     async def smoke(self, url, routes, admin_cookie=""):
         self.smoked.append((url, list(routes), bool(admin_cookie)))
         return self.smoke_problems.pop(0) if self.smoke_problems else []
+
+    async def check_payments(self, url, token):
+        self.payment_checks.append((url, token))
+        return self.payment_problems.pop(0) if self.payment_problems else []
 
     async def health(self, url, path="/api/tpf-health"):
         self.health_checks.append(url)

@@ -310,6 +310,91 @@ export async function GET(request: Request) {
 }
 '''
 
+# Before a shop is shown to the client, the platform has it create throwaway orders and "pay" them through its
+# own onPaid: the one piece of a shop that nothing else exercises until a real customer pays. The route answers
+# only to a token the platform puts into the review build's secrets for the length of the check.
+SHOP_PAY_CHECK = '''import { timingSafeEqual } from "crypto";
+import { createCheckOrder, isPaid, onPaid, removeCheckOrder } from "@/lib/payments";
+import { sql } from "@/tpf/db";
+import type { Payment } from "@/tpf/payments";
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+type Step = { name: string; ok: boolean; detail?: string };
+type CheckOrder = { reference: string; amountTotal: number; currency: string };
+
+export async function POST(request: Request) {
+  let token = "";
+  try {
+    const rows = await sql`select value from tpf_secrets where key = 'check_token'`;
+    token = String(rows[0]?.value ?? "");
+  } catch {
+    // no secrets table: this is not a build under check
+  }
+  const given = Buffer.from(request.headers.get("x-tpf-check") ?? ""), expected = Buffer.from(token);
+  if (token.length < 32 || given.length !== expected.length || !timingSafeEqual(given, expected)) {
+    return new Response("not found", { status: 404 });
+  }
+
+  const steps: Step[] = [];
+  const made: string[] = [];
+  const flags = globalThis as { __tpfMuteNotify?: boolean };
+  flags.__tpfMuteNotify = true;          // the owner must not get e-mails about orders nobody placed
+  const order = async (): Promise<CheckOrder> => {
+    const o = await createCheckOrder();
+    made.push(o.reference);
+    if (!Number.isInteger(o.amountTotal) || o.amountTotal <= 0) throw new Error("createCheckOrder: amountTotal must be a positive integer");
+    return o;
+  };
+  const payment = (o: CheckOrder, over: Partial<Payment> = {}): Payment =>
+    ({ sessionId: "check_" + o.reference.slice(0, 12), amountTotal: o.amountTotal, currency: o.currency.toLowerCase(), email: "check@example.com", ...over });
+  const step = async (name: string, run: () => Promise<string | null>) => {
+    try {
+      const problem = await run();
+      steps.push(problem ? { name, ok: false, detail: problem } : { name, ok: true });
+    } catch (e) {
+      steps.push({ name, ok: false, detail: (e instanceof Error ? `threw ${e.name}: ${e.message}` : "threw").slice(0, 600) });
+    }
+  };
+  try {
+    await step("a payment of the order's exact total and currency marks it paid, and a repeat changes nothing", async () => {
+      const o = await order();
+      if (await isPaid(o.reference)) return "isPaid is true before any payment";
+      await onPaid(o.reference, payment(o));
+      if (!(await isPaid(o.reference))) return "isPaid is false after onPaid with the order's exact total and currency";
+      await onPaid(o.reference, payment(o));
+      return (await isPaid(o.reference)) ? null : "isPaid became false after onPaid was called a second time";
+    });
+    await step("a payment of a different amount does not mark the order paid", async () => {
+      const o = await order();
+      await onPaid(o.reference, payment(o, { amountTotal: o.amountTotal + 1 }));
+      return (await isPaid(o.reference)) ? "the order was marked paid by a payment of a different amount" : null;
+    });
+    await step("a payment in a different currency does not mark the order paid", async () => {
+      const o = await order();
+      await onPaid(o.reference, payment(o, { currency: o.currency.toLowerCase() === "usd" ? "eur" : "usd" }));
+      return (await isPaid(o.reference)) ? "the order was marked paid by a payment in a different currency" : null;
+    });
+    await step("a payment for an unknown order is ignored without an error", async () => {
+      await onPaid("no-such-order-" + Date.now(), { sessionId: "check_none", amountTotal: 100, currency: "usd", email: "" });
+      return null;
+    });
+  } finally {
+    for (const reference of made) {
+      try {
+        await removeCheckOrder(reference);
+      } catch (e) {
+        steps.push({ name: "removeCheckOrder removes the order made for the check", ok: false, detail: (e instanceof Error ? `threw ${e.name}: ${e.message}` : "threw").slice(0, 600) });
+      }
+    }
+    flags.__tpfMuteNotify = false;
+  }
+  return Response.json({ ok: steps.every((s) => s.ok), steps });
+}
+'''
+
+SHOP_PAY_CHECK_PATH = "app/api/tpf-check/route.ts"
 SHOP_PAY_NOTIFY_PATH = "app/api/tpf-pay/route.ts"
 SHOP_PAY_RETURN_PATH = "app/api/tpf-pay-return/route.ts"
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import secrets
 import time
 from pathlib import Path
 from typing import Any
@@ -112,8 +113,26 @@ async def _build_on_vercel(ctx: Ctx, files: list[dict[str, str]], version: int, 
         if broken:
             return RunResult(40, "The application was built, but these pages fail when opened (signed in as the owner):\n"
                              + "\n".join(broken) + "\nFind what throws while each page renders and fix it.")
+    if kind == "shop":
+        failed = await _payment_check(ctx, dep.url)
+        report["payment_check"] = {"ok": not failed, "failed": failed}
+        if failed:
+            return RunResult(40, "The shop was built, but lib/payments.ts fails the platform's payment check — with this code "
+                             "a customer's payment would not be recorded correctly:\n" + "\n".join(f"- {f}" for f in failed)
+                             + "\nFix onPaid, createCheckOrder, isPaid or removeCheckOrder in lib/payments.ts.")
     report["preview"] = {"url": dep.url, "deployment_id": dep.id, "code_version": version}
     return RunResult(0, f"Vercel build ok: {dep.url}")
+
+
+async def _payment_check(ctx: Ctx, url: str) -> list[str]:
+    """Let the review build prove that its payment handling works, with a token only this check knows."""
+    db = await ctx.tenant_db.ensure(ctx.orch.pool, ctx.order_id, "stg")
+    token = secrets.token_hex(24)
+    await ctx.tenant_db.set_secrets(db, {"check_token": token})
+    try:
+        return await ctx.deployer.check_payments(url, token)
+    finally:
+        await ctx.tenant_db.set_secrets(db, {"check_token": ""})     # the route answers to nobody afterwards
 
 
 def _code_digest(files: list[dict[str, str]]) -> list[dict[str, str]]:

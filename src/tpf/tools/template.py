@@ -6,8 +6,8 @@ import json
 import re
 from pathlib import Path
 
-from tpf.tools.shop_payments_ts import (SHOP_PAY_NOTIFY, SHOP_PAY_NOTIFY_PATH, SHOP_PAY_RETURN, SHOP_PAY_RETURN_PATH,
-                                         SHOP_PAYMENTS)
+from tpf.tools.shop_payments_ts import (SHOP_PAY_CHECK, SHOP_PAY_CHECK_PATH, SHOP_PAY_NOTIFY, SHOP_PAY_NOTIFY_PATH,
+                                         SHOP_PAY_RETURN, SHOP_PAY_RETURN_PATH, SHOP_PAYMENTS)
 
 TEMPLATE_FILES: dict[str, str] = {
     "package.json": json.dumps({
@@ -365,6 +365,7 @@ import { FORM_ENDPOINT } from "@/tpf/config";
 /** E-mail the owner about a new record (a booking, an order, a request). Never throws; at most 30 an hour. */
 export async function notifyOwner(subject: string, text: string, contact = "—"): Promise<boolean> {
   if (!FORM_ENDPOINT) return false;
+  if ((globalThis as { __tpfMuteNotify?: boolean }).__tpfMuteNotify) return true;   // the platform is checking the shop
   try {
     const r = await fetch(FORM_ENDPOINT, {
       method: "POST", headers: { "content-type": "application/json" },
@@ -452,6 +453,17 @@ SHOP_RULES = (
     "'pending'`, and only when that update changed a row does it reduce stock and call notifyOwner — the platform "
     "may report the same payment twice, so onPaid must be safe to repeat. If `payment.amountTotal` differs from the order's "
     "total, or `payment.currency` from the order's currency compared in lowercase, do not mark it paid: record the mismatch on the order and notify the owner. "
+    "PAYMENT CHECK: before the shop is shown to the client, the platform runs your onPaid against throwaway "
+    "orders, so lib/payments.ts also exports three small functions used only by that check (the platform's route "
+    "app/api/tpf-check, which you must not write): "
+    "`async function createCheckOrder(): Promise<{ reference: string; amountTotal: number; currency: string }>` "
+    "inserts an order exactly as the checkout's server action would for a customer about to pay by card — status "
+    "'pending', a new crypto.randomUUID() token, placeholder customer details, and one order line that refers to no "
+    "product (so no stock changes) with a positive price — and returns its token, total and currency; "
+    "`async function isPaid(reference: string): Promise<boolean>` tells whether that order's status is 'paid'; "
+    "`async function removeCheckOrder(reference: string): Promise<void>` deletes that order and its lines. The "
+    "check calls onPaid with the exact total (the order must become paid, and stay so when called again), with a "
+    "different amount and with a different currency (it must not), and for an unknown reference (no error). "
     "Admin: products (create, edit, deactivate), orders (list, details, status: new, pending, paid, shipped, "
     "completed, cancelled). Refunds are made by the owner in the payment provider's own dashboard, not here. "
     "Never read or print payment keys and never call a payment provider's API yourself. Texts for customers say "
@@ -609,7 +621,7 @@ def validate_path(path: str, kind: str = "site") -> str | None:
     if not path.endswith(APP_SUFFIXES if app else ALLOWED_SUFFIXES):
         return f"file type not allowed: {path}"
     if path.startswith(("app/api/tpf-health/", "app/api/tpf-telegram/", "app/api/tpf-stripe/", "app/api/tpf-pay/",
-                        "app/api/tpf-pay-return/", "app/tpf-icon/")) \
+                        "app/api/tpf-pay-return/", "app/api/tpf-check/", "app/tpf-icon/")) \
             or path in ("app/manifest.ts", "public/sw.js", "public/offline.html"):
         return f"path reserved by the platform: {path}"
     if path.startswith("db/") and path != SCHEMA_PATH:
@@ -660,7 +672,8 @@ def platform_files(form_endpoint: str = "", kind: str = "site") -> dict[str, str
         files |= {"tpf/telegram.ts": BOT_TELEGRAM, BOT_WEBHOOK_PATH: BOT_WEBHOOK}
     if kind == "shop":
         files |= {"tpf/payments.ts": SHOP_PAYMENTS, SHOP_WEBHOOK_PATH: SHOP_WEBHOOK,
-                  SHOP_PAY_NOTIFY_PATH: SHOP_PAY_NOTIFY, SHOP_PAY_RETURN_PATH: SHOP_PAY_RETURN}
+                  SHOP_PAY_NOTIFY_PATH: SHOP_PAY_NOTIFY, SHOP_PAY_RETURN_PATH: SHOP_PAY_RETURN,
+                  SHOP_PAY_CHECK_PATH: SHOP_PAY_CHECK}
     if installable(kind):
         files |= {"public/sw.js": PWA_SW, "public/offline.html": PWA_OFFLINE, "tpf/Pwa.tsx": PWA_COMPONENT,
                   "app/manifest.ts": PWA_MANIFEST, "app/tpf-icon/[size]/route.tsx": PWA_ICON}

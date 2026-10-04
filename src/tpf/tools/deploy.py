@@ -112,6 +112,20 @@ class VercelDeployer:
                     problems.append(f"{route}: redirects to {r.headers.get('location', '?')} although the owner is signed in")
         return problems
 
+    async def check_payments(self, url: str, token: str) -> list[str]:
+        """Have a built shop run its own payment handling against throwaway orders (app/api/tpf-check).
+        Returns what failed; empty when a payment of the right amount, and only that, marks an order paid."""
+        path = "/api/tpf-check"
+        try:
+            async with httpx.AsyncClient(timeout=90, follow_redirects=False) as http:
+                r = await http.post(url.rstrip("/") + path, headers={"x-tpf-check": token})
+            body = r.json() if r.status_code == 200 else {}
+        except (httpx.HTTPError, ValueError) as e:
+            return [f"{path}: {type(e).__name__}: {e}"]
+        if r.status_code != 200 or not isinstance(body.get("steps"), list):
+            return [f"{path} answered {r.status_code}: {r.text[:300]}"]
+        return [f"{s.get('name')}: {s.get('detail') or 'failed'}" for s in body["steps"] if not s.get("ok")]
+
     async def _make_public(self, project: str) -> None:
         """New Vercel projects hide previews behind a Vercel login; the client must see staging."""
         if project in self._public:

@@ -329,8 +329,13 @@ class FakeShopStripe:
         return (endpoint_id, None) if endpoint_id else (f"we_{len(self.calls)}", f"whsec_{len(self.calls)}")
 
 
+ON_PAID = (
+    "export async function onPaid(reference: string, payment: { amountTotal: number }): Promise<void> { void payment.amountTotal; }\n"
+    "export async function createCheckOrder() { return { reference: 'r', amountTotal: 1, currency: 'usd' }; }\n"
+    "export async function isPaid(reference: string): Promise<boolean> { return false; }\n"
+    "export async function removeCheckOrder(reference: string): Promise<void> {}\n")
 TEST_KEY, LIVE_KEY = "sk_test_" + "a" * 24, "sk_live_" + "b" * 24
-SHOP_FILES = APP_CODE["files"] + [{"path": "lib/payments.ts", "content": "export async function onPaid(reference: string, payment: { amountTotal: number }): Promise<void> { void payment.amountTotal; }"}]
+SHOP_FILES = APP_CODE["files"] + [{"path": "lib/payments.ts", "content": ON_PAID}]
 
 
 @pytest.fixture
@@ -652,8 +657,10 @@ def test_onpaid_must_read_the_payment_fields_as_typed():
     routes = ["/", "/admin", "/admin/login"]
     guessed = "export async function onPaid(reference: string, payment: Payment): Promise<void> { const p = payment as unknown as { amount?: number }; void p.amount; }"
     cast = "export async function onPaid(reference: string, payment: Payment): Promise<void> { const p = payment as any; void p.amountTotal; }"
+    exports = ON_PAID.split("\n", 1)[1]
     for bad, why in ((guessed, "amountTotal"), (cast, "without")):
-        files = [f if f["path"] != "lib/payments.ts" else {"path": f["path"], "content": bad} for f in SHOP_FILES]
+        files = [f if f["path"] != "lib/payments.ts" else {"path": f["path"], "content": bad + "\n" + exports} for f in SHOP_FILES]
+        assert not any("must export" in p for p in check_files(files, routes, "shop"))
         assert any(why in p for p in check_files(files, routes, "shop")), why
     assert check_files(SHOP_FILES, routes, "shop") == []
     rules = rules_for("shop")
@@ -697,3 +704,49 @@ async def test_delivered_order_is_redeployed_without_moving_or_notifying(shop_en
     env.deployer.failures.append(DeployError("deployment dpl_x ended in ERROR", log="Type error", deployment_id="dpl_x"))
     assert await redeploy() == "failed"
     assert (await env.orch.get_order(oid))["state"] == State.DELIVERED and len(await env.orch.messages(oid)) == messages
+
+
+async def test_shop_must_pass_the_payment_check_before_the_client_sees_it(shop_env):
+    """QA has the built shop pay throwaway orders through its own onPaid; a shop that fails goes back to the developer."""
+    env = shop_env
+    env.settings.sandbox = "vercel"
+    env.deployer.payment_problems = [["a payment of the order's exact total and currency marks it paid, and a repeat changes nothing: "
+                                      "isPaid is false after onPaid with the order's exact total and currency"]]
+    env.llm.queue("developer", {"files": [], "remaining": [], "notes": "fixed onPaid"})
+    oid = await new_app_order(env)
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    assert State((await env.orch.get_order(oid))["state"]) is State.AWAITING_ACCEPTANCE
+    names = [e["name"] for e in await env.orch.events(oid) if e["kind"] == "transition"]
+    assert names.count("checks_failed") == 1                       # the first build was stopped by the payment check
+    reports = [r["content"] for r in await env.pool.fetch("SELECT content FROM artifacts WHERE order_id = $1 AND kind = 'qa_report' ORDER BY version", oid)]
+    assert reports[0]["payment_check"]["ok"] is False and "isPaid is false" in reports[0]["build"]["log_tail"]
+    assert reports[0]["build"]["failed_at"] == "health" and "preview" not in reports[0]      # a failed build is never shown as staging
+    assert reports[-1]["payment_check"] == {"ok": True, "failed": []} and reports[-1]["passed"]
+
+    # Each check had its own long token, the shop was asked at the build's own address, and the token is gone afterwards.
+    (url1, token1), (url2, token2) = env.deployer.payment_checks
+    assert token1 != token2 and len(token1) == 48 and url2 == reports[-1]["preview"]["url"]
+    assert (await shop_secrets(env, oid, "stg"))["check_token"] == ""
+
+
+async def test_plain_applications_are_not_asked_for_a_payment_check(app_env):
+    env = app_env
+    env.settings.sandbox = "vercel"
+    oid = await new_app_order(env)
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    assert State((await env.orch.get_order(oid))["state"]) is State.AWAITING_ACCEPTANCE and env.deployer.payment_checks == []
+
+
+def test_shop_code_must_export_the_check_functions():
+    routes = ["/", "/admin", "/admin/login"]
+    only_on_paid = [f if f["path"] != "lib/payments.ts" else {"path": f["path"], "content": ON_PAID.split("\n", 1)[0]} for f in SHOP_FILES]
+    problems = check_files(only_on_paid, routes, "shop")
+    assert [n for n in ("createCheckOrder", "isPaid", "removeCheckOrder") if any(n in p for p in problems)] == ["createCheckOrder", "isPaid", "removeCheckOrder"]
+    assert validate_path("app/api/tpf-check/route.ts", "shop")
+    files = {f["path"]: f["content"] for f in all_files(SHOP_FILES, "x", "shop")}
+    assert "check_token" in files["app/api/tpf-check/route.ts"] and "__tpfMuteNotify" in files["tpf/notify.ts"]
+    assert "app/api/tpf-check/route.ts" not in {f["path"] for f in all_files(APP_CODE["files"], "x", "app")}
