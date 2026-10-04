@@ -15,7 +15,7 @@ from tpf.agents.devops import staging_project
 from tpf.orchestrator.states import Ev
 from tpf.tools.deploy import DeployError
 from tpf.tools.sandbox import RunResult
-from tpf.tools.template import SCHEMA_PATH, all_files, has_database, kind_of, materialize, route_to_page
+from tpf.tools.template import SCHEMA_PATH, all_files, has_database, installable, kind_of, materialize, route_to_page
 from tpf.tools.tenantdb import TenantDBError
 
 BUILD_CMD = (
@@ -49,6 +49,14 @@ BOT_CRITERIA = [
     "Telegram is reached only through @/tpf/telegram; the bot token is never read, logged or shown",
     "Notifications go only to owner chats linked with a one-time code; a message to many users sends at most 25 per call",
     "Text from users is trimmed and length-limited before it is stored or sent back",
+]
+SHOP_CRITERIA = [
+    "Totals are computed on the server from database prices; nothing the browser sends (prices, totals, product names) is trusted",
+    "An order is marked paid only in onPaid, with an update guarded by status = 'pending' so a repeated payment event changes nothing; "
+    "stock changes and the owner's notification happen only when that update changed a row; a wrong amount is not accepted as paid",
+    "The order status page is found by a random token, not a sequential id, and shows nothing about other orders",
+    "Checkout works without Stripe connected: the order is saved as 'new' and the customer is told the shop will contact them",
+    "Money is stored as integers in minor units and formatted only for display; Stripe is reached only through @/tpf/payments",
 ]
 
 
@@ -157,6 +165,10 @@ async def run(ctx: Ctx) -> Outcome:
                 "Accessible: semantic HTML, alt text on images, labels on form fields",
                 *(APP_CRITERIA if has_database(kind) else []),
                 *(BOT_CRITERIA if kind == "bot" else []),
+                *(SHOP_CRITERIA if kind == "shop" else []),
+                *(["Installable: lib/pwa.ts exports PWA with the design's colours, app/layout.tsx renders <Pwa /> and sets "
+                   "appleWebApp, the icons and the theme colour; pages work at 360px wide with touch targets of at least 44px"]
+                  if installable(kind) else []),
             ],
             context=(f"Architecture:\n{json.dumps(arch, ensure_ascii=False)}\n\n"
                      f"Spec client_content (the only facts the client gave):\n"

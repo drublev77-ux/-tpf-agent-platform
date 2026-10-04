@@ -132,6 +132,15 @@ class TenantDB:
         finally:
             await admin.close()
 
+    async def get_secrets(self, db: AppDatabase) -> dict[str, str]:
+        admin = await self._connect(self.admin_url)
+        try:
+            if not await admin.fetchval("SELECT to_regclass($1)", f"{db.role}.tpf_secrets"):
+                return {}
+            return {r["key"]: r["value"] for r in await admin.fetch(f"SELECT key, value FROM {db.role}.tpf_secrets")}
+        finally:
+            await admin.close()
+
     async def apply_schema(self, db: AppDatabase, schema_sql: str) -> None:
         """Run the application's schema.sql as the application's own role, inside its own schema."""
         problem = check_schema_sql(schema_sql)

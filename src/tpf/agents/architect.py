@@ -16,7 +16,8 @@ SCHEMA = {
         "routes": {"type": "array", "items": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "pattern": "^/([a-z0-9-]+(/[a-z0-9-]+)*)?$"},
+                "path": {"type": "string", "pattern": "^/((\\[[a-z]+\\]|[a-z0-9-]+)(/(\\[[a-z]+\\]|[a-z0-9-]+))*)?$",
+                         "description": "A dynamic segment is written in brackets: /product/[id]"},
                 "title": {"type": "string"},
                 "purpose": {"type": "string"},
                 "sections": {"type": "array", "items": {"type": "string"}},
@@ -91,6 +92,14 @@ BOT_NOTE = (
     "/admin/login and one admin route per managed list. "
 )
 
+SHOP_NOTE = (
+    "This order is an online shop. Routes: the catalogue, a product page (/product/[id]), /cart, /checkout, the "
+    "order status page (/order/[token]), plus /admin, /admin/login, /admin/products and /admin/orders. data_model "
+    "has products, orders (with a random token, status, customer details, total in minor units) and order_items "
+    "(a snapshot of name, unit price and quantity). Say in notes which currency the shop uses and how the cart "
+    "cookie is shaped. "
+)
+
 REVIEW_CRITERIA = [
     "Every page in the spec maps to a route, and every route's sections cover the spec's sections for it",
     "Route paths are lowercase, unique, and '/' exists",
@@ -100,12 +109,17 @@ SITE_CRITERIA = ["Nothing requires a backend, accounts, payments or packages bey
 APP_CRITERIA = [
     "data_model has a table for every kind of record in the spec, with the fields the spec lists",
     "There is /admin, /admin/login and an admin route for every list the owner manages; public routes never expose admin data",
-    "Nothing requires visitor accounts, payments, file uploads, e-mail sending, external services or packages beyond next, react and postgres",
+    "Nothing requires visitor accounts, file uploads, external services or packages beyond next, react and postgres; payments appear only in an online shop",
 ]
 BOT_CRITERIA = [
     "bot describes every command and dialog in the spec step by step with exact wording, including /start, /help and the reply to unknown text",
     "data_model stores each user's dialog state by Telegram chat id, the bot's users, and the owner chats for notifications if the spec has them",
     "Nothing requires artificial intelligence, payments, stored files or photos, group moderation or services other than Telegram",
+]
+SHOP_CRITERIA = [
+    "There are routes for the catalogue, a product, the cart, the checkout and the order status page by token, and admin routes for products and orders",
+    "Prices and totals are integers in minor units; orders carry a random token, a status and an order_items snapshot",
+    "Card payment is the only online payment and goes through the platform's Stripe helper; nothing needs customer accounts, discount codes or outside delivery services",
 ]
 
 
@@ -115,8 +129,8 @@ async def run(ctx: Ctx) -> Outcome:
         return Outcome(escalate="Нет утверждённого ТЗ для проектирования")
     kind = kind_of(spec)
     system = (SYSTEM + (APP_NOTE if has_database(kind) else "") + (BOT_NOTE if kind == "bot" else "")
-              + rules_for(kind) + " " + SAFETY_NOTE)
-    criteria = REVIEW_CRITERIA + (APP_CRITERIA if has_database(kind) else SITE_CRITERIA) + (BOT_CRITERIA if kind == "bot" else [])
+              + (SHOP_NOTE if kind == "shop" else "") + rules_for(kind) + " " + SAFETY_NOTE)
+    criteria = REVIEW_CRITERIA + (APP_CRITERIA if has_database(kind) else SITE_CRITERIA) + (BOT_CRITERIA if kind == "bot" else []) + (SHOP_CRITERIA if kind == "shop" else [])
     base = f"Approved spec:\n{json.dumps(spec, ensure_ascii=False, indent=2)}\n\nDesign the site for this spec."
     issues: list[str] = []
     for _ in range(ctx.settings.max_review_rounds + 1):

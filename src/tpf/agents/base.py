@@ -37,6 +37,7 @@ class Ctx:
     payload: dict[str, Any] = field(default_factory=dict)  # the task's own input
     tenant_db: Any = None  # tpf.tools.tenantdb.TenantDB, or None when applications are not enabled
     telegram: Any = None   # tpf.tools.telegram.TelegramAPI
+    shop_stripe: Any = None  # tpf.tools.shop_stripe.ShopStripe
 
     @property
     def order_id(self) -> int:

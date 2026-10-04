@@ -21,7 +21,8 @@ APP_ARCH = ARCH | {"routes": ARCH["routes"] + [
     {"path": "/admin", "title": "Admin", "purpose": "manage", "sections": ["Bookings"]},
     {"path": "/admin/login", "title": "Login", "purpose": "sign in", "sections": ["Form"]}]}
 PAGE = "export default function P(){return <main/>}"
-APP_CODE = {"files": CODE["files"] + [
+APP_LAYOUT = {"path": "app/layout.tsx", "content": "import Pwa from '@/tpf/Pwa';\nexport default function L({children}:{children:React.ReactNode}){return <html><body><Pwa />{children}</body></html>}"}
+APP_CODE = {"files": [APP_LAYOUT, CODE["files"][1], {"path": "lib/pwa.ts", "content": "export const PWA = { name: 'A', shortName: 'A', themeColor: '#111111', backgroundColor: '#ffffff', letter: 'A' };"}] + [
     {"path": "app/admin/page.tsx", "content": PAGE}, {"path": "app/admin/login/page.tsx", "content": PAGE},
     {"path": "db/schema.sql", "content": SCHEMA_SQL}], "notes": "app"}
 
@@ -163,7 +164,7 @@ class FakeTelegram:
 
 
 BOT_TOKEN = "123456789:" + "A" * 35
-BOT_FILES = APP_CODE["files"] + [{"path": "lib/bot.ts", "content": "export async function handleUpdate(update: unknown): Promise<void> {}"}]
+BOT_FILES = [f for f in APP_CODE["files"] if f["path"] != "lib/pwa.ts"] + [{"path": "lib/bot.ts", "content": "export async function handleUpdate(update: unknown): Promise<void> {}"}]
 
 
 @pytest.fixture
@@ -249,6 +250,10 @@ def test_static_rules_for_bots():
     routes = ["/", "/admin", "/admin/login"]
     assert check_files(BOT_FILES, routes, "bot") == []
     assert any("lib/bot.ts" in p for p in check_files(APP_CODE["files"], routes, "bot"))
+    assert any("lib/pwa.ts" in p for p in check_files(BOT_FILES, routes, "app"))
+    assert any("<Pwa />" in p for p in check_files(CODE["files"] + APP_CODE["files"][2:], routes, "app"))
+    assert {"app/manifest.ts", "public/sw.js", "tpf/Pwa.tsx"} <= {f["path"] for f in all_files([], "x", "app")}
+    assert "app/manifest.ts" not in {f["path"] for f in all_files([], "x", "bot")} and validate_path("app/manifest.ts", "app")
     direct = BOT_FILES + [{"path": "lib/x.ts", "content": "fetch('https://api.telegram.org/bot' + t)"}]
     assert any("directly" in p for p in check_files(direct, routes, "bot"))
     assert check_schema_sql("CREATE TABLE IF NOT EXISTS tpf_secrets (key text);")
@@ -300,3 +305,121 @@ def test_each_product_type_has_its_own_rate():
     assert s.rate_for("something-new") == s.hourly_rate
     assert (s.rate_for("site", "ru"), s.rate_for("app", "ru"), s.rate_for("bot", "ru")) == (36, 56, 34)
     assert s.rate_for("site", "en") == 45 and s.rate_for("bot", "zh") == 50
+
+
+# --- online shops ---
+
+class FakeShopStripe:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, str]] = []
+        self.bad: set[str] = set()
+
+    async def check(self, key):
+        from tpf.tools.shop_stripe import StripeKeyError
+        if key in self.bad:
+            raise StripeKeyError("Invalid API Key")
+
+    async def ensure_webhook(self, key, url, endpoint_id=""):
+        from tpf.tools.shop_stripe import StripeKeyError
+        if key in self.bad:
+            raise StripeKeyError("Invalid API Key")
+        self.calls.append((key, url, endpoint_id))
+        return (endpoint_id, None) if endpoint_id else (f"we_{len(self.calls)}", f"whsec_{len(self.calls)}")
+
+
+TEST_KEY, LIVE_KEY = "sk_test_" + "a" * 24, "sk_live_" + "b" * 24
+SHOP_FILES = APP_CODE["files"] + [{"path": "lib/payments.ts", "content": "export async function onPaid(reference: string, payment: unknown): Promise<void> {}"}]
+
+
+@pytest.fixture
+async def shop_env(app_env):
+    env = app_env
+    env.llm.script["analyst"][0]["spec"] = APP_SPEC | {"product_type": "shop"}
+    env.llm.script["developer"] = [{"files": SHOP_FILES, "notes": "shop"}]
+    env.worker.shop_stripe = FakeShopStripe()
+    return env
+
+
+async def enter_key(env, oid, key):
+    from tpf.orchestrator import queue
+    from tpf.tools.shop_stripe import key_mode
+    await env.pool.execute(
+        "INSERT INTO payment_connections (order_id, secret_key, mode) VALUES ($1,$2,$3) "
+        "ON CONFLICT (order_id) DO UPDATE SET secret_key = EXCLUDED.secret_key, mode = EXCLUDED.mode, connected_env = NULL",
+        oid, key, key_mode(key))
+    async with env.pool.acquire() as conn:
+        await queue.enqueue(conn, oid, "connect_payments", {})
+
+
+async def shop_secrets(env, oid, which):
+    conn = await asyncpg.connect(env.deployer.env[f"tpf-order-{oid}" + ("-preview" if which == "stg" else "")]["DATABASE_URL"])
+    try:
+        return {r["key"]: r["value"] for r in await conn.fetch("SELECT key, value FROM tpf_secrets")}
+    finally:
+        await conn.close()
+
+
+async def test_shop_payments_follow_the_order_from_review_to_production(shop_env):
+    env = shop_env
+    stripe = env.worker.shop_stripe
+    oid = await new_app_order(env)
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    order = await env.orch.get_order(oid)
+    assert State(order["state"]) is State.AWAITING_ACCEPTANCE and stripe.calls == []
+
+    await enter_key(env, oid, TEST_KEY)
+    await env.drain()
+    assert stripe.calls[-1] == (TEST_KEY, order["staging_url"] + "/api/tpf-stripe", "")
+    stg = await shop_secrets(env, oid, "stg")
+    assert stg == {"stripe_secret_key": TEST_KEY, "stripe_webhook_id": "we_1", "stripe_webhook_secret": "whsec_1"}
+    assert "4242" in (await env.orch.messages(oid))[-1]["text"]
+
+    # A change request redeploys the review build: the same endpoint is moved, its secret is kept.
+    env.llm.queue("developer", {"files": [], "remaining": [], "notes": "tweak"})
+    await env.orch.fire(oid, Ev.CHANGES_REQUESTED, actor="client", data={"comment": "bigger photos"})
+    await env.drain()
+    order = await env.orch.get_order(oid)
+    assert stripe.calls[-1] == (TEST_KEY, order["staging_url"] + "/api/tpf-stripe", "we_1")
+    assert (await shop_secrets(env, oid, "stg"))["stripe_webhook_secret"] == "whsec_1"
+
+    await env.orch.fire(oid, Ev.ACCEPTED, actor="client")
+    await env.drain()
+    order = await env.orch.get_order(oid)
+    assert order["state"] == State.DELIVERED
+    assert stripe.calls[-1] == (TEST_KEY, order["production_url"] + "/api/tpf-stripe", "")   # production gets its own endpoint
+
+    # The owner switches to the live key after release: production is reconnected with a new endpoint.
+    await enter_key(env, oid, LIVE_KEY)
+    await env.drain()
+    prod = await shop_secrets(env, oid, "prod")
+    assert prod["stripe_secret_key"] == LIVE_KEY and stripe.calls[-1][2] == ""
+    assert await env.pool.fetchval("SELECT mode || ':' || connected_env FROM payment_connections WHERE order_id = $1", oid) == "live:prod"
+
+
+async def test_refused_stripe_key_does_not_block_the_shop(shop_env):
+    env = shop_env
+    env.worker.shop_stripe.bad.add(TEST_KEY)
+    oid = await new_app_order(env)
+    await env.drain()
+    await enter_key(env, oid, TEST_KEY)          # before anything is deployed: just stored
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    assert State((await env.orch.get_order(oid))["state"]) is State.AWAITING_ACCEPTANCE
+    assert await env.pool.fetchval("SELECT connected_env FROM payment_connections WHERE order_id = $1", oid) is None
+
+
+def test_static_rules_for_shops():
+    from tpf.tools.shop_stripe import KEY_RE, key_mode
+    routes = ["/", "/admin", "/admin/login"]
+    assert check_files(SHOP_FILES, routes, "shop") == []
+    assert any("lib/payments.ts" in p for p in check_files(APP_CODE["files"], routes, "shop"))
+    direct = SHOP_FILES + [{"path": "lib/x.ts", "content": "fetch('https://api.stripe.com/v1/charges')"}]
+    assert any("directly" in p for p in check_files(direct, routes, "shop"))
+    assert validate_path("app/api/tpf-stripe/route.ts", "shop") and validate_path("app/order/[token]/page.tsx", "shop") is None
+    paths = {f["path"] for f in all_files(SHOP_FILES, "x", "shop")}
+    assert {"tpf/payments.ts", "app/api/tpf-stripe/route.ts", "tpf/notify.ts"} <= paths
+    assert KEY_RE.match(TEST_KEY) and KEY_RE.match("rk_live_" + "c" * 30) and not KEY_RE.match("pk_test_" + "a" * 24)
+    assert key_mode(TEST_KEY) == "test" and key_mode(LIVE_KEY) == "live"

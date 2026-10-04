@@ -354,6 +354,269 @@ BOT_RULES = (
     "owner see and manage the bot's data and edit the texts and lists the spec says the owner controls. "
 )
 
+# --- every application: a way to tell the owner that something happened (an e-mail through the platform) ---
+
+APP_NOTIFY = '''import "server-only";
+import { FORM_ENDPOINT } from "@/tpf/config";
+
+/** E-mail the owner about a new record (a booking, an order, a request). Never throws; at most 30 an hour. */
+export async function notifyOwner(subject: string, text: string, contact = "—"): Promise<boolean> {
+  if (!FORM_ENDPOINT) return false;
+  try {
+    const r = await fetch(FORM_ENDPOINT, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: subject.slice(0, 200), contact: contact.slice(0, 200) || "—", message: text.slice(0, 5000) }),
+      signal: AbortSignal.timeout(8000),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+'''
+
+# --- online shops: an application that takes card payments through the owner's own Stripe account ---
+
+SHOP_PAYMENTS = '''import "server-only";
+import { createHmac, timingSafeEqual } from "crypto";
+import { sql } from "@/tpf/db";
+
+// The owner's Stripe keys are kept by the platform in a table this application can only read.
+let cached: { key: string; webhookSecret: string; at: number } | null = null;
+
+async function secrets(): Promise<{ key: string; webhookSecret: string }> {
+  if (cached && Date.now() - cached.at < 60_000) return cached;
+  let key = "", webhookSecret = "";
+  try {
+    const rows = await sql`select key, value from tpf_secrets where key in ('stripe_secret_key', 'stripe_webhook_secret')`;
+    key = String(rows.find((r) => r.key === "stripe_secret_key")?.value ?? "");
+    webhookSecret = String(rows.find((r) => r.key === "stripe_webhook_secret")?.value ?? "");
+  } catch {
+    // the owner has not connected Stripe yet
+  }
+  cached = { key, webhookSecret, at: Date.now() };
+  return cached;
+}
+
+/** True once the owner has connected Stripe. Until then the shop takes orders without online payment. */
+export async function paymentsEnabled(): Promise<boolean> {
+  const s = await secrets();
+  return Boolean(s.key && s.webhookSecret);
+}
+
+export type CheckoutLine = { name: string; unitAmount: number; quantity: number };
+export type Checkout = { url: string; sessionId: string };
+export type Payment = { sessionId: string; amountTotal: number; currency: string; email: string };
+
+/**
+ * Start a Stripe Checkout payment and return the page to send the customer to, or null if it could not be
+ * started. `reference` is your own order's unguessable token; it comes back in onPaid(). `unitAmount` is an
+ * integer in the currency's smallest unit (cents). Amounts must come from your database, never from the browser.
+ */
+export async function createCheckout(opts: {
+  reference: string; lines: CheckoutLine[]; currency: string; successUrl: string; cancelUrl: string; customerEmail?: string;
+}): Promise<Checkout | null> {
+  const { key } = await secrets();
+  if (!key || opts.lines.length === 0) return null;
+  const form = new URLSearchParams({
+    mode: "payment", client_reference_id: opts.reference, success_url: opts.successUrl, cancel_url: opts.cancelUrl,
+    "metadata[reference]": opts.reference,
+  });
+  if (opts.customerEmail) form.set("customer_email", opts.customerEmail);
+  opts.lines.forEach((line, i) => {
+    if (!Number.isInteger(line.unitAmount) || line.unitAmount < 0 || !Number.isInteger(line.quantity) || line.quantity < 1) {
+      throw new Error("createCheckout: unitAmount and quantity must be whole numbers");
+    }
+    form.set(`line_items[${i}][quantity]`, String(line.quantity));
+    form.set(`line_items[${i}][price_data][currency]`, opts.currency.toLowerCase());
+    form.set(`line_items[${i}][price_data][unit_amount]`, String(line.unitAmount));
+    form.set(`line_items[${i}][price_data][product_data][name]`, line.name.slice(0, 250));
+  });
+  try {
+    const r = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+      method: "POST", body: form, signal: AbortSignal.timeout(15000),
+      headers: { authorization: `Bearer ${key}`, "content-type": "application/x-www-form-urlencoded" },
+    });
+    const body = (await r.json()) as { id?: string; url?: string; error?: { message?: string } };
+    if (!r.ok || !body.url || !body.id) {
+      console.error("stripe checkout:", body.error?.message ?? r.status);
+      return null;
+    }
+    return { url: body.url, sessionId: body.id };
+  } catch (e) {
+    console.error("stripe checkout:", e instanceof Error ? e.name : "error");
+    return null;
+  }
+}
+
+/** Used by the platform's webhook route: the event, if Stripe really sent it. */
+export async function verifyStripeEvent(payload: string, header: string): Promise<Record<string, unknown> | null> {
+  const { webhookSecret } = await secrets();
+  if (!webhookSecret) return null;
+  const parts = new Map(header.split(",").map((p) => p.split("=") as [string, string]));
+  const timestamp = parts.get("t") ?? "";
+  const given = header.split(",").filter((p) => p.startsWith("v1=")).map((p) => p.slice(3));
+  if (!timestamp || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return null;
+  const expected = Buffer.from(createHmac("sha256", webhookSecret).update(`${timestamp}.${payload}`).digest("hex"));
+  const ok = given.some((sig) => { const g = Buffer.from(sig); return g.length === expected.length && timingSafeEqual(g, expected); });
+  if (!ok) return null;
+  try {
+    return JSON.parse(payload) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+'''
+
+SHOP_WEBHOOK = '''import { onPaid } from "@/lib/payments";
+import { verifyStripeEvent, type Payment } from "@/tpf/payments";
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 30;
+
+// Stripe calls this when a customer has paid. Only events signed with the owner's webhook secret are accepted.
+export async function POST(request: Request) {
+  const payload = await request.text();
+  const event = await verifyStripeEvent(payload, request.headers.get("stripe-signature") ?? "");
+  if (!event) return new Response("forbidden", { status: 403 });
+  const type = String(event.type ?? "");
+  const session = ((event.data as { object?: Record<string, unknown> } | undefined)?.object ?? {}) as Record<string, unknown>;
+  const paid = (type === "checkout.session.completed" && session.payment_status === "paid")
+    || type === "checkout.session.async_payment_succeeded";
+  if (paid && typeof session.client_reference_id === "string") {
+    const payment: Payment = {
+      sessionId: String(session.id ?? ""), amountTotal: Number(session.amount_total ?? 0),
+      currency: String(session.currency ?? ""),
+      email: String((session.customer_details as { email?: string } | undefined)?.email ?? ""),
+    };
+    try {
+      await onPaid(session.client_reference_id, payment);
+    } catch (e) {
+      console.error("onPaid failed:", e instanceof Error ? e.message : "error");
+      return new Response("retry", { status: 500 });   // Stripe delivers the event again
+    }
+  }
+  return Response.json({ received: true });
+}
+'''
+
+SHOP_WEBHOOK_PATH = "app/api/tpf-stripe/route.ts"
+SHOP_HANDLER_PATH = "lib/payments.ts"
+
+NOTIFY_RULES = (
+    "To tell the owner about a new record by e-mail, call `await notifyOwner(subject, text, contact?)` from "
+    "`@/tpf/notify` in the server action that creates it (it never throws and is limited to 30 e-mails an hour, "
+    "so use it for records people create, not for routine events). "
+)
+
+SHOP_RULES = (
+    "ONLINE SHOP: this application sells products and takes card payments through the owner's own Stripe account. "
+    "The platform owns the payment plumbing: `import { paymentsEnabled, createCheckout, type Payment } from "
+    "'@/tpf/payments'` and the webhook app/api/tpf-stripe/route.ts; you write lib/payments.ts, which must export "
+    "`async function onPaid(reference: string, payment: Payment): Promise<void>`. "
+    "Money is always an integer in the currency's smallest unit (cents) in the database and in code; format it "
+    "only when displaying. The shop has one currency, taken from the spec. "
+    "Catalogue: products (name, description, price, image URL, active flag, optional stock) come from the database "
+    "and are managed by the owner under /admin; product images are URLs the owner pastes, shown with a plain "
+    "<img> and a neutral placeholder when empty. "
+    "Cart: kept in an httpOnly cookie holding only product ids and quantities; totals are always recomputed on "
+    "the server from current database prices. "
+    "Checkout: a form (name, e-mail or phone, delivery details or comment as the spec says) whose server action "
+    "validates the cart against the database (active, in stock), creates an order with a random unguessable "
+    "token (crypto.randomUUID()), status 'pending' and an order_items snapshot of names, unit prices and "
+    "quantities, then: if `await paymentsEnabled()`, calls `createCheckout({ reference: token, lines, currency, "
+    "successUrl, cancelUrl, customerEmail })` with absolute URLs built from the request's host and redirects to "
+    "its url (if it returns null, show an error and keep the cart); otherwise marks the order 'new', clears the "
+    "cart and shows a page saying the shop will contact the customer about payment. "
+    "The success page (/order/[token]) shows the order's status from the database; it never marks an order paid. "
+    "Only onPaid marks it paid: `update orders set status = 'paid', ... where token = ${reference} and status = "
+    "'pending'`, and only when that update changed a row does it reduce stock and call notifyOwner — Stripe may "
+    "deliver the same payment twice, so onPaid must be safe to repeat. If the paid amount differs from the "
+    "order's total, do not mark it paid: record the mismatch on the order and notify the owner. "
+    "Admin: products (create, edit, deactivate), orders (list, details, status: new, pending, paid, shipped, "
+    "completed, cancelled). Refunds are made by the owner in Stripe, not here. "
+    "Never read or print Stripe keys and never call api.stripe.com yourself. Not available: customer accounts, "
+    "discount codes, delivery-price calculation by outside services, subscriptions, saved cards. "
+)
+
+# --- applications and shops install on a phone's home screen like an app (PWA) ---
+
+PWA_SW = '''// Installed-app support: when the device is offline, navigation shows a small "no connection" page.
+// Nothing else is cached, so pages and data are always fresh.
+self.addEventListener("install", (event) => {
+  event.waitUntil(caches.open("tpf-offline-v1").then((cache) => cache.add("/offline.html")));
+  self.skipWaiting();
+});
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener("fetch", (event) => {
+  if (event.request.mode !== "navigate") return;
+  event.respondWith(fetch(event.request).catch(() => caches.match("/offline.html")));
+});
+'''
+
+PWA_OFFLINE = '''<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offline</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;font:16px/1.5 system-ui,sans-serif;background:#f6f6f4;color:#1c1c1c;text-align:center;padding:24px}
+button{margin-top:16px;min-height:44px;padding:10px 22px;border-radius:999px;border:1px solid #1c1c1c;background:transparent;font:inherit;cursor:pointer}</style></head>
+<body><main><p>Нет соединения с интернетом.<br>No internet connection.<br>没有网络连接。</p><button onclick="location.reload()">↻</button></main></body></html>
+'''
+
+PWA_COMPONENT = '''"use client";
+import { useEffect } from "react";
+
+/** Registers the service worker that makes the application installable. Render once, in app/layout.tsx. */
+export default function Pwa() {
+  useEffect(() => {
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }, []);
+  return null;
+}
+'''
+
+PWA_MANIFEST = '''import type { MetadataRoute } from "next";
+import { PWA } from "@/lib/pwa";
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: PWA.name, short_name: PWA.shortName, start_url: "/", display: "standalone",
+    background_color: PWA.backgroundColor, theme_color: PWA.themeColor,
+    icons: [192, 512].map((size) => ({ src: `/tpf-icon/${size}`, sizes: `${size}x${size}`, type: "image/png" as const })),
+  };
+}
+'''
+
+PWA_ICON = '''import { ImageResponse } from "next/og";
+import { PWA } from "@/lib/pwa";
+
+// The application's icon, drawn from lib/pwa.ts: /tpf-icon/192, /tpf-icon/512 and /tpf-icon/180 (iPhone).
+export async function GET(_request: Request, { params }: { params: Promise<{ size: string }> }) {
+  const size = [180, 192, 512].includes(Number((await params).size)) ? Number((await params).size) : 192;
+  const letter = /^[A-Za-z0-9]$/.test(PWA.letter) ? PWA.letter : "";
+  return new ImageResponse(
+    (
+      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center",
+                    background: PWA.themeColor, color: PWA.backgroundColor, fontSize: size * 0.56, fontWeight: 700 }}>
+        {letter || <div style={{ width: size * 0.42, height: size * 0.42, borderRadius: size, background: PWA.backgroundColor }} />}
+      </div>
+    ),
+    { width: size, height: size, headers: { "cache-control": "public, max-age=86400" } },
+  );
+}
+'''
+
+PWA_CONFIG_PATH = "lib/pwa.ts"
+PWA_RULES = (
+    "INSTALLABLE: the application installs on a phone's home screen like an app. The platform owns the manifest, "
+    "the icon route, the service worker and `@/tpf/Pwa`; you write lib/pwa.ts exporting `export const PWA = { name, "
+    "shortName, themeColor, backgroundColor, letter }` (shortName at most 12 characters; colours as #rrggbb from "
+    "the design; letter is one Latin letter or digit for the icon, or '' for a plain mark), render `<Pwa />` from "
+    "'@/tpf/Pwa' once inside <body> in app/layout.tsx, and set in the layout's metadata `appleWebApp: { capable: "
+    "true, title: PWA.shortName }` and `icons: { icon: '/tpf-icon/192', apple: '/tpf-icon/180' }`, plus `export "
+    "const viewport = { themeColor: PWA.themeColor }`. Do not write app/manifest.ts, public/sw.js, "
+    "public/offline.html or anything under app/tpf-icon/. Every page must be usable at 360px wide with touch "
+    "targets of at least 44px. "
+)
+
 HEALTH_PATH = "app/api/tpf-health/route.ts"
 SCHEMA_PATH = "db/schema.sql"
 
@@ -382,8 +645,8 @@ APP_RULES = (
     "Validate and trim every input on the server (length limits, allowed values) before it reaches the database; "
     "public forms get a hidden honeypot field. Mutations go through server actions followed by revalidatePath or "
     "redirect. Never expose environment variables, the admin password or database errors to the browser. "
-    "Do not write files under tpf/ or app/api/tpf-health/. Not available: e-mail sending, file uploads, payments, "
-    "visitor accounts, external APIs, scheduled jobs. "
+    "Do not write files under tpf/ or app/api/tpf-health/. Not available unless a later section "
+    "provides it: e-mail sending, file uploads, payments, visitor accounts, external APIs, scheduled jobs. "
 )
 
 ALLOWED_PREFIXES = ("app/", "components/", "lib/", "public/")
@@ -425,7 +688,8 @@ def validate_path(path: str, kind: str = "site") -> str | None:
         return f"path outside allowed folders: {path}"
     if not path.endswith(APP_SUFFIXES if app else ALLOWED_SUFFIXES):
         return f"file type not allowed: {path}"
-    if path.startswith(("app/api/tpf-health/", "app/api/tpf-telegram/")):
+    if path.startswith(("app/api/tpf-health/", "app/api/tpf-telegram/", "app/api/tpf-stripe/", "app/tpf-icon/")) \
+            or path in ("app/manifest.ts", "public/sw.js", "public/offline.html"):
         return f"path reserved by the platform: {path}"
     if path.startswith("db/") and path != SCHEMA_PATH:
         return f"the only file allowed under db/ is {SCHEMA_PATH}: {path}"
@@ -435,8 +699,10 @@ def validate_path(path: str, kind: str = "site") -> str | None:
 def rules_for(kind: str) -> str:
     """The template rules an agent works under: a static site, or an application with a database."""
     if kind == "bot":
-        return APP_RULES + BOT_RULES
-    return (APP_RULES + CONTACT_FORM_RULES) if kind == "app" else TEMPLATE_RULES
+        return APP_RULES + NOTIFY_RULES + BOT_RULES
+    if kind == "shop":
+        return APP_RULES + NOTIFY_RULES + SHOP_RULES + PWA_RULES + CONTACT_FORM_RULES
+    return (APP_RULES + NOTIFY_RULES + PWA_RULES + CONTACT_FORM_RULES) if kind == "app" else TEMPLATE_RULES
 
 
 def route_to_page(route: str) -> str:
@@ -454,12 +720,17 @@ def platform_files(form_endpoint: str = "", kind: str = "site") -> dict[str, str
     if has_database(kind):
         files |= {
             "package.json": APP_PACKAGE, "next.config.mjs": APP_NEXT_CONFIG,
-            "tpf/db.ts": APP_DB, "tpf/auth.ts": APP_AUTH, HEALTH_PATH: APP_HEALTH,
+            "tpf/db.ts": APP_DB, "tpf/auth.ts": APP_AUTH, "tpf/notify.ts": APP_NOTIFY, HEALTH_PATH: APP_HEALTH,
             "vercel.json": '{ "regions": ["fra1"] }\n',   # next to the database, not across an ocean from it
             ".env.example": "DATABASE_URL=postgres://user:password@host:6543/postgres\nSESSION_SECRET=\nADMIN_PASSWORD=\n",
         }
     if kind == "bot":
         files |= {"tpf/telegram.ts": BOT_TELEGRAM, BOT_WEBHOOK_PATH: BOT_WEBHOOK}
+    if kind == "shop":
+        files |= {"tpf/payments.ts": SHOP_PAYMENTS, SHOP_WEBHOOK_PATH: SHOP_WEBHOOK}
+    if installable(kind):
+        files |= {"public/sw.js": PWA_SW, "public/offline.html": PWA_OFFLINE, "tpf/Pwa.tsx": PWA_COMPONENT,
+                  "app/manifest.ts": PWA_MANIFEST, "app/tpf-icon/[size]/route.tsx": PWA_ICON}
     return files
 
 
@@ -491,11 +762,16 @@ def all_files(files: list[dict[str, str]], form_endpoint: str = "", kind: str = 
 
 
 def kind_of(spec: dict | None) -> str:
-    """What the order is: 'site' (static pages), 'app' (database and admin area) or 'bot' (a Telegram bot
-    with a database and admin area)."""
+    """What the order is: 'site' (static pages), 'app' (database and admin area), 'bot' (a Telegram bot
+    with a database and admin area) or 'shop' (an application that sells and takes card payments)."""
     kind = (spec or {}).get("product_type")
-    return kind if kind in ("app", "bot") else "site"
+    return kind if kind in ("app", "bot", "shop") else "site"
 
 
 def has_database(kind: str) -> bool:
-    return kind in ("app", "bot")
+    return kind in ("app", "bot", "shop")
+
+
+def installable(kind: str) -> bool:
+    """Applications and shops install on a phone's home screen; a bot lives in Telegram and a site is just pages."""
+    return kind in ("app", "shop")

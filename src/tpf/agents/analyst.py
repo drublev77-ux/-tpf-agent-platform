@@ -27,10 +27,11 @@ SCHEMA = {
             "type": "object",
             "properties": {
                 "product_type": {
-                    "type": "string", "enum": ["site", "app", "bot"],
+                    "type": "string", "enum": ["site", "app", "bot", "shop"],
                     "description": "'site': pages with fixed content (optionally a contact form). 'app': a web application "
                                    "that stores data in a database and has an owner-only admin area. 'bot': a Telegram bot "
-                                   "with a database and a web admin area for its owner.",
+                                   "with a database and a web admin area for its owner. 'shop': an online shop "
+                                   "with a catalogue, cart and card payments through the owner's Stripe account.",
                 },
                 "title": {"type": "string"},
                 "summary": {"type": "string"},
@@ -113,8 +114,29 @@ SCOPE_BOT = (
     "Telegram's @BotFather and enters its token on their order page later: never ask for the token in questions "
     "and do not list it as missing content. "
 )
+SCOPE_SHOP = (
+    "An online shop (product_type 'shop'), when the client sells goods or services online: a catalogue of "
+    "products with prices, a cart, a checkout that takes the customer's contact and delivery details, card "
+    "payment through the client's own Stripe account (the money goes straight to the client), and an admin area "
+    "where the owner manages products and orders and gets an e-mail about each paid order. The shop sells in one "
+    "currency. It has no customer accounts, discount codes, subscriptions, delivery-cost calculation by courier "
+    "services, marketplace integrations or product photo uploads (the owner pastes image links). If the client "
+    "cannot use Stripe, the shop takes orders without online payment and the owner arranges payment personally: "
+    "say so in assumptions. In the spec state the currency, what a product has, what the checkout asks, the "
+    "delivery or pickup options as fixed text or fixed prices the owner sets, and the order statuses. The client "
+    "enters the Stripe key on their order page later: never ask for it in questions and do not list it as "
+    "missing content. Products the owner will add through the admin area are not missing content. "
+)
+SCOPE_MOBILE = (
+    "Every application and shop is also installable: on a phone it is added to the home screen with its own icon "
+    "and opens full-screen like an app, with nothing to download from a store. When a client asks for a mobile "
+    "app, offer exactly this (product_type 'app' or 'shop') and say in assumptions that it is installed from the "
+    "browser and is not published in the App Store or Google Play; add an acceptance criterion that it can be "
+    "installed on a phone. Only if the client insists on a store listing, push notifications or device features "
+    "such as the camera, Bluetooth or background location is the order out of scope. "
+)
 SCOPE_END = (
-    "Anything outside this — a native mobile app, an online shop with payments, a bot for another messenger, a "
+    "Anything outside this — an app published in the App Store or Google Play, a marketplace with many sellers, a bot for another messenger, a "
     "system with user accounts, integrations — is out of scope: set in_pilot_scope to false and say why in scope_note. "
 )
 RULES = (
@@ -138,15 +160,15 @@ RULES = (
 def system_prompt(apps_enabled: bool) -> str:
     return (
         "You are the Analyst at TPF Technology, a studio where AI agents build client software end to end. "
-        + SCOPE_SITE + (SCOPE_APP + SCOPE_BOT if apps_enabled else "Applications with a database and Telegram bots are not available: product_type is always 'site'. ")
+        + SCOPE_SITE + (SCOPE_APP + SCOPE_BOT + SCOPE_SHOP + SCOPE_MOBILE if apps_enabled else "Applications with a database and Telegram bots are not available: product_type is always 'site'. ")
         + SCOPE_END + RULES + SAFETY_NOTE
     )
 
 
 REVIEW_CRITERIA = [
     "Every page has a purpose and concrete sections; nothing essential from the client's request is missing",
-    "The spec fits what the studio builds: a static website (product_type 'site', its only dynamic feature a contact form), a web application (product_type 'app') with a database and an owner-only admin area, or a rule-based Telegram bot (product_type 'bot') with a database and a web admin area; in every case no visitor accounts, payments, uploads or integrations",
-    "product_type is 'app' only if the client needs data stored or managed and 'bot' only if the client asked for a Telegram bot; for an app or a bot, every kind of record has its fields and the owner's actions on it described; for a bot, every command and dialog is described step by step",
+    "The spec fits what the studio builds: a static website (product_type 'site', its only dynamic feature a contact form), a web application (product_type 'app') with a database and an owner-only admin area, a rule-based Telegram bot (product_type 'bot') with a database and a web admin area, or an online shop (product_type 'shop') with card payments through the owner's Stripe account; no visitor accounts, uploads or integrations, and no payments outside a shop",
+    "product_type is 'app' only if the client needs data stored or managed and 'bot' only if the client asked for a Telegram bot and 'shop' only if the client sells online; for an app or a bot, every kind of record has its fields and the owner's actions on it described; for a bot, every command and dialog is described step by step",
     "Acceptance criteria are specific and checkable by looking at the site or by talking to the bot",
     "Assumptions are stated where the client did not decide",
     "client_content contains only facts found in the client conversation; every other fact the site needs is in missing_content",

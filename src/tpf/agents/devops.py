@@ -5,7 +5,8 @@ from tpf.agents.base import Ctx, Outcome
 from tpf.orchestrator.states import Ev, State
 from tpf.tools.deploy import Deployment, DeployError
 from tpf.tools.telegram import TelegramError, webhook_secret
-from tpf.tools.template import BOT_WEBHOOK_PATH, all_files, has_database, kind_of
+from tpf.tools.shop_stripe import StripeKeyError
+from tpf.tools.template import BOT_WEBHOOK_PATH, SHOP_WEBHOOK_PATH, all_files, has_database, kind_of
 from tpf.tools.tenantdb import TenantDBError
 
 
@@ -58,15 +59,42 @@ async def connect_bot_to(ctx: Ctx, env: str, site_url: str) -> str | None:
     return username
 
 
+async def connect_shop_to(ctx: Ctx, env: str, site_url: str) -> str | None:
+    """Give the shop at this deployment its owner's Stripe key and a webhook for payments. Returns the key's
+    mode ('test' or 'live'), or None when the owner has not entered a key. Raises StripeKeyError when Stripe
+    refuses the key."""
+    row = await ctx.orch.pool.fetchrow("SELECT secret_key, mode FROM payment_connections WHERE order_id = $1", ctx.order_id)
+    if row is None or ctx.tenant_db is None:
+        return None
+    key = row["secret_key"]
+    db = await ctx.tenant_db.ensure(ctx.orch.pool, ctx.order_id, env)
+    known = await ctx.tenant_db.get_secrets(db)
+    same_key = known.get("stripe_secret_key") == key
+    hook = site_url.rstrip("/") + "/" + SHOP_WEBHOOK_PATH.removeprefix("app/").removesuffix("/route.ts")
+    endpoint_id, secret = await ctx.shop_stripe.ensure_webhook(key, hook, known.get("stripe_webhook_id", "") if same_key else "")
+    values = {"stripe_secret_key": key, "stripe_webhook_id": endpoint_id}
+    if secret:
+        values["stripe_webhook_secret"] = secret
+    await ctx.tenant_db.set_secrets(db, values)
+    await ctx.orch.pool.execute(
+        "UPDATE payment_connections SET connected_env = $2, updated_at = now() WHERE order_id = $1", ctx.order_id, env)
+    await ctx.orch.log(ctx.order_id, "payments_connected", "devops", {"env": env, "mode": row["mode"], "webhook": hook}, kind="tool")
+    return row["mode"]
+
+
 async def _connect_after_deploy(ctx: Ctx, env: str, url: str) -> None:
-    """A bot order's deployment is useless until Telegram points at it; a refused token must not stop the release."""
-    if await _kind(ctx) != "bot":
+    """A bot is useless until Telegram points at the deployment, and a shop cannot take payments until Stripe
+    does; a refused token or key must not stop the release."""
+    kind = await _kind(ctx)
+    connect = {"bot": connect_bot_to, "shop": connect_shop_to}.get(kind)
+    if connect is None:
         return
     try:
-        await connect_bot_to(ctx, env, url)
+        await connect(ctx, env, url)
     except Exception as e:  # noqa: BLE001
-        await ctx.orch.log(ctx.order_id, "bot_connect_failed", "devops", {"env": env, "error": str(e)[:300]}, kind="tool")
-        await ctx.orch.notify_operator(ctx.order, f"Заказ #{ctx.order_id}: не удалось подключить Telegram-бота ({env}): {e}")
+        what = "Telegram-бота" if kind == "bot" else "Stripe магазина"
+        await ctx.orch.log(ctx.order_id, f"{kind}_connect_failed", "devops", {"env": env, "error": str(e)[:300]}, kind="tool")
+        await ctx.orch.notify_operator(ctx.order, f"Заказ #{ctx.order_id}: не удалось подключить {what} ({env}): {e}")
 
 
 async def _reuse_qa_preview(ctx: Ctx) -> Deployment | None:
@@ -198,14 +226,11 @@ BOT_TEXT = {
 async def connect_bot(ctx: Ctx) -> Outcome:
     """Side task (does not move the order): the client entered or replaced the bot token on their order page."""
     lang = ctx.order["language"] if ctx.order["language"] in ("ru", "en", "zh") else "en"
-    state = ctx.order["state"]
-    if ctx.order["production_url"] and state == State.DELIVERED:
-        env, url = "prod", ctx.order["production_url"]
-    elif ctx.order["staging_url"] and state in (State.AWAITING_ACCEPTANCE, State.AWAITING_FINAL_PAYMENT):
-        env, url = "stg", ctx.order["staging_url"]
-    else:
+    target = _live_target(ctx)
+    if target is None:
         await ctx.orch.notify_client(ctx.order, BOT_TEXT["saved"][lang].format(id=ctx.order_id))
         return Outcome(data={"result": "saved"})
+    env, url = target
     try:
         username = await connect_bot_to(ctx, env, url)
     except TelegramError as e:
@@ -214,3 +239,54 @@ async def connect_bot(ctx: Ctx) -> Outcome:
         return Outcome(data={"result": "failed"})
     await ctx.orch.notify_client(ctx.order, BOT_TEXT["connected"][lang].format(id=ctx.order_id, user=username))
     return Outcome(data={"result": "connected", "env": env, "username": username})
+
+
+PAY_TEXT = {
+    "connected_test": {
+        "ru": "Stripe подключён к магазину заказа №{id} в тестовом режиме: оплату можно проверить картой 4242 4242 4242 4242, деньги не списываются. Перед приёмом настоящих платежей замените ключ на рабочий (sk_live…) на странице заказа.",
+        "en": "Stripe is connected to the shop of order #{id} in test mode: try a payment with card 4242 4242 4242 4242, no money moves. Before taking real payments, replace the key with the live one (sk_live…) on your order page.",
+        "zh": "Stripe 已以测试模式连接到订单 #{id} 的商店：可用卡号 4242 4242 4242 4242 测试付款，不会实际扣款。正式收款前，请在订单页面将密钥更换为正式密钥（sk_live…）。",
+    },
+    "connected_live": {
+        "ru": "Stripe подключён к магазину заказа №{id} в рабочем режиме: покупатели платят настоящими картами, деньги поступают на ваш счёт Stripe.",
+        "en": "Stripe is connected to the shop of order #{id} in live mode: customers pay with real cards and the money goes to your Stripe account.",
+        "zh": "Stripe 已以正式模式连接到订单 #{id} 的商店：顾客使用真实银行卡付款，款项进入您的 Stripe 账户。",
+    },
+    "saved": {
+        "ru": "Ключ Stripe для заказа №{id} сохранён. Мы подключим оплату, как только будет готова версия для проверки.",
+        "en": "The Stripe key for order #{id} is saved. We will connect payments as soon as the review version is ready.",
+        "zh": "订单 #{id} 的 Stripe 密钥已保存。审核版本准备好后我们会立即接通付款。",
+    },
+    "failed": {
+        "ru": "Не удалось подключить Stripe к заказу №{id}: Stripe не принял ключ. Скопируйте секретный ключ в панели Stripe ещё раз и введите его на странице заказа.",
+        "en": "We could not connect Stripe to order #{id}: Stripe refused the key. Copy the secret key from the Stripe dashboard again and enter it on your order page.",
+        "zh": "无法将 Stripe 连接到订单 #{id}：Stripe 拒绝了该密钥。请在 Stripe 后台重新复制密钥并在订单页面输入。",
+    },
+}
+
+
+def _live_target(ctx: Ctx) -> tuple[str, str] | None:
+    """Which deployment a newly entered token or key should be connected to right now, if any."""
+    state = ctx.order["state"]
+    if ctx.order["production_url"] and state == State.DELIVERED:
+        return "prod", ctx.order["production_url"]
+    if ctx.order["staging_url"] and state in (State.AWAITING_ACCEPTANCE, State.AWAITING_FINAL_PAYMENT):
+        return "stg", ctx.order["staging_url"]
+    return None
+
+
+async def connect_payments(ctx: Ctx) -> Outcome:
+    """Side task (does not move the order): the owner entered or replaced the shop's Stripe key."""
+    lang = ctx.order["language"] if ctx.order["language"] in ("ru", "en", "zh") else "en"
+    target = _live_target(ctx)
+    if target is None:
+        await ctx.orch.notify_client(ctx.order, PAY_TEXT["saved"][lang].format(id=ctx.order_id))
+        return Outcome(data={"result": "saved"})
+    try:
+        mode = await connect_shop_to(ctx, *target)
+    except StripeKeyError as e:
+        await ctx.orch.log(ctx.order_id, "shop_connect_failed", "devops", {"env": target[0], "error": str(e)[:300]}, kind="tool")
+        await ctx.orch.notify_client(ctx.order, PAY_TEXT["failed"][lang].format(id=ctx.order_id))
+        return Outcome(data={"result": "failed"})
+    await ctx.orch.notify_client(ctx.order, PAY_TEXT[f"connected_{mode}"][lang].format(id=ctx.order_id))
+    return Outcome(data={"result": "connected", "env": target[0], "mode": mode})
