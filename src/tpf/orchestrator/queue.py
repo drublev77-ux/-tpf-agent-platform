@@ -1,8 +1,9 @@
 """Postgres-backed work queue.
 
 Workers claim one task at a time with FOR UPDATE SKIP LOCKED, so any number of workers can run
-side by side. A claimed task holds a lease; if a worker dies, the lease expires and another worker
-picks the task up again.
+side by side. A claimed task holds a short lease that its worker keeps extending while it works; if
+the worker dies (a crash, a redeploy), the lease runs out within minutes and another worker picks the
+task up again. A worker that is told to stop hands its tasks back at once.
 """
 from __future__ import annotations
 
@@ -36,6 +37,20 @@ async def enqueue(conn: asyncpg.Connection, order_id: int, kind: str, payload: d
 async def claim(pool: asyncpg.Pool, lease_sec: int) -> asyncpg.Record | None:
     async with pool.acquire() as conn:
         return await conn.fetchrow(CLAIM_SQL, lease_sec)
+
+
+async def extend(pool: asyncpg.Pool, task_id: int, lease_sec: int) -> bool:
+    """Keep the lease of a task this worker is still running. False when the task is no longer running
+    (finished or cancelled), so there is nothing left to renew."""
+    return bool(await pool.fetchval(
+        "UPDATE tasks SET locked_until = now() + make_interval(secs => $2) "
+        "WHERE id = $1 AND status = 'running' RETURNING 1", task_id, lease_sec))
+
+
+async def release(pool: asyncpg.Pool, task_ids: list[int]) -> None:
+    """Hand running tasks back to the queue now, without waiting for their leases to run out."""
+    await pool.execute(
+        "UPDATE tasks SET locked_until = now() WHERE id = ANY($1::bigint[]) AND status = 'running'", task_ids)
 
 
 async def mark_done(conn: asyncpg.Connection, task_id: int, result: dict[str, Any] | None) -> None:

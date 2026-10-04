@@ -27,7 +27,9 @@ class Settings(BaseSettings):
     max_check_attempts: int = 3
     max_review_rounds: int = 2
     task_max_retries: int = 3
-    task_lease_sec: int = 1800
+    # How long a task stays claimed without a sign of life from its worker. The worker renews the lease
+    # every third of it while the task runs, so this is only how fast a dead worker's task is retried.
+    task_lease_sec: int = 120
 
     # Commercial terms
     hourly_rate: float = 40.0          # fallback for a product type without its own rate

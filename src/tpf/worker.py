@@ -43,6 +43,7 @@ class Worker:
         self.telegram = telegram or TelegramAPI()
         self.shop_stripe = shop_stripe or ShopStripe()
         self.stopping = asyncio.Event()
+        self.running: set[int] = set()   # ids of the tasks this worker holds right now
 
     async def run_once(self) -> bool:
         """Claim and run one task. Returns False when the queue is empty."""
@@ -61,8 +62,12 @@ class Worker:
                   payments=self.payments, payload=task["payload"] or {}, tenant_db=self.tenant_db, telegram=self.telegram,
                   shop_stripe=self.shop_stripe)
         await self.orch.log(order["id"], "task_started", task["kind"], {"task": task["id"], "attempt": task["attempts"]})
+        self.running.add(task["id"])
+        heartbeat = asyncio.create_task(self._keep_lease(task["id"]))
         try:
             outcome = await handler(ctx)
+        except asyncio.CancelledError:   # the worker is shutting down: release() has handed the task back
+            raise
         except BudgetExceeded as e:
             await self.orch.escalate(order["id"], f"Бюджет исчерпан: {e}", actor=task["kind"], failed_task=task["id"])
             return True
@@ -75,6 +80,9 @@ class Worker:
             else:
                 await self.orch.escalate(order["id"], f"Задача {task['kind']} падает: {err}", actor=task["kind"], failed_task=task["id"])
             return True
+        finally:
+            heartbeat.cancel()
+            self.running.discard(task["id"])
 
         try:
             if outcome.escalate:
@@ -91,6 +99,23 @@ class Worker:
             async with self.pool.acquire() as conn:
                 await queue.mark_failed(conn, task["id"], f"transition rejected: {e}")
         return True
+
+    async def _keep_lease(self, task_id: int) -> None:
+        """While a task runs, renew its lease; an agent task can take many minutes, the lease is short."""
+        every = max(self.settings.task_lease_sec / 3, 1)
+        while True:
+            await asyncio.sleep(every)
+            try:
+                if not await queue.extend(self.pool, task_id, self.settings.task_lease_sec):
+                    return
+            except Exception:  # noqa: BLE001 — a passing database error; the next beat tries again
+                log.warning("could not renew the lease of task %s", task_id)
+
+    async def release_running(self) -> None:
+        """On shutdown: give the tasks in flight back to the queue so the next worker starts them at once."""
+        if self.running:
+            await queue.release(self.pool, sorted(self.running))
+            log.info("released tasks %s", sorted(self.running))
 
     async def loop(self, slot: int) -> None:
         while not self.stopping.is_set():
@@ -148,8 +173,15 @@ async def main() -> None:
         loop.add_signal_handler(sig, worker.stopping.set)
     slots = int(os.environ.get("WORKER_CONCURRENCY", "4"))
     log.info("worker started with %s slots", slots)
+    loops = [asyncio.create_task(worker.loop(i)) for i in range(slots)]
     try:
-        await asyncio.gather(*(worker.loop(i) for i in range(slots)))
+        # A redeploy gives the process seconds, an agent call takes minutes: do not wait for tasks in
+        # flight. Hand them back, so the new worker picks them up at once, and leave.
+        await worker.stopping.wait()
+        await worker.release_running()
+        for t in loops:
+            t.cancel()
+        await asyncio.gather(*loops, return_exceptions=True)
     finally:
         await llm.aclose()
         await pool.close()
