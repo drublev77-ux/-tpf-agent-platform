@@ -22,13 +22,17 @@ BUILD_CMD = (
     "export NEXT_TELEMETRY_DISABLED=1; "
     "npm install --no-audit --no-fund --loglevel=error > /tmp/install.log 2>&1 "
     "|| { tail -c 4000 /tmp/install.log; exit 10; }; "
+    "npx tsc --noEmit --pretty false || echo 'TYPE ERRORS ABOVE: fix all of them'; "
     "npm run build || exit 20; "
     "npm audit --omit=dev --audit-level=high || exit 30"
 )
 REVIEW_CODE_CHARS = 400_000
 
 # The same gates, run by Vercel's own isolated build when the worker has no Docker (SANDBOX=vercel).
-VERCEL_BUILD_CMD = "npm run build && npm audit --omit=dev --audit-level=high"
+# The type check runs first and does not stop the build: it lists every type error at once, where the build
+# alone would stop at the first and cost a whole round per error.
+VERCEL_BUILD_CMD = ("(npx tsc --noEmit --pretty false || echo 'TYPE ERRORS ABOVE: fix all of them') "
+                    "&& npm run build && npm audit --omit=dev --audit-level=high")
 
 
 APP_CRITERIA = [

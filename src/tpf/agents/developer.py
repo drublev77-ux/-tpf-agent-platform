@@ -86,6 +86,13 @@ def check_files(files: list[dict[str, str]], routes: list[str], kind: str = "sit
     for required in ["app/layout.tsx", *(route_to_page(r) for r in routes), *([SCHEMA_PATH] if has_database(kind) else []), *([BOT_HANDLER_PATH] if kind == "bot" else []), *([SHOP_HANDLER_PATH] if kind == "shop" else []), *([PWA_CONFIG_PATH] if installable(kind) else [])]:
         if required not in paths:
             problems.append(f"missing required file: {required}")
+    for f in files:
+        # Next.js refuses a "use server" module that exports anything but async functions, and says so only
+        # late in the build.
+        if f["path"].endswith((".ts", ".tsx")) and re.match(r"""\s*(['"])use server\1""", f["content"]):
+            bad = re.findall(r"^export\s+(?:(?:const|let|var|class|enum)\b|\{|\*|(?:default\s+)?function\b).*$", f["content"], re.M)
+            if bad:
+                problems.append(f"a 'use server' file may export only async functions: {f['path']}: {bad[0].strip()[:80]}")
     if installable(kind):
         by_path = {f["path"]: f["content"] for f in files}
         if PWA_CONFIG_PATH in by_path and not re.search(r"export\s+const\s+PWA\b", by_path[PWA_CONFIG_PATH]):

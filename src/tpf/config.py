@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # Budgets and limits
     order_token_budget: int = 2_000_000
     budget_warning_share: float = 0.8
-    max_check_attempts: int = 3
+    max_check_attempts: int = 6
     max_review_rounds: int = 2
     task_max_retries: int = 3
     # How long a task stays claimed without a sign of life from its worker. The worker renews the lease

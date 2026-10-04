@@ -465,3 +465,12 @@ def test_static_rules_for_shops():
     assert {"tpf/payments.ts", "app/api/tpf-stripe/route.ts", "tpf/notify.ts"} <= paths
     assert KEY_RE.match(TEST_KEY) and KEY_RE.match("rk_live_" + "c" * 30) and not KEY_RE.match("pk_test_" + "a" * 24)
     assert key_mode(TEST_KEY) == "test" and key_mode(LIVE_KEY) == "live"
+
+
+def test_use_server_modules_may_only_export_async_functions():
+    ok = {"path": "lib/actions.ts", "content": "'use server';\nimport { x } from './x';\nexport async function save() {}\nexport type T = string;\n"}
+    for bad in ("export const LIMIT = 5;", "export { x };", "export function plain() {}", "export default function f() {}"):
+        broken = {"path": "lib/actions.ts", "content": ok["content"] + bad + "\n"}
+        assert any("use server" in p for p in check_files(CODE["files"] + [broken], ["/"], "site")), bad
+    assert check_files(CODE["files"] + [ok], ["/"], "site") == []
+    assert check_files(CODE["files"] + [{"path": "lib/c.ts", "content": "export const A = 1;"}], ["/"], "site") == []
