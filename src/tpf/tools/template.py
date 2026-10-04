@@ -399,7 +399,7 @@ export async function POST(request: Request) {
   if (paid && typeof session.client_reference_id === "string") {
     const payment: Payment = {
       sessionId: String(session.id ?? ""), amountTotal: Number(session.amount_total ?? 0),
-      currency: String(session.currency ?? ""),
+      currency: String(session.currency ?? "").toLowerCase(),
       email: String((session.customer_details as { email?: string } | undefined)?.email ?? ""),
     };
     try {
@@ -429,6 +429,10 @@ SHOP_RULES = (
     "The platform owns the payment plumbing: `import { paymentsEnabled, createCheckout, type Payment } from "
     "'@/tpf/payments'` and the routes app/api/tpf-stripe, app/api/tpf-pay and app/api/tpf-pay-return; you write "
     "lib/payments.ts, which must export `async function onPaid(reference: string, payment: Payment): Promise<void>`. "
+    "`Payment` is exactly `{ sessionId: string; amountTotal: number; currency: string; email: string }`: "
+    "`payment.amountTotal` is what the customer paid, an integer in the currency's smallest unit, and "
+    "`payment.currency` is the lowercase ISO code ('usd', 'rub', 'byn'). Use these fields by these names, with no "
+    "type casts: a guessed field name reads as undefined and every real payment would be refused. "
     "Money is always an integer in the currency's smallest unit (cents) in the database and in code; format it "
     "only when displaying. The shop has one currency, taken from the spec. "
     "Catalogue: products (name, description, price, image URL, active flag, optional stock) come from the database "
@@ -446,8 +450,8 @@ SHOP_RULES = (
     "The success page (/order/[token]) shows the order's status from the database; it never marks an order paid. "
     "Only onPaid marks it paid: `update orders set status = 'paid', ... where token = ${reference} and status = "
     "'pending'`, and only when that update changed a row does it reduce stock and call notifyOwner — the platform "
-    "may report the same payment twice, so onPaid must be safe to repeat. If the paid amount differs from the "
-    "order's total, do not mark it paid: record the mismatch on the order and notify the owner. "
+    "may report the same payment twice, so onPaid must be safe to repeat. If `payment.amountTotal` differs from the order's "
+    "total, or `payment.currency` from the order's currency compared in lowercase, do not mark it paid: record the mismatch on the order and notify the owner. "
     "Admin: products (create, edit, deactivate), orders (list, details, status: new, pending, paid, shipped, "
     "completed, cancelled). Refunds are made by the owner in the payment provider's own dashboard, not here. "
     "Never read or print payment keys and never call a payment provider's API yourself. Texts for customers say "

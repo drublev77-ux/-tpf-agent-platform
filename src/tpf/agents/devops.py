@@ -183,6 +183,40 @@ async def deploy_production(ctx: Ctx) -> Outcome:
     return Outcome(Ev.RELEASED, data={"url": dep.url, "repo": repo_url}, details=dep.url)
 
 
+async def redeploy_production(ctx: Ctx) -> Outcome:
+    """Side task (does not move the order): deploy a delivered order again from its latest code and the
+    platform's current files — after a platform fix, or after an engineer corrected the code. The address
+    and the data stay; the client is not notified."""
+    if ctx.order["state"] != State.DELIVERED or not ctx.order["production_url"] or ctx.deployer is None:
+        return Outcome(data={"result": "not_delivered"})
+    files = await _files(ctx)
+    if files is None:
+        return Outcome(data={"result": "no_code"})
+    app = has_database(await _kind(ctx))
+    problem = await _database(ctx, files, "prod", project_name(ctx.order_id)) if app else None
+    dep = None
+    if not problem:
+        try:
+            dep = await ctx.deployer.deploy(project_name(ctx.order_id), files, production=True)
+        except DeployError as e:      # a failed build leaves the version that is live untouched
+            problem = f"{e}: {(e.log or '')[-1500:]}"
+    if dep is not None and app:
+        problem = await ctx.deployer.health(dep.url)
+    if problem:
+        await ctx.orch.log(ctx.order_id, "redeploy_failed", "devops", {"error": str(problem)[:2000]}, kind="tool")
+        await ctx.orch.notify_operator(ctx.order, f"Заказ #{ctx.order_id}: повторная выкладка не удалась: {str(problem)[:500]}")
+        return Outcome(data={"result": "failed"})
+    await _connect_after_deploy(ctx, "prod", ctx.order["production_url"])
+    await ctx.orch.save_artifact(ctx.order_id, "deployment", {"target": "production", "id": dep.id, "url": dep.url, "redeploy": True}, "devops")
+    if ctx.github is not None:
+        try:
+            await ctx.github.publish(project_name(ctx.order_id), files, f"Redeploy of order #{ctx.order_id}")
+        except Exception as e:  # noqa: BLE001 — the shop is live; the repository copy can wait
+            await ctx.orch.log(ctx.order_id, "code_publish_failed", "devops", {"error": str(e)[:500]}, kind="tool")
+    await ctx.orch.log(ctx.order_id, "redeployed", "devops", {"url": dep.url, "note": str(ctx.payload.get("note", ""))[:500]}, kind="tool")
+    return Outcome(data={"result": "redeployed", "url": dep.url})
+
+
 REPO_TEXT = {
     "invited": {
         "ru": "Мы пригласили пользователя GitHub {user} в репозиторий с исходным кодом заказа №{id}: {url}. Примите приглашение — GitHub отправил его письмом и показывает на странице репозитория.",

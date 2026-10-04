@@ -108,6 +108,12 @@ def check_files(files: list[dict[str, str]], routes: list[str], kind: str = "sit
                 problems.append(f"a payment provider is called directly instead of through @/tpf/payments: {f['path']}")
             if kind == "shop" and f["path"] == SHOP_HANDLER_PATH and not re.search(r"export\s+async\s+function\s+onPaid\b", f["content"]):
                 problems.append(f"{SHOP_HANDLER_PATH} must export async function onPaid(reference, payment)")
+            if kind == "shop" and f["path"] == SHOP_HANDLER_PATH:
+                # A real payment was once refused by a shop whose onPaid read a guessed field through a cast.
+                if "amountTotal" not in f["content"]:
+                    problems.append(f"{SHOP_HANDLER_PATH} must compare payment.amountTotal with the order's total")
+                if re.search(r"\bas\s+(unknown|any)\b", f["content"]):
+                    problems.append(f"{SHOP_HANDLER_PATH} must use the Payment fields as typed, without `as unknown` or `as any`")
             if kind == "bot" and f["path"] == BOT_HANDLER_PATH and not re.search(r"export\s+async\s+function\s+handleUpdate\b", f["content"]):
                 problems.append(f"{BOT_HANDLER_PATH} must export async function handleUpdate(update: TgUpdate)")
             if f["path"] == SCHEMA_PATH:

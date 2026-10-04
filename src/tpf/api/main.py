@@ -202,6 +202,25 @@ async def resume(order_id: int, body: OperatorNote, request: Request) -> dict[st
     return await _fire(orch(request), order_id, Ev.RESUME, "operator", {"note": body.note})
 
 
+@app.post("/admin/orders/{order_id}/redeploy", dependencies=[Depends(operator)])
+async def redeploy_order(order_id: int, body: OperatorNote, request: Request) -> dict[str, Any]:
+    """Deploy a delivered order again from its latest code and the platform's current files."""
+    o = orch(request)
+    try:
+        order = await o.get_order(order_id)
+    except KeyError:
+        raise HTTPException(404, "order not found") from None
+    if order["state"] != State.DELIVERED:
+        raise HTTPException(409, "only a delivered order can be redeployed")
+    try:
+        async with o.pool.acquire() as conn:
+            task_id = await queue.enqueue(conn, order_id, "redeploy_production", {"note": body.note})
+    except asyncpg.UniqueViolationError:
+        raise HTTPException(409, "another task of this order is still running") from None
+    await o.log(order_id, "redeploy_requested", "operator", {"note": body.note[:500]}, kind="operator")
+    return {"task": task_id}
+
+
 @app.post("/admin/orders/{order_id}/budget", dependencies=[Depends(operator)])
 async def raise_budget(order_id: int, request: Request, add_tokens: int = 500_000) -> dict[str, Any]:
     o = orch(request)

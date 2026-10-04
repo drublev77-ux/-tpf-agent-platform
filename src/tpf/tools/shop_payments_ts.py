@@ -51,6 +51,7 @@ export async function paymentsEnabled(): Promise<boolean> {
 
 export type CheckoutLine = { name: string; unitAmount: number; quantity: number };
 export type Checkout = { url: string; sessionId: string };
+/** What the customer paid: amountTotal in the currency's smallest unit, currency as a lowercase ISO code. */
 export type Payment = { sessionId: string; amountTotal: number; currency: string; email: string };
 
 type Options = {
@@ -187,7 +188,7 @@ async function paidAt(s: Secrets, provider: string, paymentId: string, reference
     if (r.status !== 200 || b.status !== "succeeded" || b.paid !== true) return null;
     if ((b.metadata as { reference?: string } | undefined)?.reference !== reference) return null;
     const total = minor(amount.value);
-    return Number.isInteger(total) ? { sessionId: paymentId, amountTotal: total, currency: String(amount.currency ?? ""), email: "" } : null;
+    return Number.isInteger(total) ? { sessionId: paymentId, amountTotal: total, currency: String(amount.currency ?? "").toLowerCase(), email: "" } : null;
   }
   if (provider === "bepaid") {
     const r = await call("bepaid status", `https://checkout.bepaid.by/ctp/api/checkouts/${encodeURIComponent(paymentId)}`, {
@@ -199,7 +200,7 @@ async function paidAt(s: Secrets, provider: string, paymentId: string, reference
     if (r.status !== 200 || c.status !== "successful" || !Number.isInteger(order.amount)) return null;
     if (order.tracking_id !== undefined && order.tracking_id !== reference) return null;
     if (test === true && !s.test) return null;     // a test payment never pays a real order
-    return { sessionId: paymentId, amountTotal: Number(order.amount), currency: String(order.currency ?? ""), email: "" };
+    return { sessionId: paymentId, amountTotal: Number(order.amount), currency: String(order.currency ?? "").toLowerCase(), email: "" };
   }
   return null;
 }

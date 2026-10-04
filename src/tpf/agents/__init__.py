@@ -19,7 +19,8 @@ HANDLERS: dict[str, Callable[[Ctx], Awaitable[Outcome]]] = {
     "grant_repo_access": devops.grant_repo_access,
     "connect_bot": devops.connect_bot,
     "connect_payments": devops.connect_payments,
+    "redeploy_production": devops.redeploy_production,
 }
 
 # Tasks that serve a finished order without moving it; they run whatever state the order is in.
-SIDE_TASKS = {"grant_repo_access", "connect_bot", "connect_payments"}
+SIDE_TASKS = {"grant_repo_access", "connect_bot", "connect_payments", "redeploy_production"}

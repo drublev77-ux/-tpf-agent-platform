@@ -126,3 +126,21 @@ def test_operator_console(client, monkeypatch):
     new_id = int(re.search(r"/admin/order/(\d+)", made.headers["location"])[1])
     page = client.get(f"/admin/order/{new_id}", headers=auth).text
     assert "Li Wei" in page and "zh · wechat" in page and new_id != oid
+
+
+def test_operator_redeploys_only_a_delivered_order(client):
+    from tpf.api.main import app
+    admin = {"X-Admin-Token": "test-admin"}
+    r = client.post("/orders", json={"client_name": "A", "client_email": "a@example.com", "language": "en", "request_text": "a landing page please"})
+    oid = r.json()["order"]["id"]
+    assert client.post(f"/admin/orders/{oid}/redeploy", json={"note": "x"}).status_code == 422       # no operator token
+    assert client.post(f"/admin/orders/{oid}/redeploy", json={"note": "x"}, headers=admin).status_code == 409   # not delivered
+    assert client.post("/admin/orders/999999/redeploy", json={}, headers=admin).status_code == 404
+    pool = app.state.orch.pool
+    client.portal.call(pool.execute, "UPDATE tasks SET status='done' WHERE order_id=$1", oid)
+    client.portal.call(pool.execute, "UPDATE orders SET state='delivered' WHERE id=$1", oid)
+    r = client.post(f"/admin/orders/{oid}/redeploy", json={"note": "template fix"}, headers=admin)
+    assert r.status_code == 200
+    task = client.portal.call(pool.fetchrow, "SELECT kind, payload, status FROM tasks WHERE id=$1", r.json()["task"])
+    assert dict(task) == {"kind": "redeploy_production", "payload": {"note": "template fix"}, "status": "queued"}
+    assert client.post(f"/admin/orders/{oid}/redeploy", json={}, headers=admin).status_code == 409    # one at a time

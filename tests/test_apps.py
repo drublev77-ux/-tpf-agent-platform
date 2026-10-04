@@ -330,7 +330,7 @@ class FakeShopStripe:
 
 
 TEST_KEY, LIVE_KEY = "sk_test_" + "a" * 24, "sk_live_" + "b" * 24
-SHOP_FILES = APP_CODE["files"] + [{"path": "lib/payments.ts", "content": "export async function onPaid(reference: string, payment: unknown): Promise<void> {}"}]
+SHOP_FILES = APP_CODE["files"] + [{"path": "lib/payments.ts", "content": "export async function onPaid(reference: string, payment: { amountTotal: number }): Promise<void> { void payment.amountTotal; }"}]
 
 
 @pytest.fixture
@@ -643,3 +643,57 @@ def test_shop_template_carries_all_three_providers_and_keeps_them_out_of_generat
     assert check_schema_sql("CREATE TABLE IF NOT EXISTS tpf_payments (id int);")      # the platform's table, not the developer's
     rules = rules_for("shop")
     assert "YooKassa" in rules and "never names one" in rules and "app/api/tpf-pay-return" in rules
+
+
+def test_onpaid_must_read_the_payment_fields_as_typed():
+    """A delivered shop refused every real Stripe payment: its onPaid read `amount` through a cast, got
+    undefined, and recorded 'paid 0'. The fields are named in the rules and checked before QA."""
+    from tpf.tools.template import rules_for
+    routes = ["/", "/admin", "/admin/login"]
+    guessed = "export async function onPaid(reference: string, payment: Payment): Promise<void> { const p = payment as unknown as { amount?: number }; void p.amount; }"
+    cast = "export async function onPaid(reference: string, payment: Payment): Promise<void> { const p = payment as any; void p.amountTotal; }"
+    for bad, why in ((guessed, "amountTotal"), (cast, "without")):
+        files = [f if f["path"] != "lib/payments.ts" else {"path": f["path"], "content": bad} for f in SHOP_FILES]
+        assert any(why in p for p in check_files(files, routes, "shop")), why
+    assert check_files(SHOP_FILES, routes, "shop") == []
+    rules = rules_for("shop")
+    assert "amountTotal: number" in rules and "lowercase ISO code" in rules
+    payments_ts = {f["path"]: f["content"] for f in all_files(SHOP_FILES, "x", "shop")}["tpf/payments.ts"]
+    assert payments_ts.count(".toLowerCase(), email") == 2          # YooKassa and bePaid report the currency as Stripe does
+
+
+async def test_delivered_order_is_redeployed_without_moving_or_notifying(shop_env):
+    from tpf.orchestrator import queue
+    env = shop_env
+    oid = await new_app_order(env)
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+
+    async def redeploy():
+        async with env.pool.acquire() as conn:
+            await queue.enqueue(conn, oid, "redeploy_production", {"note": "payments fix"})
+        await env.drain()
+        return await env.pool.fetchval("SELECT result->>'result' FROM tasks WHERE order_id = $1 ORDER BY id DESC LIMIT 1", oid)
+
+    assert await redeploy() == "not_delivered"                 # under review: nothing is touched
+    await env.orch.fire(oid, Ev.ACCEPTED, actor="client")
+    await env.drain()
+    await enter_key(env, oid, TEST_KEY)
+    await env.drain()
+    order = await env.orch.get_order(oid)
+    messages, deploys = len(await env.orch.messages(oid)), len(env.deployer.deploys)
+
+    assert await redeploy() == "redeployed"
+    after = await env.orch.get_order(oid)
+    assert after["state"] == State.DELIVERED and after["production_url"] == order["production_url"]
+    assert env.deployer.deploys[-1][:2] == (f"tpf-order-{oid}", True) and len(env.deployer.deploys) == deploys + 1
+    assert len(await env.orch.messages(oid)) == messages       # the client hears nothing
+    assert env.worker.shop_stripe.calls[-1][1] == order["production_url"] + "/api/tpf-stripe"   # payments stay connected
+    assert [e["data"]["note"] for e in await env.orch.events(oid) if e["name"] == "redeployed"] == ["payments fix"]
+
+    # A build that fails leaves the live version alone and tells the operator, not the client.
+    from tpf.tools.deploy import DeployError
+    env.deployer.failures.append(DeployError("deployment dpl_x ended in ERROR", log="Type error", deployment_id="dpl_x"))
+    assert await redeploy() == "failed"
+    assert (await env.orch.get_order(oid))["state"] == State.DELIVERED and len(await env.orch.messages(oid)) == messages
