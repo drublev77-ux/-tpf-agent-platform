@@ -252,8 +252,10 @@ def test_static_rules_for_bots():
     assert any("lib/bot.ts" in p for p in check_files(APP_CODE["files"], routes, "bot"))
     assert any("lib/pwa.ts" in p for p in check_files(BOT_FILES, routes, "app"))
     assert any("<Pwa />" in p for p in check_files(CODE["files"] + APP_CODE["files"][2:], routes, "app"))
-    assert {"app/manifest.ts", "public/sw.js", "tpf/Pwa.tsx"} <= {f["path"] for f in all_files([], "x", "app")}
-    assert "app/manifest.ts" not in {f["path"] for f in all_files([], "x", "bot")} and validate_path("app/manifest.ts", "app")
+    assert {"app/manifest.ts", "public/sw.js", "tpf/Pwa.tsx"} <= {f["path"] for f in all_files(APP_CODE["files"], "x", "app")}
+    # an application delivered before applications became installable still builds on redeploy
+    assert "app/manifest.ts" not in {f["path"] for f in all_files(BOT_FILES, "x", "app")}
+    assert "app/manifest.ts" not in {f["path"] for f in all_files(APP_CODE["files"], "x", "bot")} and validate_path("app/manifest.ts", "app")
     direct = BOT_FILES + [{"path": "lib/x.ts", "content": "fetch('https://api.telegram.org/bot' + t)"}]
     assert any("directly" in p for p in check_files(direct, routes, "bot"))
     assert check_schema_sql("CREATE TABLE IF NOT EXISTS tpf_secrets (key text);")

@@ -710,6 +710,17 @@ def route_to_page(route: str) -> str:
     return "app/page.tsx" if not route else f"app/{route}/page.tsx"
 
 
+PWA_FILES = ("public/sw.js", "public/offline.html", "tpf/Pwa.tsx", "app/manifest.ts", "app/tpf-icon/[size]/route.tsx")
+
+
+def _for_code(platform: dict[str, str], files: list[dict[str, str]]) -> dict[str, str]:
+    """Platform files that fit this code: an application written before applications became installable has
+    no lib/pwa.ts, and the manifest that imports it would break its build."""
+    if PWA_CONFIG_PATH in {f["path"] for f in files}:
+        return platform
+    return {p: c for p, c in platform.items() if p not in PWA_FILES}
+
+
 def platform_files(form_endpoint: str = "", kind: str = "site") -> dict[str, str]:
     """Everything the platform owns in a project: build configuration, the contact form and its endpoint,
     and for an application the database client, the admin session helper and the health check."""
@@ -741,7 +752,7 @@ def form_endpoint(base_url: str, order_id: int) -> str:
 def materialize(root: Path, files: list[dict[str, str]], form_endpoint: str = "", kind: str = "site") -> Path:
     """Write template + generated files into `root` and return it."""
     root.mkdir(parents=True, exist_ok=True)
-    for path, content in platform_files(form_endpoint, kind).items():
+    for path, content in _for_code(platform_files(form_endpoint, kind), files).items():
         (root / path).parent.mkdir(parents=True, exist_ok=True)
         (root / path).write_text(content, encoding="utf-8")
     for f in files:
@@ -758,7 +769,7 @@ def materialize(root: Path, files: list[dict[str, str]], form_endpoint: str = ""
 
 def all_files(files: list[dict[str, str]], form_endpoint: str = "", kind: str = "site") -> list[dict[str, str]]:
     """Template + generated files, as the deployer and git publisher need them."""
-    return [{"path": p, "content": c} for p, c in platform_files(form_endpoint, kind).items()] + list(files)
+    return [{"path": p, "content": c} for p, c in _for_code(platform_files(form_endpoint, kind), files).items()] + list(files)
 
 
 def kind_of(spec: dict | None) -> str:
