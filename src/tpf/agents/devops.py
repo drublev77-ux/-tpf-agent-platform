@@ -61,10 +61,15 @@ async def connect_bot_to(ctx: Ctx, env: str, site_url: str) -> str | None:
 
 async def connect_shop_to(ctx: Ctx, env: str, site_url: str) -> str | None:
     """Give the shop at this deployment its owner's Stripe key and a webhook for payments. Returns the key's
-    mode ('test' or 'live'), or None when the owner has not entered a key. Raises StripeKeyError when Stripe
-    refuses the key."""
+    mode ('test' or 'live'), or None when nothing was connected: the owner has not entered a key, or the key
+    is a live one and this is the review build. Raises StripeKeyError when Stripe refuses the key."""
     row = await ctx.orch.pool.fetchrow("SELECT secret_key, mode FROM payment_connections WHERE order_id = $1", ctx.order_id)
     if row is None or ctx.tenant_db is None:
+        return None
+    if env == "stg" and row["mode"] == "live":
+        # The review build is for trying things out and its orders are thrown away: a live key there would
+        # charge real cards for them. It waits for the release; the review build keeps whatever it had.
+        await ctx.orch.log(ctx.order_id, "payments_held", "devops", {"env": env, "mode": "live"}, kind="tool")
         return None
     key = row["secret_key"]
     db = await ctx.tenant_db.ensure(ctx.orch.pool, ctx.order_id, env)
@@ -257,6 +262,11 @@ PAY_TEXT = {
         "en": "The Stripe key for order #{id} is saved. We will connect payments as soon as the review version is ready.",
         "zh": "订单 #{id} 的 Stripe 密钥已保存。审核版本准备好后我们会立即接通付款。",
     },
+    "held": {
+        "ru": "Рабочий ключ Stripe для заказа №{id} сохранён. К версии для проверки мы его не подключаем, чтобы при проверке не списывались настоящие деньги: оплата заработает сразу после запуска магазина. Чтобы попробовать оплату уже сейчас, введите на странице заказа тестовый ключ (sk_test…), а перед запуском снова замените его на рабочий.",
+        "en": "The live Stripe key for order #{id} is saved. We do not connect it to the review version, so that reviewing the shop cannot charge real money: payments will start working as soon as the shop is released. To try a payment now, enter the test key (sk_test…) on your order page and switch back to the live one before release.",
+        "zh": "订单 #{id} 的 Stripe 正式密钥已保存。为避免审核时产生真实扣款，我们不会把它连接到审核版本：商店上线后付款将立即生效。如需现在测试付款，请在订单页面输入测试密钥（sk_test…），上线前再换回正式密钥。",
+    },
     "failed": {
         "ru": "Не удалось подключить Stripe к заказу №{id}: Stripe не принял ключ. Скопируйте секретный ключ в панели Stripe ещё раз и введите его на странице заказа.",
         "en": "We could not connect Stripe to order #{id}: Stripe refused the key. Copy the secret key from the Stripe dashboard again and enter it on your order page.",
@@ -279,9 +289,10 @@ async def connect_payments(ctx: Ctx) -> Outcome:
     """Side task (does not move the order): the owner entered or replaced the shop's Stripe key."""
     lang = ctx.order["language"] if ctx.order["language"] in ("ru", "en", "zh") else "en"
     target = _live_target(ctx)
-    if target is None:
-        await ctx.orch.notify_client(ctx.order, PAY_TEXT["saved"][lang].format(id=ctx.order_id))
-        return Outcome(data={"result": "saved"})
+    live = await ctx.orch.pool.fetchval("SELECT mode FROM payment_connections WHERE order_id = $1", ctx.order_id) == "live"
+    if target is None or (live and target[0] == "stg"):
+        await ctx.orch.notify_client(ctx.order, PAY_TEXT["held" if live else "saved"][lang].format(id=ctx.order_id))
+        return Outcome(data={"result": "held" if live else "saved"})
     try:
         mode = await connect_shop_to(ctx, *target)
     except StripeKeyError as e:

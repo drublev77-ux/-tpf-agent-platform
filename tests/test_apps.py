@@ -398,6 +398,48 @@ async def test_shop_payments_follow_the_order_from_review_to_production(shop_env
     assert await env.pool.fetchval("SELECT mode || ':' || connected_env FROM payment_connections WHERE order_id = $1", oid) == "live:prod"
 
 
+async def test_live_key_is_never_connected_to_the_review_build(shop_env):
+    from tpf.api.portal import T, _pay_block
+    env = shop_env
+    stripe = env.worker.shop_stripe
+    oid = await new_app_order(env)
+    await env.drain()
+    await enter_key(env, oid, LIVE_KEY)          # before anything is deployed
+    await env.drain()
+    assert "после запуска" in (await env.orch.messages(oid))[-1]["text"]
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    order = await env.orch.get_order(oid)
+    assert State(order["state"]) is State.AWAITING_ACCEPTANCE
+    # The review build was deployed with a live key on file: Stripe was not touched and the shop has no key.
+    assert stripe.calls == []
+    conn = await asyncpg.connect(env.deployer.env[f"tpf-order-{oid}-preview"]["DATABASE_URL"])
+    assert await conn.fetchval("SELECT to_regclass('tpf_secrets')") is None
+    await conn.close()
+    assert "не подключается" in await _pay_block(env.orch, oid, "t", T["ru"])
+
+    # Trying payments during the review takes a test key; a live key entered afterwards leaves the review build on it.
+    await enter_key(env, oid, TEST_KEY)
+    await env.drain()
+    assert (await shop_secrets(env, oid, "stg"))["stripe_secret_key"] == TEST_KEY
+    await enter_key(env, oid, LIVE_KEY)
+    await env.drain()
+    assert (await shop_secrets(env, oid, "stg"))["stripe_secret_key"] == TEST_KEY and len(stripe.calls) == 1
+    assert "после запуска" in (await env.orch.messages(oid))[-1]["text"]
+    assert await env.pool.fetchval("SELECT connected_env FROM payment_connections WHERE order_id = $1", oid) is None
+
+    # The release is where the live key goes.
+    await env.orch.fire(oid, Ev.ACCEPTED, actor="client")
+    await env.drain()
+    order = await env.orch.get_order(oid)
+    assert order["state"] == State.DELIVERED
+    assert stripe.calls[-1] == (LIVE_KEY, order["production_url"] + "/api/tpf-stripe", "")
+    assert (await shop_secrets(env, oid, "prod"))["stripe_secret_key"] == LIVE_KEY
+    assert await env.pool.fetchval("SELECT mode || ':' || connected_env FROM payment_connections WHERE order_id = $1", oid) == "live:prod"
+    held = [e for e in await env.orch.events(oid) if e["name"] == "payments_held"]
+    assert held and all(e["data"]["env"] == "stg" for e in held)
+
+
 async def test_refused_stripe_key_does_not_block_the_shop(shop_env):
     env = shop_env
     env.worker.shop_stripe.bad.add(TEST_KEY)
