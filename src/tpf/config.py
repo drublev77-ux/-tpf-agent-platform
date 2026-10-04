@@ -38,14 +38,14 @@ class Settings(BaseSettings):
     hourly_rate_site: float = 45.0
     hourly_rate_app: float = 70.0
     hourly_rate_bot: float = 50.0
-    hourly_rate_shop: float = 55.0     # small shop ~$3,000 on the market
+    hourly_rate_shop: float = 37.0     # small shop ~$3,000 on the market; a shop takes about 65 hours
 
     # Orders in Russian are priced against the Russian-speaking market, which is cheaper: landing ~60 000 RUB,
     # simple bot ~65 000 RUB, bot with booking ~140 000 RUB, small application ~200 000 RUB (USD at ~83 RUB).
     hourly_rate_ru_site: float = 36.0
     hourly_rate_ru_app: float = 56.0
     hourly_rate_ru_bot: float = 34.0
-    hourly_rate_ru_shop: float = 42.0  # small shop ~200 000 RUB
+    hourly_rate_ru_shop: float = 29.0  # small shop ~200 000 RUB
 
     def rate_for(self, product_type: str, language: str = "") -> float:
         regional = getattr(self, f"hourly_rate_{language}_{product_type}", 0) if language else 0
