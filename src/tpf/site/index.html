@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TPF Technology — разработка ПО, сайтов и приложений</title>
-<meta name="description" content="TPF Technology: разработка ПО, сайтов и мобильных приложений командой ИИ‑агентов под контролем инженеров.">
+<title>TPF Technology — сайты, веб‑приложения, магазины и Telegram‑боты</title>
+<meta name="description" content="TPF Technology: сайты, веб‑приложения, интернет‑магазины и Telegram‑боты от команды ИИ‑агентов под контролем инженеров. Смета бесплатно и до оплаты.">
 <meta property="og:title" content="TPF Technology">
 <meta property="og:image" content="/brand.jpg">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none' stroke='%235CE1F0' stroke-width='2'%3E%3Cpolygon points='16,2 29,9.5 29,22.5 16,30 3,22.5 3,9.5'/%3E%3Ccircle cx='16' cy='16' r='3'/%3E%3C/svg%3E">
@@ -150,7 +150,7 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 <section id="stack">
 <div class="head" style="margin-bottom:0"><div><div class="kicker" data-t="st_kicker"></div><h2 data-t="st_title"></h2><p style="max-width:760px;font-size:17px;color:var(--muted)" data-t="st_lead"></p></div></div>
 <div class="chips hot" data-list="integrations"></div>
-<div class="chips" style="margin-top:12px"><span>React</span><span>Next.js</span><span>TypeScript</span><span>Node.js</span><span>Python</span><span>Swift</span><span>Kotlin</span><span>Flutter</span><span>React Native</span><span>PostgreSQL</span><span>Supabase</span><span>Docker</span><span>AWS</span><span>Vercel</span><span class="warm">LLM API</span></div>
+<div class="chips" style="margin-top:12px"><span>React</span><span>Next.js</span><span>TypeScript</span><span>Node.js</span><span>PostgreSQL</span><span>Supabase</span><span>Vercel</span><span>PWA</span><span class="warm">LLM API</span></div>
 </section>
 
 <section>
@@ -399,7 +399,109 @@ var ICONS = [
 var lang = 'ru';
 function el(tag, text, cls) { var e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; }
 function fill(node, items, make) { node.replaceChildren.apply(node, items.map(make)); }
-function T() { var t = Object.assign({}, I18N[lang], EXTRA[lang]); return t; }
+// What the studio really builds today. These texts replace the earlier, broader ones above.
+var ACTUAL = {
+  ru: {
+    hero_lead: 'Делаем сайты, веб‑приложения, интернет‑магазины и Telegram‑ботов силами команды ИИ‑агентов под контролем инженеров — от заявки до запуска.',
+    tags: ['Web', 'Telegram', 'На телефон', 'ИИ‑агенты'],
+    sv_lead: 'От заявки и сметы до запуска — на одной платформе. Исходный код и все права остаются у вас.',
+    services: [
+      { title: 'Лендинги и сайты', text: 'Одна страница или несколько: дизайн, тексты по вашим данным, адаптация под телефон, форма заявки с отправкой вам на почту.' },
+      { title: 'Веб‑приложения', text: 'Сайт с базой данных и админкой: запись, заявки, каталог, расписание. Данными управляете вы сами, без разработчика.' },
+      { title: 'Интернет‑магазины', text: 'Каталог, корзина, оформление заказа, учёт остатков и оплата картой. Товары и заказы — в вашей админке.' },
+      { title: 'Telegram‑боты', text: 'Меню кнопками, ответы на частые вопросы, пошаговая запись или заказ, уведомления владельцу и веб‑админка.' },
+      { title: 'Приложения на телефон', text: 'Приложение или магазин ставится на главный экран телефона со своей иконкой и открывается на весь экран — без магазинов приложений.' },
+      { title: 'Приём оплаты', text: 'Подключаем Stripe, ЮKassa или bePaid к вашему счёту: деньги покупателей поступают сразу вам, не через нас.' }
+    ],
+    agents: [
+      { title: 'Аналитик', text: 'Принимает заявку, уточняет требования, пишет ТЗ и считает смету и сроки.' },
+      { title: 'Архитектор', text: 'Проектирует страницы, данные и оформление: палитру, шрифты, структуру.' },
+      { title: 'Разработчик', text: 'Пишет код продукта и исправляет его по результатам проверок и вашим правкам.' },
+      { title: 'Тестировщик', text: 'Собирает проект, проверяет зависимости на уязвимости, открывает каждую страницу и сверяет результат с ТЗ.' },
+      { title: 'Ревьюер', text: 'Независимо перепроверяет ТЗ, проект и код перед каждым следующим шагом.' },
+      { title: 'DevOps', text: 'Публикует версию для вашей проверки, а после приёмки — рабочую, и передаёт вам исходный код.' }
+    ],
+    benefits: [
+      { title: 'Быстро', text: 'Агенты работают круглосуточно: смета обычно готова в течение часа, первая версия — за часы или дни.' },
+      { title: 'Без риска', text: 'Смета бесплатна и приходит до оплаты. Половина суммы — перед стартом, половина — только после того, как вы приняли работу.' },
+      { title: 'Прозрачно', text: 'У каждого заказа своя страница: статус, ТЗ, смета, версия для проверки и кнопка «запросить правки».' }
+    ],
+    nav_stack: 'Технологии', st_kicker: '03 / ТЕХНОЛОГИИ', st_title: 'На чём мы строим',
+    st_lead: 'Проверенный набор технологий: продукт быстро открывается, работает на телефоне и не привязан к нам — код можно забрать и развивать где угодно.',
+    integrations: ['Telegram', 'Stripe', 'ЮKassa', 'bePaid', 'Уведомления на e‑mail', 'Установка на телефон', 'GitHub'],
+    why_title: 'Прозрачно и без оплаты вслепую', why_lead: 'Статус заказа виден на вашей странице в любой момент. Вы принимаете работу до окончательной оплаты, а исходный код и все права — ваши.',
+    stats: [ { num: '100%', label: 'прав на код — у вас' }, { num: '50/50', label: 'оплата: перед стартом и после приёмки' }, { num: '0 ₽', label: 'за ТЗ и смету' }, { num: '3', label: 'языка: русский, English, 中文' } ],
+    ct_lead: 'Опишите задачу — ТЗ, смету и сроки пришлём на почту, обычно в течение часа. Бесплатно.',
+    types: ['Лендинг или сайт', 'Веб‑приложение', 'Интернет‑магазин', 'Telegram‑бот', 'Приложение на телефон', 'Другое']
+  },
+  en: {
+    hero_lead: 'We build websites, web applications, online shops and Telegram bots with a team of AI agents overseen by engineers — from request to launch.',
+    tags: ['Web', 'Telegram', 'On the phone', 'AI agents'],
+    sv_lead: 'From request and estimate to launch — on one platform. The source code and all rights stay with you.',
+    services: [
+      { title: 'Landing pages and websites', text: 'One page or several: design, copy from your facts, mobile layout, a request form delivered to your e‑mail.' },
+      { title: 'Web applications', text: 'A site with a database and an admin area: bookings, requests, a catalogue, a schedule. You manage the data yourself, without a developer.' },
+      { title: 'Online shops', text: 'Catalogue, cart, checkout, stock tracking and card payment. Products and orders live in your admin area.' },
+      { title: 'Telegram bots', text: 'A button menu, answers to frequent questions, step‑by‑step booking or ordering, notifications to the owner and a web admin area.' },
+      { title: 'Apps on the phone', text: 'An application or shop installs on the phone home screen with its own icon and opens full screen — no app stores involved.' },
+      { title: 'Taking payments', text: 'We connect Stripe, YooKassa or bePaid to your own account: customers’ money goes straight to you, not through us.' }
+    ],
+    agents: [
+      { title: 'Analyst', text: 'Takes the request, clarifies requirements, writes the spec and works out the estimate and timeline.' },
+      { title: 'Architect', text: 'Designs the pages, the data and the look: palette, fonts, structure.' },
+      { title: 'Developer', text: 'Writes the product’s code and fixes it after checks and your change requests.' },
+      { title: 'Tester', text: 'Builds the project, checks dependencies for vulnerabilities, opens every page and compares the result with the spec.' },
+      { title: 'Reviewer', text: 'Independently re‑checks the spec, the design and the code before every next step.' },
+      { title: 'DevOps', text: 'Publishes a version for your review and, once you accept it, the live one, and hands you the source code.' }
+    ],
+    benefits: [
+      { title: 'Fast', text: 'Agents work around the clock: the estimate is usually ready within an hour, the first version within hours or days.' },
+      { title: 'No risk', text: 'The estimate is free and comes before any payment. Half is due before we start, half only after you have accepted the work.' },
+      { title: 'Transparent', text: 'Every order has its own page: status, spec, estimate, the review version and a “request changes” button.' }
+    ],
+    nav_stack: 'Technology', st_kicker: '03 / TECHNOLOGY', st_title: 'What we build on',
+    st_lead: 'A proven set of technologies: the product loads fast, works on the phone and is not tied to us — you can take the code and develop it anywhere.',
+    integrations: ['Telegram', 'Stripe', 'YooKassa', 'bePaid', 'E‑mail notifications', 'Installs on the phone', 'GitHub'],
+    why_title: 'Transparent, and you never pay blind', why_lead: 'Your order page shows the status at any moment. You accept the work before the final payment, and the source code and all rights are yours.',
+    stats: [ { num: '100%', label: 'code ownership is yours' }, { num: '50/50', label: 'payment: before start and after acceptance' }, { num: '$0', label: 'for the spec and estimate' }, { num: '3', label: 'languages: English, русский, 中文' } ],
+    ct_lead: 'Describe the task — we will e‑mail the spec, estimate and timeline, usually within an hour. Free of charge.',
+    types: ['Landing page or website', 'Web application', 'Online shop', 'Telegram bot', 'App on the phone', 'Other']
+  },
+  zh: {
+    hero_lead: '我们由 AI 智能体团队在工程师监督下开发网站、Web 应用、网上商店和 Telegram 机器人——从需求到上线。',
+    tags: ['Web', 'Telegram', '手机端', 'AI 智能体'],
+    sv_lead: '从需求、报价到上线，全部在一个平台上完成。源代码和全部权利归您所有。',
+    services: [
+      { title: '落地页与网站', text: '单页或多页：设计、根据您提供的信息撰写文案、移动端适配，咨询表单的留言发送到您的邮箱。' },
+      { title: 'Web 应用', text: '带数据库和管理后台的网站：预约、申请、目录、日程。数据由您自行管理，无需开发人员。' },
+      { title: '网上商店', text: '商品目录、购物车、下单、库存管理和刷卡付款。商品与订单都在您的管理后台中。' },
+      { title: 'Telegram 机器人', text: '按钮菜单、常见问题解答、分步预约或下单、向店主发送通知，并配有网页管理后台。' },
+      { title: '手机端应用', text: '应用或商店可安装到手机主屏幕，拥有独立图标并全屏打开——无需应用商店。' },
+      { title: '在线收款', text: '我们将 Stripe、YooKassa 或 bePaid 接入您自己的账户：顾客的款项直接进入您的账户，不经过我们。' }
+    ],
+    agents: [
+      { title: '分析师', text: '接收需求、确认细节，编写规格书并估算报价与工期。' },
+      { title: '架构师', text: '设计页面、数据与外观：配色、字体、结构。' },
+      { title: '开发者', text: '编写产品代码，并根据检查结果和您的修改意见进行修复。' },
+      { title: '测试员', text: '构建项目、检查依赖漏洞、打开每个页面，并将结果与规格书逐项核对。' },
+      { title: '审核员', text: '在进入下一步之前，独立复核规格书、设计和代码。' },
+      { title: 'DevOps', text: '发布供您审核的版本，验收后发布正式版本，并将源代码交付给您。' }
+    ],
+    benefits: [
+      { title: '快速', text: '智能体全天候工作：报价通常在一小时内完成，首个版本在数小时或数天内完成。' },
+      { title: '无风险', text: '报价免费，并在付款前提供。开工前支付一半，另一半在您验收之后支付。' },
+      { title: '透明', text: '每个订单都有独立页面：状态、规格书、报价、审核版本以及“申请修改”按钮。' }
+    ],
+    nav_stack: '技术', st_kicker: '03 / 技术', st_title: '我们使用的技术',
+    st_lead: '一套成熟的技术：产品加载快、适配手机，且不依赖我们——您可以带走代码并在任何地方继续开发。',
+    integrations: ['Telegram', 'Stripe', 'YooKassa', 'bePaid', '邮件通知', '安装到手机', 'GitHub'],
+    why_title: '透明，绝不盲目付款', why_lead: '您可以随时在订单页面查看状态。您在支付尾款前先验收成果，源代码和全部权利归您所有。',
+    stats: [ { num: '100%', label: '代码归您所有' }, { num: '50/50', label: '付款：开工前与验收后' }, { num: '¥0', label: '规格书与报价免费' }, { num: '3', label: '种语言：中文、English、русский' } ],
+    ct_lead: '描述您的需求——我们会把规格书、报价和工期发送到您的邮箱，通常在一小时内。完全免费。',
+    types: ['落地页或网站', 'Web 应用', '网上商店', 'Telegram 机器人', '手机端应用', '其他']
+  }
+};
+function T() { var t = Object.assign({}, I18N[lang], EXTRA[lang], ACTUAL[lang]); return t; }
 function render() {
   var t = T();
   document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang;
