@@ -20,7 +20,8 @@ from tpf.agents.devops import staging_project
 from tpf.orchestrator.states import Ev
 from tpf.tools.deploy import DeployError
 from tpf.tools.sandbox import RunResult
-from tpf.tools.template import SCHEMA_PATH, all_files, has_database, installable, kind_of, materialize, route_to_page
+from tpf.tools.template import (ROLES_PATH, SCHEMA_PATH, access_of, all_files, has_database, installable, kind_of, materialize,
+                                route_to_page, uses_accounts)
 from tpf.tools.tenantdb import TenantDBError
 
 BUILD_CMD = (
@@ -71,6 +72,48 @@ SHOP_CRITERIA = [
 ]
 
 
+ACCOUNT_CRITERIA = [
+    "Every page, route handler and server action that is not public starts with requireUser (with the roles the "
+    "architecture allows for it) or requireAdmin; a server action repeats the check itself and does not rely on its page",
+    "Every query run for a signed-in user is narrowed to what that role may see (their own records by user id where the "
+    "architecture says so), and every change first checks that this user may change that record; an id sent by the "
+    "browser is never enough",
+    "Accounts are handled only through @/tpf/users: no password column in db/schema.sql, no hashing or comparing of "
+    "passwords, no reading or setting of the tpf_user cookie, no query on tpf_users, no self-registration",
+    "/login tells nothing about which of e-mail and password was wrong; a password from createUser or resetUserPassword "
+    "is shown once to the owner and never stored or logged; /admin/users is behind requireAdmin",
+    "lib/roles.ts lists exactly the architecture's roles, and what each role sees and can do matches the architecture",
+]
+
+
+def user_cookie(session_secret: str, user_id: int, version: int, ttl_sec: int = 600) -> str:
+    """A short-lived user session, signed the way tpf/users.ts signs it."""
+    exp = int(time.time()) + ttl_sec
+    signature = hmac.new(session_secret.encode(), f"user:{user_id}:{exp}:{version}".encode(), hashlib.sha256).hexdigest()
+    return f"{user_id}.{exp}.{version}.{signature}"
+
+
+def access_cases(routes: list[dict[str, Any]], roles: list[str], cookies: dict[str, dict[str, str]]) -> list[tuple[str, dict[str, str], bool, str]]:
+    """Every (page, visitor) pair worth trying: a stranger, the owner and each role, against each page without
+    a dynamic segment. `cookies` maps 'owner' and each role id to that visitor's cookies."""
+    cases = []
+    for route in routes:
+        path = route["path"]
+        if "[" in path:
+            continue
+        allowed = access_of(route)
+        if allowed == ["public"]:
+            continue
+        cases.append((path, {}, False, "a visitor who is not signed in"))
+        if allowed == ["owner"]:
+            cases += [(path, cookies[r], False, f"role {r}") for r in roles if r in cookies]
+            continue
+        for r in roles:
+            if r in cookies:
+                cases.append((path, cookies[r], allowed == ["users"] or r in allowed, f"role {r}"))
+    return cases
+
+
 def admin_cookie(session_secret: str, ttl_sec: int = 600) -> str:
     """A short-lived owner session, signed the way tpf/auth.ts signs it: lets the platform open admin pages."""
     exp = int(time.time()) + ttl_sec
@@ -85,13 +128,28 @@ async def prepare_database(ctx: Ctx, files: list[dict[str, str]], env: str, proj
     db = await ctx.tenant_db.ensure(ctx.orch.pool, ctx.order_id, env)
     schema = next((f["content"] for f in files if f["path"] == SCHEMA_PATH), "")
     await ctx.tenant_db.apply_schema(db, schema)
+    if any(f["path"] == ROLES_PATH for f in files):
+        await ctx.tenant_db.ensure_users_table(db)
     if ctx.deployer is not None:
         await ctx.deployer.set_env(project, db.env())
     return db
 
 
+async def _access_check(ctx: Ctx, url: str, arch: dict[str, Any], cookie: str) -> list[str]:
+    """Open every page as a stranger and as each role, with accounts made for this check only."""
+    roles = [r["id"] for r in arch["roles"]]
+    db = await ctx.tenant_db.ensure(ctx.orch.pool, ctx.order_id, "stg")
+    users = await ctx.tenant_db.add_check_users(db, roles)
+    try:
+        cookies = {r: {"tpf_user": user_cookie(db.session_secret, uid, ver)} for r, (uid, ver) in users.items()}
+        return await ctx.deployer.smoke_access(url, access_cases(arch["routes"], roles, cookies))
+    finally:
+        await ctx.tenant_db.remove_check_users(db)
+
+
 async def _build_on_vercel(ctx: Ctx, files: list[dict[str, str]], version: int, report: dict[str, Any],
-                           kind: str = "site", routes: list[str] | None = None, cookie: str = "") -> RunResult:
+                           kind: str = "site", routes: list[str] | None = None, cookie: str = "",
+                           arch: dict[str, Any] | None = None) -> RunResult:
     """Build the code as a Vercel preview. A green preview is kept for staging, so it is not built twice."""
     if ctx.deployer is None:
         return RunResult(1, "SANDBOX=vercel needs VERCEL_TOKEN")
@@ -110,10 +168,20 @@ async def _build_on_vercel(ctx: Ctx, files: list[dict[str, str]], version: int, 
         problem = await ctx.deployer.health(dep.url)
         if problem:
             return RunResult(40, f"The application was built but does not answer with a working database: {problem}")
-        broken = await ctx.deployer.smoke(dep.url, [r for r in (routes or []) if "[" not in r], cookie)
+        owner_pages = [r for r in (routes or []) if "[" not in r]
+        if uses_accounts(arch):          # the owner's cookie opens only the public and admin pages
+            owner_pages = [r["path"] for r in arch["routes"] if "[" not in r["path"] and access_of(r)[0] in ("public", "owner")]
+        broken = await ctx.deployer.smoke(dep.url, owner_pages, cookie)
         if broken:
             return RunResult(40, "The application was built, but these pages fail when opened (signed in as the owner):\n"
                              + "\n".join(broken) + "\nFind what throws while each page renders and fix it.")
+    if has_database(kind) and uses_accounts(arch):
+        wrong = await _access_check(ctx, dep.url, arch, cookie)
+        report["access_check"] = {"ok": not wrong, "failed": wrong}
+        if wrong:
+            return RunResult(40, "The application was built, but pages open for the wrong people or stay closed to the right "
+                             "ones (checked with a test account per role):\n" + "\n".join(f"- {w}" for w in wrong)
+                             + "\nGive each page and its server actions the requireUser(...roles) or requireAdmin() the architecture asks for.")
     if kind == "shop":
         failed = await _payment_check(ctx, dep.url)
         report["payment_check"] = {"ok": not failed, "failed": failed}
@@ -122,14 +190,27 @@ async def _build_on_vercel(ctx: Ctx, files: list[dict[str, str]], version: int, 
                              "a customer's payment would not be recorded correctly:\n" + "\n".join(f"- {f}" for f in failed)
                              + "\nFix onPaid, createCheckOrder, isPaid or removeCheckOrder in lib/payments.ts.")
     report["preview"] = {"url": dep.url, "deployment_id": dep.id, "code_version": version}
-    report["visual"] = await _visual_gate(ctx, dep.url, routes or ["/"], cookie)
+    report["visual"] = await _visual_gate(ctx, dep.url, routes or ["/"], cookie, arch)
     return RunResult(0, f"Vercel build ok: {dep.url}")
 
 
-async def _visual_gate(ctx: Ctx, url: str, routes: list[str], cookie: str) -> dict[str, Any]:
+async def _visual_gate(ctx: Ctx, url: str, routes: list[str], cookie: str, arch: dict[str, Any] | None = None) -> dict[str, Any]:
     """Look at the built pages. What is visibly broken sends the code back — but not forever: after a few
     rounds lost to looks alone the findings are kept for the engineer and stop blocking the order."""
-    seen = await visual.look(ctx, url, routes, cookie)
+    if uses_accounts(arch) and ctx.tenant_db is not None:
+        # Look at the signed-in pages as the role that can open most of them (plus the public and owner pages).
+        roles = [r["id"] for r in arch["roles"]]
+        opens = lambda role: [r["path"] for r in arch["routes"]            # noqa: E731
+                              if access_of(r)[0] in ("public", "owner", "users") or role in access_of(r)]
+        best = max(roles, key=lambda role: len(opens(role)))
+        db = await ctx.tenant_db.ensure(ctx.orch.pool, ctx.order_id, "stg")
+        users = await ctx.tenant_db.add_check_users(db, [best])
+        try:
+            seen = await visual.look(ctx, url, opens(best), cookie, user_cookie=user_cookie(db.session_secret, *users[best]))
+        finally:
+            await ctx.tenant_db.remove_check_users(db)
+    else:
+        seen = await visual.look(ctx, url, routes, cookie)
     if seen["ok"] or "skipped" in seen:
         return seen
     earlier = await ctx.orch.pool.fetch(
@@ -196,7 +277,7 @@ async def run(ctx: Ctx) -> Outcome:
     if schema_error:
         run_result = RunResult(50, schema_error)
     elif ctx.settings.sandbox == "vercel":
-        run_result = await _build_on_vercel(ctx, files, version, report, kind, [r["path"] for r in arch["routes"]], cookie)
+        run_result = await _build_on_vercel(ctx, files, version, report, kind, [r["path"] for r in arch["routes"]], cookie, arch)
     else:
         workdir = materialize(Path(ctx.settings.workspace_root) / f"order-{ctx.order_id}" / f"v{version}", files, ctx.form_endpoint, kind)
         run_result = await ctx.sandbox.run(workdir, BUILD_CMD)
@@ -222,6 +303,7 @@ async def run(ctx: Ctx) -> Outcome:
                 "Implements every route and section in the architecture",
                 "Accessible: semantic HTML, alt text on images, labels on form fields",
                 *(APP_CRITERIA if has_database(kind) else []),
+                *(ACCOUNT_CRITERIA if uses_accounts(arch) else []),
                 *(BOT_CRITERIA if kind == "bot" else []),
                 *(SHOP_CRITERIA if kind == "shop" else []),
                 *(["Installable: lib/pwa.ts exports PWA with the design's colours, app/layout.tsx renders <Pwa /> and sets "

@@ -112,6 +112,26 @@ class VercelDeployer:
                     problems.append(f"{route}: redirects to {r.headers.get('location', '?')} although the owner is signed in")
         return problems
 
+    async def smoke_access(self, url: str, cases: list[tuple[str, dict[str, str], bool, str]]) -> list[str]:
+        """Who can open what. Each case is (route, cookies, should it open, who is asking). A page that should
+        open must answer 2xx; one that should not must turn the visitor away (a redirect, 401, 403 or 404)."""
+        problems: list[str] = []
+        for route, cookies, opens, who in cases:
+            try:
+                async with httpx.AsyncClient(timeout=25, follow_redirects=False, cookies=cookies or None) as http:
+                    r = await http.get(url.rstrip("/") + route)
+            except httpx.HTTPError as e:
+                problems.append(f"{route} as {who}: no answer ({type(e).__name__})")
+                continue
+            if r.status_code >= 500:
+                problems.append(f"{route} as {who}: server error {r.status_code}")
+            elif opens and not 200 <= r.status_code < 300:
+                problems.append(f"{route} as {who}: should open but answers {r.status_code}"
+                                + (f" → {r.headers.get('location')}" if r.is_redirect else ""))
+            elif not opens and 200 <= r.status_code < 300:
+                problems.append(f"{route} as {who}: opens, although {who} must not see this page")
+        return problems
+
     async def check_payments(self, url: str, token: str) -> list[str]:
         """Have a built shop run its own payment handling against throwaway orders (app/api/tpf-check).
         Returns what failed; empty when a payment of the right amount, and only that, marks an order paid."""

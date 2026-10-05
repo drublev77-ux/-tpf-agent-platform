@@ -45,7 +45,7 @@ class Shot:
 
 def pick_routes(routes: list[str]) -> list[str]:
     """The pages worth looking at: the home page, the other public pages, then the owner's panel."""
-    plain = [r for r in dict.fromkeys(routes) if "[" not in r and r != "/admin/login" and not r.startswith("/api")]
+    plain = [r for r in dict.fromkeys(routes) if "[" not in r and r not in ("/admin/login", "/login") and not r.startswith("/api")]
     public = sorted((r for r in plain if not r.startswith("/admin")), key=lambda r: (r != "/", r.count("/"), r))
     admin = sorted((r for r in plain if r.startswith("/admin")), key=lambda r: (r != "/admin", r))
     keep_admin = admin[:2] if len(public) <= MAX_ROUTES - 2 else admin[:1]
@@ -53,7 +53,7 @@ def pick_routes(routes: list[str]) -> list[str]:
 
 
 class Screenshooter:
-    async def capture(self, url: str, routes: list[str], admin_cookie: str = "") -> list[Shot]:
+    async def capture(self, url: str, routes: list[str], admin_cookie: str = "", user_cookie: str = "") -> list[Shot]:
         try:
             from playwright.async_api import Error as PlaywrightError
             from playwright.async_api import async_playwright
@@ -69,8 +69,9 @@ class Screenshooter:
                         context = await browser.new_context(
                             viewport={"width": width, "height": height}, device_scale_factor=1,
                             is_mobile=name == "phone", has_touch=name == "phone", reduced_motion="reduce")
-                        if admin_cookie:
-                            await context.add_cookies([{"name": "tpf_admin", "value": admin_cookie, "url": base}])
+                        held = [("tpf_admin", admin_cookie), ("tpf_user", user_cookie)]
+                        if admin_cookie or user_cookie:
+                            await context.add_cookies([{"name": n, "value": v, "url": base} for n, v in held if v])
                         for route in routes:
                             shots.append(await self._shoot(context, base, route, name, cap, PlaywrightError))
                         await context.close()

@@ -132,6 +132,53 @@ class TenantDB:
         finally:
             await admin.close()
 
+    async def ensure_users_table(self, db: AppDatabase) -> None:
+        """Where an application with accounts keeps the people who sign in. The platform's own module in the
+        application (tpf/users.ts) is the only code meant to touch it; rows are never deleted, only blocked."""
+        role = db.role
+        if not re.fullmatch(r"o\d+_(stg|prod)", role):
+            raise TenantDBError("unexpected role name")
+        admin = await self._connect(self.admin_url)
+        try:
+            await admin.execute(
+                f"CREATE TABLE IF NOT EXISTS {role}.tpf_users (id SERIAL PRIMARY KEY, email TEXT NOT NULL UNIQUE, "
+                "name TEXT NOT NULL, role TEXT NOT NULL, password_hash TEXT NOT NULL, active BOOLEAN NOT NULL DEFAULT true, "
+                "session_version INTEGER NOT NULL DEFAULT 1, failed INTEGER NOT NULL DEFAULT 0, locked_until TIMESTAMPTZ, "
+                "last_login_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT now())")
+            await admin.execute(f"GRANT SELECT, INSERT, UPDATE ON {role}.tpf_users TO {role}")
+            await admin.execute(f"GRANT USAGE, SELECT ON SEQUENCE {role}.tpf_users_id_seq TO {role}")
+        finally:
+            await admin.close()
+
+    async def add_check_users(self, db: AppDatabase, roles: list[str]) -> dict[str, tuple[int, int]]:
+        """One account per role for the platform's own access check: {role: (id, session version)}. They have
+        no usable password and are removed again with remove_check_users."""
+        role = db.role
+        if not re.fullmatch(r"o\d+_(stg|prod)", role):
+            raise TenantDBError("unexpected role name")
+        admin = await self._connect(self.admin_url)
+        try:
+            out = {}
+            for r in roles:
+                row = await admin.fetchrow(
+                    f"INSERT INTO {role}.tpf_users (email, name, role, password_hash) VALUES ($1, $2, $3, '-') "
+                    "ON CONFLICT (email) DO UPDATE SET role = EXCLUDED.role, active = true RETURNING id, session_version",
+                    f"check-{r}@tpf.invalid", f"TPF check ({r})", r)
+                out[r] = (row["id"], row["session_version"])
+            return out
+        finally:
+            await admin.close()
+
+    async def remove_check_users(self, db: AppDatabase) -> None:
+        role = db.role
+        if not re.fullmatch(r"o\d+_(stg|prod)", role):
+            raise TenantDBError("unexpected role name")
+        admin = await self._connect(self.admin_url)
+        try:
+            await admin.execute(f"DELETE FROM {role}.tpf_users WHERE email LIKE 'check-%@tpf.invalid'")
+        finally:
+            await admin.close()
+
     async def ensure_payments_table(self, db: AppDatabase) -> None:
         """Where a shop notes which provider payment belongs to which order, so that the payment can be checked
         with the provider later. The shop may add rows and read them, never change or delete them."""

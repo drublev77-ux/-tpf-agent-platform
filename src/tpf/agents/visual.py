@@ -40,13 +40,13 @@ SCHEMA: dict[str, Any] = {
 }
 
 
-async def look(ctx: Ctx, url: str, routes: list[str], cookie: str = "", about: str = "") -> dict[str, Any]:
+async def look(ctx: Ctx, url: str, routes: list[str], cookie: str = "", about: str = "", user_cookie: str = "") -> dict[str, Any]:
     """What is visibly wrong with the site at `url`. Never raises: a check that could not run says so."""
     if ctx.screens is None:
         return {"ok": True, "skipped": "screenshots are not available on this worker"}
     chosen = pick_routes(routes) or ["/"]
     try:
-        shots = await ctx.screens.capture(url, chosen, cookie)
+        shots = await (ctx.screens.capture(url, chosen, cookie, user_cookie) if user_cookie else ctx.screens.capture(url, chosen, cookie))
     except ScreensUnavailable as e:
         log.warning("order %s: no screenshots: %s", ctx.order_id, e)
         return {"ok": True, "skipped": f"screenshots failed: {e}"}

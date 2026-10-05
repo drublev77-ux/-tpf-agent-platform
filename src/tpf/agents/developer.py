@@ -11,7 +11,7 @@ from tpf.llm.gateway import LLMError
 from tpf.orchestrator.states import Ev
 from tpf.tools.shop_payments_ts import PAYMENT_HOSTS
 from tpf.tools.tenantdb import check_schema_sql
-from tpf.tools.template import PWA_CONFIG_PATH, SHOP_HANDLER_PATH, installable, BOT_HANDLER_PATH, MAX_FILE_BYTES, SCHEMA_PATH, has_database, kind_of, route_to_page, rules_for, validate_path
+from tpf.tools.template import ACCOUNTS_RULES, ROLES_PATH, access_of, uses_accounts, PWA_CONFIG_PATH, SHOP_HANDLER_PATH, installable, BOT_HANDLER_PATH, MAX_FILE_BYTES, SCHEMA_PATH, has_database, kind_of, route_to_page, rules_for, validate_path
 
 SCHEMA = {
     "type": "object",
@@ -69,6 +69,37 @@ BOT_NOTE = (
     "This order is a Telegram bot: implement every command and dialog the architecture lists in lib/bot.ts, with "
     "the exact wording given, and keep each user's place in a dialog in the database. "
 )
+
+
+def check_accounts(files: list[dict[str, str]], arch: dict) -> list[str]:
+    """Static checks for an application whose people sign in."""
+    by_path = {f["path"]: f["content"] for f in files}
+    problems = []
+    roles_file = by_path.get(ROLES_PATH, "")
+    if not re.search(r"export\s+const\s+ROLES\b", roles_file):
+        problems.append(f"{ROLES_PATH} must export const ROLES: {{ id: string; name: string }}[]")
+    for role in arch.get("roles") or []:
+        if not re.search(r"""id:\s*["']""" + re.escape(role["id"]) + r"""["']""", roles_file):
+            problems.append(f"{ROLES_PATH} does not list the role '{role['id']}' from the architecture")
+    if re.search(r"\bpassword", by_path.get(SCHEMA_PATH, ""), re.I):
+        problems.append("db/schema.sql must not store passwords: accounts live in the platform's own table")
+    for route in arch.get("routes") or []:
+        page = by_path.get(route_to_page(route["path"]), "")
+        allowed = access_of(route)
+        if not page or allowed == ["public"]:
+            continue
+        guard = "requireAdmin" if allowed == ["owner"] else "requireUser"
+        if guard not in page:
+            problems.append(f"{route_to_page(route['path'])} must call {guard}() first: the page is for {', '.join(allowed)}")
+    for f in files:
+        if f["path"].endswith((".ts", ".tsx")):
+            if re.search(r"\btpf_users\b|\btpf_user\b", f["content"]):
+                problems.append(f"accounts are reached only through @/tpf/users, not directly: {f['path']}")
+            if re.search(r"""from\s+["'](node:)?crypto["']""", f["content"]) and re.search(r"scrypt|pbkdf2|createHash", f["content"]):
+                problems.append(f"passwords are hashed by the platform, not in the application: {f['path']}")
+            if "@/tpf/users" in f["content"] and f["content"].lstrip().startswith(("'use client'", '"use client"')):
+                problems.append(f"@/tpf/users is server-only and is imported in a client component: {f['path']}")
+    return problems
 
 
 def check_files(files: list[dict[str, str]], routes: list[str], kind: str = "site") -> list[str]:
@@ -159,7 +190,7 @@ async def run(ctx: Ctx) -> Outcome:
     routes = [r["path"] for r in arch["routes"]]
     kind = kind_of(spec)
     system = (SYSTEM + (APP_NOTE if has_database(kind) else "") + (BOT_NOTE if kind == "bot" else "")
-              + (SHOP_NOTE if kind == "shop" else "") + rules_for(kind) + " " + STEP_RULE + SAFETY_NOTE)
+              + (SHOP_NOTE if kind == "shop" else "") + rules_for(kind) + (ACCOUNTS_RULES if uses_accounts(arch) else "") + " " + STEP_RULE + SAFETY_NOTE)
 
     base = (
         f"Spec:\n{json.dumps(spec, ensure_ascii=False, indent=2)}\n\n"
@@ -223,7 +254,7 @@ async def run(ctx: Ctx) -> Outcome:
                 "files": [{"path": p, "content": c} for p, c in files.items()]}, "developer")
             continue
         result = [{"path": p, "content": c} for p, c in files.items()]
-        problems = check_files(result, routes, kind)
+        problems = check_files(result, routes, kind) + (check_accounts(result, arch) if uses_accounts(arch) else [])
         if not problems:
             await ctx.orch.save_artifact(ctx.order_id, "code", {"files": result}, "developer")
             await ctx.orch.log(ctx.order_id, "code_written", "developer",

@@ -224,6 +224,233 @@ export async function GET() {
 }
 '''
 
+# --- applications with user accounts: people the owner adds sign in with e-mail and password, each with a role.
+# Everything security-sensitive (password hashing, sessions, lockout, the owner check) lives in this file; the
+# generated code only renders forms and calls it. ---
+
+APP_USERS = '''import "server-only";
+import { createHmac, randomBytes, scrypt, timingSafeEqual } from "crypto";
+import { cache } from "react";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { ROLES } from "@/lib/roles";
+import { isAdmin } from "@/tpf/auth";
+import { sql } from "@/tpf/db";
+
+export type User = { id: number; email: string; name: string; role: string };
+export type ManagedUser = User & { active: boolean; createdAt: Date; lastLoginAt: Date | null };
+
+const COOKIE = "tpf_user";
+const TTL_SEC = 60 * 60 * 24 * 30;
+const MAX_FAILED = 8;                      // wrong passwords in a row before the account rests for 15 minutes
+const NO_SALT = Buffer.alloc(16);
+
+function secret(): string {
+  const s = process.env.SESSION_SECRET;
+  if (!s) throw new Error("SESSION_SECRET is not set");
+  return s;
+}
+
+function sign(id: number, exp: number, version: number): string {
+  return createHmac("sha256", secret()).update(`user:${id}:${exp}:${version}`).digest("hex");
+}
+
+function same(a: string, b: string): boolean {
+  const x = Buffer.from(a), y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
+function derive(password: string, salt: Buffer): Promise<Buffer> {
+  return new Promise((resolve, reject) =>
+    scrypt(password.normalize("NFKC"), salt, 64, { N: 16384, r: 8, p: 1 }, (e, key) => (e ? reject(e) : resolve(key))));
+}
+
+async function makeHash(password: string): Promise<string> {
+  const salt = randomBytes(16);
+  return `scrypt$${salt.toString("base64")}$${(await derive(password, salt)).toString("base64")}`;
+}
+
+async function matches(password: string, stored: string): Promise<boolean> {
+  const [kind, salt, hash] = stored.split("$");
+  if (kind !== "scrypt" || !salt || !hash) {
+    await derive(password, NO_SALT);       // spend the same time whether or not the account exists
+    return false;
+  }
+  const want = Buffer.from(hash, "base64"), got = await derive(password, Buffer.from(salt, "base64"));
+  return got.length === want.length && timingSafeEqual(got, want);
+}
+
+function newPassword(): string {
+  const letters = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return Array.from(randomBytes(12), (b) => letters[b % letters.length]).join("");
+}
+
+function knownRole(role: string): boolean {
+  return ROLES.some((r) => r.id === role);
+}
+
+async function startSession(id: number, version: number): Promise<void> {
+  const exp = Math.floor(Date.now() / 1000) + TTL_SEC;
+  (await cookies()).set(COOKIE, `${id}.${exp}.${version}.${sign(id, exp, version)}`,
+    { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: TTL_SEC });
+}
+
+/** The signed-in user, or null. Safe to call many times in one request. */
+export const currentUser = cache(async (): Promise<User | null> => {
+  const [idText, expText, versionText, signature] = ((await cookies()).get(COOKIE)?.value ?? "").split(".");
+  const id = Number(idText), exp = Number(expText), version = Number(versionText);
+  if (!Number.isInteger(id) || !Number.isInteger(version) || !Number.isFinite(exp) || exp < Date.now() / 1000) return null;
+  if (!signature || !same(signature, sign(id, exp, version))) return null;
+  const rows = await sql<User[]>`select id, email, name, role from tpf_users
+    where id = ${id} and active and session_version = ${version}`;
+  return rows[0] && knownRole(rows[0].role) ? rows[0] : null;
+});
+
+/** First line of every page, route handler and server action for signed-in people. With roles given, only
+ *  those roles pass. Sends everyone else to /login (not signed in) or / (signed in, wrong role). */
+export async function requireUser(...roles: string[]): Promise<User> {
+  const user = await currentUser();
+  if (!user) redirect("/login");
+  if (roles.length > 0 && !roles.includes(user.role)) redirect("/");
+  return user;
+}
+
+/** Check e-mail and password and start a session. Use only in a server action or route handler. */
+export async function signInUser(email: string, password: string): Promise<"ok" | "wrong" | "locked"> {
+  const address = email.trim().toLowerCase().slice(0, 200);
+  const rows = await sql<{ id: number; password_hash: string; active: boolean; session_version: number; locked: boolean }[]>`
+    select id, password_hash, active, session_version, coalesce(locked_until > now(), false) as locked
+    from tpf_users where email = ${address}`;
+  const found = rows[0];
+  if (!found) {
+    await matches(password, "");
+    return "wrong";
+  }
+  if (found.locked) return "locked";
+  if (!found.active || !(await matches(password.slice(0, 200), found.password_hash))) {
+    await sql`update tpf_users set
+      locked_until = case when failed + 1 >= ${MAX_FAILED} then now() + interval '15 minutes' else null end,
+      failed = case when failed + 1 >= ${MAX_FAILED} then 0 else failed + 1 end where id = ${found.id}`;
+    return "wrong";
+  }
+  await sql`update tpf_users set failed = 0, locked_until = null, last_login_at = now() where id = ${found.id}`;
+  await startSession(found.id, found.session_version);
+  return "ok";
+}
+
+/** End the user's session. Use only in a server action or route handler. */
+export async function signOutUser(): Promise<void> {
+  (await cookies()).delete(COOKIE);
+}
+
+/** The signed-in user changes their own password (8 to 200 characters). Other devices are signed out. */
+export async function changeOwnPassword(current: string, next: string): Promise<"ok" | "wrong" | "weak" | "signed-out"> {
+  const user = await currentUser();
+  if (!user) return "signed-out";
+  if (next.length < 8 || next.length > 200) return "weak";
+  const rows = await sql<{ password_hash: string }[]>`select password_hash from tpf_users where id = ${user.id}`;
+  if (!rows[0] || !(await matches(current.slice(0, 200), rows[0].password_hash))) return "wrong";
+  const updated = await sql<{ session_version: number }[]>`update tpf_users
+    set password_hash = ${await makeHash(next)}, session_version = session_version + 1 where id = ${user.id}
+    returning session_version`;
+  await startSession(user.id, updated[0].session_version);
+  return "ok";
+}
+
+/** Names and roles of the active users, for showing who a record belongs to. Any signed-in user or the owner. */
+export async function directory(): Promise<{ id: number; name: string; role: string }[]> {
+  if (!(await currentUser()) && !(await isAdmin())) return [];
+  return sql<{ id: number; name: string; role: string }[]>`select id, name, role from tpf_users where active order by name`;
+}
+
+/** The display name of a role id from lib/roles.ts. */
+export function roleName(role: string): string {
+  return ROLES.find((r) => r.id === role)?.name ?? role;
+}
+
+// --- the owner manages the accounts from the admin area; each of these checks the owner's session itself ---
+
+async function ownerOnly(): Promise<void> {
+  if (!(await isAdmin())) throw new Error("owner session required");
+}
+
+export async function listUsers(): Promise<ManagedUser[]> {
+  await ownerOnly();
+  return sql<ManagedUser[]>`select id, email, name, role, active, created_at as "createdAt", last_login_at as "lastLoginAt"
+    from tpf_users order by active desc, name`;
+}
+
+/** Add an account. The password is made here and returned once: show it to the owner to pass on. */
+export async function createUser(input: { email: string; name: string; role: string }):
+    Promise<{ ok: true; id: number; password: string } | { ok: false; error: "email" | "name" | "role" | "exists" }> {
+  await ownerOnly();
+  const email = input.email.trim().toLowerCase(), name = input.name.trim();
+  if (email.length > 200 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return { ok: false, error: "email" };
+  if (name.length < 1 || name.length > 100) return { ok: false, error: "name" };
+  if (!knownRole(input.role)) return { ok: false, error: "role" };
+  const password = newPassword();
+  const rows = await sql<{ id: number }[]>`insert into tpf_users (email, name, role, password_hash)
+    values (${email}, ${name}, ${input.role}, ${await makeHash(password)}) on conflict (email) do nothing returning id`;
+  return rows[0] ? { ok: true, id: rows[0].id, password } : { ok: false, error: "exists" };
+}
+
+/** Change a user's name, role or whether they may sign in. A change of role or access signs them out. */
+export async function updateUser(id: number, change: { name?: string; role?: string; active?: boolean }):
+    Promise<{ ok: true } | { ok: false; error: "name" | "role" | "missing" }> {
+  await ownerOnly();
+  const name = change.name?.trim();
+  if (name !== undefined && (name.length < 1 || name.length > 100)) return { ok: false, error: "name" };
+  if (change.role !== undefined && !knownRole(change.role)) return { ok: false, error: "role" };
+  const rows = await sql<{ id: number }[]>`update tpf_users set
+      name = coalesce(${name ?? null}, name),
+      role = coalesce(${change.role ?? null}, role),
+      active = coalesce(${change.active ?? null}, active),
+      session_version = session_version + ${change.role !== undefined || change.active !== undefined ? 1 : 0}
+    where id = ${id} returning id`;
+  return rows[0] ? { ok: true } : { ok: false, error: "missing" };
+}
+
+/** Give a user a new password (returned once) and sign them out everywhere. */
+export async function resetUserPassword(id: number): Promise<{ ok: true; password: string } | { ok: false }> {
+  await ownerOnly();
+  const password = newPassword();
+  const rows = await sql<{ id: number }[]>`update tpf_users set password_hash = ${await makeHash(password)},
+      session_version = session_version + 1, failed = 0, locked_until = null where id = ${id} returning id`;
+  return rows[0] ? { ok: true, password } : { ok: false };
+}
+'''
+
+USERS_PATH = "tpf/users.ts"
+ROLES_PATH = "lib/roles.ts"
+
+ACCOUNTS_RULES = (
+    "USER ACCOUNTS: this application has people who sign in, each with one role from the architecture's roles. "
+    "lib/roles.ts exports `export const ROLES: { id: string; name: string }[]` with exactly those roles (ids as in "
+    "the architecture, names in the site's language). Accounts, passwords and sessions belong to the platform: "
+    "`import { currentUser, requireUser, signInUser, signOutUser, changeOwnPassword, directory, roleName, listUsers, "
+    "createUser, updateUser, resetUserPassword, type User, type ManagedUser } from '@/tpf/users'`. "
+    "`const user = await requireUser()` (any signed-in user) or `await requireUser('manager', 'foreman')` (only "
+    "those roles) is the first line of every page, route handler and server action that is not public — a server "
+    "action checks it again itself, the page's check does not cover it. A user is `{ id, email, name, role }`. "
+    "/login has an e-mail and password form whose server action calls `signInUser(email, password)`: 'ok' → "
+    "redirect to the user's start page, 'wrong' → one message that does not say which of the two was wrong, "
+    "'locked' → 'too many attempts, try again in 15 minutes'. A sign-out button calls `signOutUser()`. /account "
+    "shows the user's name, e-mail and role and a change-password form calling `changeOwnPassword(current, next)` "
+    "('ok', 'wrong', 'weak' = under 8 characters). There is no self-registration and no password reset by e-mail: "
+    "the owner adds people at /admin/users (behind requireAdmin) with `listUsers()`, `createUser({ email, name, "
+    "role })` — it returns `{ ok: true, password }`: show that password once on the page for the owner to pass on, "
+    "never store or log it — `updateUser(id, { name, role, active })` to rename, change role or block, and "
+    "`resetUserPassword(id)` which again returns a password to show once. The owner (the /admin password) is not a "
+    "user: /admin pages keep using requireAdmin, user pages use requireUser, and neither opens the other. "
+    "In your own tables refer to a person by `user_id INTEGER NOT NULL` (the id from currentUser; no foreign key, "
+    "and never query tpf_users yourself); to show names use `directory()`, which returns `{ id, name, role }` of "
+    "the active users. DATA BELONGS TO SOMEONE: every query run for a signed-in user is narrowed by what that role "
+    "may see — a worker's own tasks by `user_id = ${user.id}`, a manager's by nothing — and every action that "
+    "changes a record first checks that this user may change that record; an id from the browser is never trusted "
+    "by itself. Do not write password fields into db/schema.sql, do not hash or compare passwords, do not read or "
+    "set the tpf_user cookie. "
+)
+
 # --- Telegram bots: an application whose main interface is a chat; Telegram calls the webhook below ---
 
 BOT_TELEGRAM = '''import "server-only";
@@ -649,9 +876,10 @@ PWA_FILES = ("public/sw.js", "public/offline.html", "tpf/Pwa.tsx", "app/manifest
 def _for_code(platform: dict[str, str], files: list[dict[str, str]]) -> dict[str, str]:
     """Platform files that fit this code: an application written before applications became installable has
     no lib/pwa.ts, and the manifest that imports it would break its build."""
-    if PWA_CONFIG_PATH in {f["path"] for f in files}:
-        return platform
-    return {p: c for p, c in platform.items() if p not in PWA_FILES}
+    paths = {f["path"] for f in files}
+    # The accounts helper imports the application's lib/roles.ts: it ships only with code that has one.
+    skip = (() if PWA_CONFIG_PATH in paths else PWA_FILES) + (() if ROLES_PATH in paths else (USERS_PATH,))
+    return {p: c for p, c in platform.items() if p not in skip}
 
 
 def platform_files(form_endpoint: str = "", kind: str = "site") -> dict[str, str]:
@@ -665,6 +893,7 @@ def platform_files(form_endpoint: str = "", kind: str = "site") -> dict[str, str
         files |= {
             "package.json": APP_PACKAGE, "next.config.mjs": APP_NEXT_CONFIG,
             "tpf/db.ts": APP_DB, "tpf/auth.ts": APP_AUTH, "tpf/notify.ts": APP_NOTIFY, HEALTH_PATH: APP_HEALTH,
+            USERS_PATH: APP_USERS,
             "vercel.json": '{ "regions": ["fra1"] }\n',   # next to the database, not across an ocean from it
             ".env.example": "DATABASE_URL=postgres://user:password@host:6543/postgres\nSESSION_SECRET=\nADMIN_PASSWORD=\n",
         }
@@ -712,6 +941,22 @@ def kind_of(spec: dict | None) -> str:
     with a database and admin area) or 'shop' (an application that sells and takes card payments)."""
     kind = (spec or {}).get("product_type")
     return kind if kind in ("app", "bot", "shop") else "site"
+
+
+def uses_accounts(arch: dict | None) -> bool:
+    """True when the architecture gives the application people who sign in, each with a role."""
+    return bool((arch or {}).get("roles"))
+
+
+def access_of(route: dict) -> list[str]:
+    """Who may open a route: ['public'], ['owner'], ['users'] (anyone signed in) or the role ids."""
+    path = route.get("path", "")
+    raw = [a.strip() for a in str(route.get("access") or "").split(",") if a.strip()]
+    if path == "/admin/login" or path == "/login":
+        return ["public"]
+    if path == "/admin" or path.startswith("/admin/"):
+        return ["owner"]
+    return raw or ["public"]
 
 
 def has_database(kind: str) -> bool:

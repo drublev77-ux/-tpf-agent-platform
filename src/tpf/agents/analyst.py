@@ -46,6 +46,15 @@ SCHEMA = {
                     "required": ["name", "purpose", "sections"],
                 }},
                 "features": {"type": "array", "items": {"type": "string"}},
+                "user_roles": {
+                    "type": "array",
+                    "description": "Only for an 'app' in which people other than the owner sign in: every kind of user.",
+                    "items": {"type": "object", "properties": {
+                        "name": {"type": "string"},
+                        "sees": {"type": "string", "description": "Which records this role sees: everything, or only its own"},
+                        "can": {"type": "string", "description": "What this role may add, change and delete"}},
+                        "required": ["name", "sees", "can"]},
+                },
                 "languages": {"type": "array", "items": {"type": "string"}},
                 "assumptions": {"type": "array", "items": {"type": "string"}},
                 "client_content": {
@@ -94,8 +103,15 @@ SCOPE_APP = (
     "awaiting moderation) or show data from it (a catalogue, a schedule, a price list, news), plus an admin area "
     "under /admin where the owner, signed in with one password, views and edits that data (lists, statuses, "
     "create, edit, delete). Choose 'app' only when the client needs data to be saved, managed or changed without "
-    "a developer; otherwise choose 'site', which is cheaper and faster. An application has no visitor accounts "
-    "or registration, no online payments, no file or photo uploads (images are fixed files or links), no e-mail "
+    "a developer; otherwise choose 'site', which is cheaper and faster. "
+    "An application can also have people who sign in — staff, members, clients — each with a role (for example "
+    "worker, foreman, manager): a login page with e-mail and password, pages and actions that depend on the role, "
+    "and records that belong to a person (my tasks, my hours, my requests). The owner adds these people in the "
+    "admin area, sets their role, blocks them and gives them a password to pass on; a person can change their own "
+    "password. When the client needs this, list every role in user_roles with what it sees and what it may do, "
+    "and describe each page per role. There is no self-registration, no password reset by e-mail and no sign-in "
+    "through Google or other services: say so in assumptions. Without user_roles an application has no accounts "
+    "besides the owner. An application has no online payments, no chat or messaging between people, no file or photo uploads (images are fixed files or links), no e-mail "
     "or SMS sending apart from the contact form, no integrations with outside services, no scheduled jobs and no "
     "mobile app. In the spec of an application, list the admin area as a page, and state for every kind of record "
     "which fields it has, who creates it (visitor or owner) and what the owner can do with it. "
@@ -170,7 +186,7 @@ def system_prompt(apps_enabled: bool) -> str:
 
 REVIEW_CRITERIA = [
     "Every page has a purpose and concrete sections; nothing essential from the client's request is missing",
-    "The spec fits what the studio builds: a static website (product_type 'site', its only dynamic feature a contact form), a web application (product_type 'app') with a database and an owner-only admin area, a rule-based Telegram bot (product_type 'bot') with a database and a web admin area, or an online shop (product_type 'shop') with card payments through the owner's Stripe account; no visitor accounts, uploads or integrations, and no payments outside a shop",
+    "The spec fits what the studio builds: a static website (product_type 'site', its only dynamic feature a contact form), a web application (product_type 'app') with a database and an owner-only admin area, a rule-based Telegram bot (product_type 'bot') with a database and a web admin area, or an online shop (product_type 'shop') with card payments through the owner's own payment provider account; no self-registration of visitors, chat, uploads or integrations, and no payments outside a shop; people sign in only in an 'app' whose user_roles lists every role with what it sees and may do",
     "product_type is 'app' only if the client needs data stored or managed and 'bot' only if the client asked for a Telegram bot and 'shop' only if the client sells online; for an app or a bot, every kind of record has its fields and the owner's actions on it described; for a bot, every command and dialog is described step by step",
     "Acceptance criteria are specific and checkable by looking at the site or by talking to the bot",
     "Assumptions are stated where the client did not decide",

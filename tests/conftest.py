@@ -95,6 +95,10 @@ class FakeDeployer:
         self.smoked.append((url, list(routes), bool(admin_cookie)))
         return self.smoke_problems.pop(0) if self.smoke_problems else []
 
+    async def smoke_access(self, url, cases):
+        self.access_cases = list(cases)
+        return self.access_problems.pop(0) if getattr(self, "access_problems", None) else []
+
     async def check_payments(self, url, token):
         self.payment_checks.append((url, token))
         return self.payment_problems.pop(0) if self.payment_problems else []

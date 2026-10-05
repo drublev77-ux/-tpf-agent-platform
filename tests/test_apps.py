@@ -750,3 +750,106 @@ def test_shop_code_must_export_the_check_functions():
     files = {f["path"]: f["content"] for f in all_files(SHOP_FILES, "x", "shop")}
     assert "check_token" in files["app/api/tpf-check/route.ts"] and "__tpfMuteNotify" in files["tpf/notify.ts"]
     assert "app/api/tpf-check/route.ts" not in {f["path"] for f in all_files(APP_CODE["files"], "x", "app")}
+
+
+# --- applications whose people sign in, each with a role -------------------------------------------
+
+ROLES = [{"id": "worker", "name": "Рабочий", "sees": "own tasks", "can": "tick tasks"},
+         {"id": "manager", "name": "Менеджер", "sees": "everything", "can": "everything"}]
+ACC_SPEC = APP_SPEC | {"user_roles": [{"name": r["name"], "sees": r["sees"], "can": r["can"]} for r in ROLES]}
+_route = lambda path, access: {"path": path, "title": path, "purpose": "x", "sections": ["x"], "access": access}   # noqa: E731
+ACC_ARCH = ARCH | {"roles": ROLES, "routes": [
+    _route("/", "public"), _route("/login", "public"), _route("/account", "users"), _route("/tasks", "worker, manager"),
+    _route("/manage", "manager"), _route("/admin", "owner"), _route("/admin/login", "public"), _route("/admin/users", "owner")]}
+_page = lambda guard: f"import {{ x }} from '@/tpf/y';\nexport default async function P(){{ {guard}; return <main/> }}"   # noqa: E731
+ACC_CODE = {"files": [f for f in APP_CODE["files"] if not f["path"].startswith("app/admin")] + [
+    {"path": "lib/roles.ts", "content": 'export const ROLES: { id: string; name: string }[] = [{ id: "worker", name: "Рабочий" }, { id: "manager", name: "Менеджер" }];'},
+    {"path": "app/login/page.tsx", "content": PAGE}, {"path": "app/admin/login/page.tsx", "content": PAGE},
+    {"path": "app/account/page.tsx", "content": _page("await requireUser()")},
+    {"path": "app/tasks/page.tsx", "content": _page("await requireUser('worker', 'manager')")},
+    {"path": "app/manage/page.tsx", "content": _page("await requireUser('manager')")},
+    {"path": "app/admin/page.tsx", "content": _page("await requireAdmin()")},
+    {"path": "app/admin/users/page.tsx", "content": _page("await requireAdmin()")}], "notes": "accounts"}
+
+
+def test_architecture_with_accounts_must_say_who_opens_what():
+    from tpf.agents.architect import access_problems
+
+    assert access_problems(ACC_ARCH) == []
+    broken = ACC_ARCH | {"routes": [r for r in ACC_ARCH["routes"] if r["path"] != "/account"]
+                         + [_route("/reports", "boss"), _route("/admin/extra", "manager"), _route("/open", "")]}
+    text = " | ".join(access_problems(broken))
+    assert "/account is missing" in text and "/reports" in text and "/admin/extra" in text and "/open has no access" in text
+    assert "roles is empty" in " ".join(access_problems(ACC_ARCH | {"roles": []}))
+
+
+def test_code_with_accounts_is_checked_before_qa():
+    from tpf.agents.developer import check_accounts
+
+    assert check_accounts(ACC_CODE["files"], ACC_ARCH) == []
+    files = [f for f in ACC_CODE["files"] if f["path"] not in ("app/manage/page.tsx", "lib/roles.ts")] + [
+        {"path": "lib/roles.ts", "content": 'export const ROLES = [{ id: "worker", name: "Рабочий" }];'},
+        {"path": "app/manage/page.tsx", "content": PAGE},
+        {"path": "lib/auth.ts", "content": "import { scrypt } from 'crypto';\nconst q = sql`select * from tpf_users`;"},
+        {"path": "db/schema.sql", "content": SCHEMA_SQL + "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS password TEXT;"}]
+    text = " | ".join(check_accounts(files, ACC_ARCH))
+    assert "does not list the role 'manager'" in text and "app/manage/page.tsx must call requireUser" in text
+    assert "only through @/tpf/users" in text and "hashed by the platform" in text and "must not store passwords" in text
+
+
+def test_every_page_is_tried_as_a_stranger_and_as_each_role():
+    from tpf.agents.qa import access_cases
+
+    cookies = {"worker": {"tpf_user": "w"}, "manager": {"tpf_user": "m"}}
+    cases = access_cases(ACC_ARCH["routes"], ["worker", "manager"], cookies)
+    got = {(route, who): opens for route, _c, opens, who in cases}
+    assert got[("/manage", "role worker")] is False and got[("/manage", "role manager")] is True
+    assert got[("/tasks", "role worker")] is True and got[("/account", "a visitor who is not signed in")] is False
+    assert got[("/admin/users", "role manager")] is False and not any(route in ("/", "/login", "/admin/login") for route, _ in got)
+
+
+async def test_application_with_accounts_gets_a_users_table_and_an_access_check(app_env):
+    env = app_env
+    env.settings.sandbox = "vercel"
+    for agent in ("analyst", "architect", "developer"):
+        env.llm.script[agent].clear()
+    env.llm.queue("analyst", {"in_pilot_scope": True, "questions": [], "spec": ACC_SPEC,
+                              "estimate": {"items": [{"name": "Build", "hours": 40}], "duration_days": 10}})
+    env.llm.queue("architect", ACC_ARCH)
+    env.llm.queue("developer", ACC_CODE, ACC_CODE)
+    env.deployer.access_problems = [["/manage as role worker: opens, although role worker must not see this page"]]
+    oid = await new_app_order(env)
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    assert State((await env.orch.get_order(oid))["state"]) is State.AWAITING_ACCEPTANCE
+    reports = [r["content"] for r in await env.pool.fetch(
+        "SELECT content FROM artifacts WHERE order_id=$1 AND kind='qa_report' ORDER BY version", oid)]
+    assert not reports[0]["passed"] and "role worker" in reports[0]["build"]["log_tail"]       # went back to the developer
+    assert reports[-1]["passed"] and reports[-1]["access_check"] == {"ok": True, "failed": []}
+    assert len(env.deployer.access_cases) == 15
+    # the owner's smoke test opened only public and admin pages
+    assert set(env.deployer.smoked[-1][1]) == {"/", "/login", "/admin", "/admin/login", "/admin/users"}
+
+    stg = env.deployer.env[f"tpf-order-{oid}-preview"]
+    conn = await asyncpg.connect(stg["DATABASE_URL"])
+    assert await conn.fetchval("SELECT count(*) FROM tpf_users") == 0            # the check's accounts are gone
+    await conn.execute("INSERT INTO tpf_users (email, name, role, password_hash) VALUES ('a@b.co', 'A', 'worker', 'x')")
+    with pytest.raises(asyncpg.PostgresError):
+        await conn.execute("DELETE FROM tpf_users")                              # people are blocked, never deleted
+    await conn.close()
+    # the deployed project carries the platform's accounts module
+    assert env.deployer.deploys[-1][2] == len(all_files(ACC_CODE["files"], "x", "app"))
+    assert "tpf/users.ts" in {f["path"] for f in all_files(ACC_CODE["files"], "x", "app")}
+    assert "tpf/users.ts" not in {f["path"] for f in all_files(APP_CODE["files"], "x", "app")}
+
+
+async def test_architect_drops_roles_when_the_spec_has_no_accounts(app_env):
+    env = app_env
+    env.llm.script["architect"].clear()
+    env.llm.queue("architect", APP_ARCH | {"roles": ROLES})
+    oid = await new_app_order(env)
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    assert "roles" not in await env.orch.latest_artifact(oid, "architecture")
