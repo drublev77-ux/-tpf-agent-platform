@@ -314,7 +314,7 @@ async def run(ctx: Ctx) -> Outcome:
     # Gate 4: acceptance criteria, judged by the reviewer model (only if it builds: no point otherwise).
     if report["build"]["ok"] and report["routes"]["ok"]:
         verdict = await review(
-            ctx, author="developer", artifact_name="site code",
+            ctx, author="developer", artifact_name="site code", graded=True,
             artifact=_code_digest(files),
             criteria=[
                 *spec.get("acceptance_criteria", []),
@@ -338,7 +338,8 @@ async def run(ctx: Ctx) -> Outcome:
                      f"Spec missing_content (must be placeholders):\n"
                      f"{json.dumps(spec.get('missing_content', []), ensure_ascii=False)}"),
         )
-        report["acceptance"] = {"ok": verdict["approved"], "issues": verdict["issues"]}
+        # minor findings ride along: the developer fixes them when a round is needed anyway, and never one for them alone
+        report["acceptance"] = {"ok": verdict["approved"], "issues": verdict["issues"], "minor": verdict["minor"]}
     else:
         report["acceptance"] = {"ok": False, "issues": ["skipped: fix build and routes first"]}
 

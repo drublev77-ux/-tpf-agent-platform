@@ -958,3 +958,17 @@ async def test_a_fix_that_takes_several_steps_keeps_the_report_in_front_of_the_d
     for prompt in asked[1:]:                       # the second step of the fix used to be asked blind
         assert "FAILED checks" in prompt and "role worker must not see this page" in prompt
     assert "Continue: write the next files" in asked[2]
+
+
+async def test_minor_findings_do_not_cost_a_round_of_fixes(app_env):
+    env = app_env
+    env.llm.queue("reviewer", {"approved": True, "issues": []}, {"approved": True, "issues": []},     # spec, architecture
+                  {"issues": [], "minor": ["the status select has no label"]})                        # the finished code
+    oid = await new_app_order(env)
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    assert State((await env.orch.get_order(oid))["state"]) is State.AWAITING_ACCEPTANCE
+    report = await env.orch.latest_artifact(oid, "qa_report")
+    assert report["passed"] and report["acceptance"] == {"ok": True, "issues": [], "minor": ["the status select has no label"]}
+    assert env.llm.calls.count("developer") == 1
