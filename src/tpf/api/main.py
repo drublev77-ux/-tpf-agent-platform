@@ -367,7 +367,8 @@ async def case_zerno() -> FileResponse:
 
 SITE_ASSETS = {"apple-touch-icon.png": "image/png", "apple-touch-icon-precomposed.png": "image/png", "icon-192.png": "image/png",
                "icon-512.png": "image/png", "favicon.png": "image/png", "favicon.ico": "image/png",
-               "manifest.webmanifest": "application/manifest+json", "case-gge.jpg": "image/jpeg"}
+               "manifest.webmanifest": "application/manifest+json", "case-gge.jpg": "image/jpeg",
+               "demo-mug-1.jpg": "image/jpeg", "demo-mug-2.jpg": "image/jpeg", "demo-plate-1.jpg": "image/jpeg", "demo-plate-2.jpg": "image/jpeg", "demo-vase-1.jpg": "image/jpeg", "demo-vase-2.jpg": "image/jpeg"}
 SITE_ALIASES = {"apple-touch-icon-precomposed.png": "apple-touch-icon.png", "favicon.ico": "favicon.png"}
 
 
