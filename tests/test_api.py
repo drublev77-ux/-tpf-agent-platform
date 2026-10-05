@@ -144,3 +144,103 @@ def test_operator_redeploys_only_a_delivered_order(client):
     task = client.portal.call(pool.fetchrow, "SELECT kind, payload, status FROM tasks WHERE id=$1", r.json()["task"])
     assert dict(task) == {"kind": "redeploy_production", "payload": {"note": "template fix"}, "status": "queued"}
     assert client.post(f"/admin/orders/{oid}/redeploy", json={}, headers=admin).status_code == 409    # one at a time
+
+
+# --- an order that comes with a video ----------------------------------------------------------------
+
+def _upload(client, data: bytes, name="task.mp4"):
+    from tpf.api import uploads
+    up = client.post("/uploads", json={"size": len(data), "filename": name})
+    assert up.status_code == 201, up.text
+    u = up.json()
+    for n in range(u["chunks"]):
+        r = client.put(f"/uploads/{u['id']}/chunks/{n}", content=data[n * uploads.CHUNK:(n + 1) * uploads.CHUNK],
+                       headers={"x-upload-token": u["token"]})
+        assert r.status_code == 200, r.text
+    return u, r.json()
+
+
+def test_video_upload_arrives_in_pieces_and_is_guarded(client, monkeypatch):
+    from tpf.api import uploads
+    monkeypatch.setattr(uploads, "CHUNK", 1000)
+    assert client.post("/uploads", json={"size": 10, "filename": "notes.exe"}).status_code == 415
+    assert client.post("/uploads", json={"size": uploads.MAX_SIZE + 1, "filename": "a.mp4"}).status_code == 422
+    data = bytes(range(256)) * 10 + b"tail"                      # 2564 bytes: three pieces
+    u = client.post("/uploads", json={"size": len(data), "filename": "a.MOV"}).json()
+    assert u["chunks"] == 3
+    put = lambda n, body, token=u["token"]: client.put(f"/uploads/{u['id']}/chunks/{n}", content=body, headers={"x-upload-token": token})  # noqa: E731
+    assert put(0, data[:1000], "wrong").status_code == 404
+    assert put(0, data[:999]).status_code == 400 and put(5, b"x").status_code == 409
+    assert put(0, data[:1000]).json() == {"received": 1000, "complete": False}
+    assert put(0, data[:1000]).json()["received"] == 1000        # a repeated piece changes nothing
+    assert put(2, data[2000:]).json()["complete"] is False
+    order = {"client_name": "Анна", "client_email": "anna@example.com", "request_text": "[Сайт] Описание — в видео."}
+    assert client.post("/orders", json=order | {"video": {"id": u["id"], "token": u["token"]}}).status_code == 422   # not finished
+    assert put(1, data[1000:2000]).json() == {"received": len(data), "complete": True}
+    assert put(1, data[1000:2000]).status_code == 409            # nothing more is accepted
+    assert client.post("/orders", json=order | {"video": {"id": u["id"], "token": "wrong"}}).status_code == 422
+    for _ in range(uploads.PER_IP_HOUR - 1):
+        assert client.post("/uploads", json={"size": 5, "filename": "b.mp4"}).status_code == 201
+    assert client.post("/uploads", json={"size": 5, "filename": "b.mp4"}).status_code == 429
+
+
+def test_order_with_a_video_waits_for_it_then_reaches_the_analyst(client, monkeypatch):
+    import asyncio
+
+    from tpf.agents import video as video_agent
+    from tpf.agents.base import Ctx
+    from tpf.api.main import app
+    from tpf.tools import video as video_tool
+
+    data = b"not really a video" * 50
+    u, last = _upload(client, data)
+    assert last["complete"]
+    r = client.post("/orders", json={"client_name": "Анна", "client_email": "anna@example.com", "language": "ru",
+                                     "request_text": "[Сайт] Описание — в приложенном видео.",
+                                     "video": {"id": u["id"], "token": u["token"]}})
+    assert r.status_code == 201 and r.json()["order"]["state"] == "new"          # the analyst has not started
+    oid = r.json()["order"]["id"]
+    orch = app.state.orch
+    call = client.portal.call
+    task = call(orch.pool.fetchrow, "SELECT kind, payload FROM tasks WHERE order_id=$1", oid)
+    assert task["kind"] == "understand_video" and task["payload"] == {"upload_id": u["id"]}
+    # the same upload cannot be attached to a second order
+    assert client.post("/orders", json={"client_name": "X", "client_email": "x@example.com", "request_text": "0123456789",
+                                        "video": {"id": u["id"], "token": u["token"]}}).status_code == 422
+
+    seen: dict = {}
+
+    async def fake_watch(path, workdir, language=None):
+        seen["bytes"] = path.read_bytes()
+        return video_tool.Watched(42.0, frames=[(1.3, b"\xff\xd8a"), (65.0, b"\xff\xd8b")], speech="Нужен сайт для салона красоты с записью")
+    monkeypatch.setattr(video_tool, "watch", fake_watch)
+
+    class LLM:
+        async def structured(self, **kw):
+            seen["llm"] = kw
+            return {"summary": "Клиентка просит сайт салона красоты с онлайн-записью.", "shown": "Сайт-пример beauty.example",
+                    "details": ["Запись на стрижку", "Телефон +375 29 000-00-00"], "unclear": ["Нужна ли оплата онлайн"]}
+
+    async def go():
+        order = await orch.get_order(oid)
+        ctx = Ctx(orch, LLM(), orch.settings, None, None, None, order, payload={"upload_id": u["id"]})
+        return await video_agent.run(ctx)
+    outcome = call(lambda: go())
+    assert seen["bytes"] == data and outcome.event == "intake_accepted" and outcome.data == {"video": "processed"}
+    assert [i["label"] for i in seen["llm"]["images"]] == ["Frame at 0:01", "Frame at 1:05"]
+    assert "салона красоты с записью" in seen["llm"]["prompt"]
+    msgs = call(orch.pool.fetch, "SELECT direction, text FROM messages WHERE order_id=$1 ORDER BY id", oid)
+    text = msgs[-1]["text"]
+    assert msgs[-1]["direction"] == "in" and text.startswith("[Содержание вашего видео") and "Запись на стрижку" in text
+    assert "Осталось неясным" in text and "«Нужен сайт для салона" in text
+    assert call(orch.pool.fetchval, "SELECT count(*) FROM video_chunks WHERE upload_id=$1", u["id"]) == 0     # the file is gone
+    assert call(orch.pool.fetchval, "SELECT status FROM video_uploads WHERE id=$1", u["id"]) == "processed"
+
+    # an unreadable video does not strand the order
+    async def broken(path, workdir, language=None):
+        raise video_tool.VideoError("not a video")
+    monkeypatch.setattr(video_tool, "watch", broken)
+    outcome = call(lambda: go())
+    assert outcome.event == "intake_accepted" and outcome.data == {"video": "failed"}
+    last = call(orch.pool.fetchrow, "SELECT direction, text FROM messages WHERE order_id=$1 ORDER BY id DESC LIMIT 1", oid)
+    assert last["direction"] == "out" and "разобрать его не удалось" in last["text"]

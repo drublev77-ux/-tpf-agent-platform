@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel, EmailStr, Field
 
 from tpf.notifications import portal_url
+from tpf.api import uploads
 from tpf.config import get_settings
 from tpf.db import create_pool
 from tpf.notifications import make_notifier
@@ -42,12 +43,18 @@ def orch(request: Request) -> Orchestrator:
 
 # --- models ---------------------------------------------------------------------------------
 
+class VideoRef(BaseModel):
+    id: int
+    token: str = Field(max_length=100)
+
+
 class OrderIn(BaseModel):
     client_name: str = Field(min_length=1, max_length=200)
     client_email: EmailStr
     request_text: str = Field(min_length=10, max_length=20_000)
     channel: Literal["site", "telegram", "whatsapp", "wechat", "email", "crm"] = "site"
     language: Literal["ru", "en", "zh"] = "ru"
+    video: VideoRef | None = None      # a finished upload (see uploads.py) to watch before the analyst starts
 
 
 class MessageIn(BaseModel):
@@ -104,7 +111,12 @@ async def create_order(body: OrderIn, request: Request) -> dict[str, Any]:
     recent = await orch(request).pool.fetchval("SELECT count(*) FROM orders WHERE created_at > now() - interval '1 hour'")
     if recent >= get_settings().intake_hourly_limit:
         raise HTTPException(429, "too many orders right now, try again later")
-    order, token = await orch(request).create_order(**body.model_dump())
+    video = None
+    if body.video is not None:
+        if not await uploads.claim(orch(request).pool, body.video.id, body.video.token):
+            raise HTTPException(422, "the video upload is not finished or not found")
+        video = body.video.id
+    order, token = await orch(request).create_order(**body.model_dump(exclude={"video"}), video_upload=video)
     return {"order": public(order), "client_token": token,
             "portal_url": portal_url(get_settings().public_base_url, order["id"], token)}
 
@@ -369,3 +381,4 @@ app.include_router(admin_router)
 from tpf.api.forms import router as forms_router  # noqa: E402
 
 app.include_router(forms_router)
+app.include_router(uploads.router)

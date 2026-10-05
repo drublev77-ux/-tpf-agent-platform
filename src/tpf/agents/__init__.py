@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 
 from tpf import payments
-from tpf.agents import analyst, architect, developer, devops, qa, visual
+from tpf.agents import analyst, architect, developer, devops, qa, video, visual
 from tpf.agents.base import Ctx, Outcome
 
 HANDLERS: dict[str, Callable[[Ctx], Awaitable[Outcome]]] = {
@@ -21,7 +21,8 @@ HANDLERS: dict[str, Callable[[Ctx], Awaitable[Outcome]]] = {
     "connect_payments": devops.connect_payments,
     "redeploy_production": devops.redeploy_production,
     "visual_check": visual.check_live,
+    "understand_video": video.run,
 }
 
 # Tasks that serve a finished order without moving it; they run whatever state the order is in.
-SIDE_TASKS = {"grant_repo_access", "connect_bot", "connect_payments", "redeploy_production", "visual_check"}
+SIDE_TASKS = {"grant_repo_access", "connect_bot", "connect_payments", "redeploy_production", "visual_check", "understand_video"}

@@ -30,7 +30,7 @@ class Orchestrator:
 
     async def create_order(
         self, *, client_name: str, client_email: str, request_text: str,
-        channel: str = "site", language: str = "ru",
+        channel: str = "site", language: str = "ru", video_upload: int | None = None,
     ) -> tuple[dict[str, Any], str]:
         token = secrets.token_urlsafe(24)
         async with self.pool.acquire() as conn, conn.transaction():
@@ -43,8 +43,13 @@ class Orchestrator:
             await conn.execute(
                 "INSERT INTO messages (order_id, direction, text) VALUES ($1, 'in', $2)", order_id, request_text
             )
-            await self._event(conn, order_id, "client", "order_created", "client", {"channel": channel})
-        await self.fire(order_id, Ev.INTAKE_ACCEPTED, actor="intake")
+            await self._event(conn, order_id, "client", "order_created", "client", {"channel": channel, "video": bool(video_upload)})
+            if video_upload is not None:
+                # The order waits as new until a worker has watched the video; that task then starts the analyst.
+                await conn.execute("UPDATE video_uploads SET order_id = $2 WHERE id = $1", video_upload, order_id)
+                await queue.enqueue(conn, order_id, "understand_video", {"upload_id": video_upload})
+        if video_upload is None:
+            await self.fire(order_id, Ev.INTAKE_ACCEPTED, actor="intake")
         order = await self.get_order(order_id)
         await self._welcome(order)
         return order, token

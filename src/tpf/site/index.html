@@ -180,6 +180,7 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 </div>
 <label><span data-t="f_type"></span><select name="type" id="types"></select></label>
 <label><span data-t="f_about"></span><textarea name="about" rows="5" required minlength="10" maxlength="15000" data-ph="f_about_ph"></textarea></label>
+<label><span data-t="f_video"></span><input name="video" type="file" accept="video/*,.mp4,.mov,.webm,.m4v,.mkv"><small class="small" data-t="f_video_hint"></small></label>
 <label class="hp" aria-hidden="true">Website<input name="website" type="text" tabindex="-1" autocomplete="off"></label>
 <button class="btn fill" type="submit" id="submit" data-t="f_submit"></button>
 <div id="msg" role="status" aria-live="polite"></div>
@@ -378,13 +379,13 @@ var I18N = {
 
 var EXTRA = {
   ru: { cs_lead: 'Каждый проект проходит весь путь на нашей платформе: заявка, ТЗ и смета, разработка, проверки, запуск.', case1_tag: 'ЛЕНДИНГ', case1_title: 'Кофейня «Зерно»', case1_text: 'Одностраничный сайт: первый экран, меню с ценами, адрес и часы работы, звонок в одно касание. От заявки до рабочей версии — силами ИИ‑агентов, с автоматическими проверками сборки, безопасности и критериев приёмки.', case1_facts: ['Next.js', 'Адаптивная вёрстка', 'Исходный код у клиента'], case1_open: 'Открыть сайт →', case1_alt: 'Главный экран сайта кофейни «Зерно»', privacy: 'Политика обработки данных', f_email: 'E‑mail', f_consent: 'Нажимая кнопку, вы соглашаетесь на обработку указанных данных для ответа на заявку.',
-        sending: 'Отправляем…', ok: 'Заявка принята. Мы отправили подтверждение на вашу почту. Статус заказа: ', ok_link: 'страница заказа',
+        f_video: 'Видео (необязательно)', f_video_hint: 'Расскажите о задаче голосом или покажите на экране пример — мы составим по видео ТЗ и смету. До 50 МБ, смотрим первые 5 минут.', in_video: 'Описание — в приложенном видео.', e_video: 'Видео больше 50 МБ. Сократите его или опишите задачу текстом.', e_upload: 'Не получилось загрузить видео. Отправьте заявку без него или попробуйте ещё раз.', uploading: 'Загружаем видео… ', ok_video: 'Заявка принята. Мы посмотрим видео и пришлём ТЗ со сметой на вашу почту. Статус заказа: ', sending: 'Отправляем…', ok: 'Заявка принята. Мы отправили подтверждение на вашу почту. Статус заказа: ', ok_link: 'страница заказа',
         e_fields: 'Заполните имя, e‑mail и опишите задачу (не меньше 10 символов).', e_busy: 'Сейчас слишком много заявок. Попробуйте через час.', e_fail: 'Не получилось отправить. Попробуйте ещё раз чуть позже.' },
   en: { cs_lead: 'Every project runs end to end on our platform: request, spec and estimate, development, checks, launch.', case1_tag: 'LANDING PAGE', case1_title: 'Zerno coffee shop', case1_text: 'A one‑page site: hero, menu with prices, address and opening hours, one‑tap call. From request to live version by AI agents, with automated build, security and acceptance checks.', case1_facts: ['Next.js', 'Responsive layout', 'Client owns the source'], case1_open: 'Open the site →', case1_alt: 'Home screen of the Zerno coffee shop website', privacy: 'Privacy policy', f_email: 'Email', f_consent: 'By clicking the button, you agree that we process these details to answer your request.',
-        sending: 'Sending…', ok: 'Request received. We have emailed you a confirmation. Order status: ', ok_link: 'your order page',
+        f_video: 'Video (optional)', f_video_hint: 'Tell us about the task aloud or show an example on screen — we will write the spec and estimate from the video. Up to 50 MB; we watch the first 5 minutes.', in_video: 'The description is in the attached video.', e_video: 'The video is larger than 50 MB. Shorten it or describe the task in text.', e_upload: 'Could not upload the video. Send the request without it or try again.', uploading: 'Uploading the video… ', ok_video: 'Request received. We will watch the video and email you the spec and estimate. Order status: ', sending: 'Sending…', ok: 'Request received. We have emailed you a confirmation. Order status: ', ok_link: 'your order page',
         e_fields: 'Please fill in your name, email and describe the task (at least 10 characters).', e_busy: 'Too many requests right now. Please try again in an hour.', e_fail: 'Could not send. Please try again a little later.' },
   zh: { cs_lead: '每个项目都在我们的平台上全流程完成：需求、规格书与报价、开发、检查、上线。', case1_tag: '落地页', case1_title: '“Zerno”咖啡馆', case1_text: '单页网站：首屏、带价格的菜单、地址与营业时间、一键拨号。从需求到正式上线均由 AI 智能体完成，并自动检查构建、安全与验收标准。', case1_facts: ['Next.js', '响应式布局', '源代码归客户所有'], case1_open: '打开网站 →', case1_alt: '“Zerno”咖啡馆网站首页', privacy: '隐私政策', f_email: '邮箱', f_consent: '点击按钮即表示您同意我们为回复需求而处理上述信息。',
-        sending: '正在提交…', ok: '需求已收到，确认邮件已发送至您的邮箱。订单状态：', ok_link: '订单页面',
+        f_video: '视频（可选）', f_video_hint: '用语音讲述需求，或在屏幕上展示示例——我们将根据视频编写规格书和报价。最大 50 MB，仅查看前 5 分钟。', in_video: '需求说明见所附视频。', e_video: '视频超过 50 MB。请缩短视频或用文字描述需求。', e_upload: '视频上传失败。请不带视频提交，或稍后重试。', uploading: '正在上传视频… ', ok_video: '需求已收到。我们将查看视频，并把规格书和报价发送到您的邮箱。订单状态：', sending: '正在提交…', ok: '需求已收到，确认邮件已发送至您的邮箱。订单状态：', ok_link: '订单页面',
         e_fields: '请填写姓名、邮箱并描述需求（不少于 10 个字符）。', e_busy: '当前请求过多，请一小时后再试。', e_fail: '提交失败，请稍后再试。' }
 };
 var LANGS = [['ru','RU'],['en','EN'],['zh','中文']];
@@ -543,16 +544,43 @@ document.getElementById('form').addEventListener('submit', function (ev) {
   function show(text, err, link) { msg.className = 'msg' + (err ? ' err' : ''); msg.textContent = text; if (link) { var a = el('a', t.ok_link); a.href = link; msg.append(a); } }
   if (f.website.value) return;                       // bots fill the hidden field
   var name = f.name.value.trim(), email = f.email.value.trim(), about = f.about.value.trim();
-  if (!name || !/^\S+@\S+\.\S+$/.test(email) || about.length < 10) { show(t.e_fields, true); return; }
-  btn.disabled = true; show(t.sending);
-  fetch('/orders', { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ client_name: name, client_email: email, language: lang, channel: 'site', request_text: '[' + f.type.value + '] ' + about }) })
-    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); })
-    .then(function (r) {
-      if (r.ok) { f.reset(); show(t.ok, false, r.d.portal_url); }
+  var file = f.video.files && f.video.files[0];
+  if (!name || !/^\S+@\S+\.\S+$/.test(email) || (about.length < 10 && !file)) { show(t.e_fields, true); return; }
+  if (file && file.size > 50 * 1024 * 1024) { show(t.e_video, true); return; }
+  if (!about) about = t.in_video;
+  btn.disabled = true; show(file ? t.uploading + '0%' : t.sending);
+  function json(r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); }
+  // A video goes up first, in pieces; the order is created once the whole file has arrived.
+  function upload() {
+    if (!file) return Promise.resolve(null);
+    return fetch('/uploads', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ size: file.size, filename: file.name || 'video.mp4' }) }).then(json).then(function (r) {
+        if (!r.ok) throw new Error(r.status === 429 ? 'busy' : 'upload');
+        var u = r.d, n = 0;
+        function next() {
+          if (n >= u.chunks) return { id: u.id, token: u.token };
+          var piece = file.slice(n * u.chunk_size, Math.min((n + 1) * u.chunk_size, file.size)), tries = 0;
+          function put() {
+            return fetch('/uploads/' + u.id + '/chunks/' + n, { method: 'PUT', body: piece,
+              headers: { 'content-type': 'application/octet-stream', 'x-upload-token': u.token } }).then(function (c) {
+                if (!c.ok) throw new Error('upload');
+              }).catch(function (e) { if (++tries < 3) return put(); throw e; });
+          }
+          return put().then(function () { n++; show(t.uploading + Math.round(100 * n / u.chunks) + '%'); return next(); });
+        }
+        return next();
+      });
+  }
+  upload().then(function (video) {
+    if (file) show(t.sending);
+    return fetch('/orders', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ client_name: name, client_email: email, language: lang, channel: 'site',
+        request_text: '[' + f.type.value + '] ' + about, video: video }) }).then(json);
+  }).then(function (r) {
+      if (r.ok) { f.reset(); show(file ? t.ok_video : t.ok, false, r.d.portal_url); }
       else show(r.status === 429 ? t.e_busy : r.status === 422 ? t.e_fields : t.e_fail, true);
     })
-    .catch(function () { show(t.e_fail, true); })
+    .catch(function (e) { show(e && e.message === 'busy' ? t.e_busy : e && e.message === 'upload' ? t.e_upload : t.e_fail, true); })
     .finally(function () { btn.disabled = false; });
 });
 </script>

@@ -1,14 +1,17 @@
 # Worker for hosts without Docker-in-Docker (Railway, Fly.io, Render):
 # site builds are checked on Vercel (SANDBOX=vercel), so no Docker CLI is needed here.
-# Chromium is here so that QA can look at screenshots of the pages it has built.
+# Chromium is here so that QA can look at screenshots of the pages it has built; ffmpeg and the speech
+# model so that a video attached to an order can be watched and listened to.
 FROM python:3.12-slim
 
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    HF_HOME=/opt/hf
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git fonts-noto-cjk \
- && pip install --no-cache-dir "playwright==1.56.0" \
+ && apt-get install -y --no-install-recommends git fonts-noto-cjk ffmpeg \
+ && pip install --no-cache-dir "playwright==1.56.0" "faster-whisper==1.2.1" \
  && playwright install --with-deps chromium \
+ && python -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')" \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

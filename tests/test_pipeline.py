@@ -137,3 +137,22 @@ async def test_events_are_append_only(env):
     import pytest
     with pytest.raises(asyncpg.RaiseError):
         await env.pool.execute("DELETE FROM events WHERE order_id = $1", oid)
+
+
+async def test_order_with_video_starts_the_analyst_only_after_the_video_task(env, monkeypatch):
+    from tpf.tools import video as video_tool
+
+    async def fake_watch(path, workdir, language=None):
+        return video_tool.Watched(10.0, frames=[(1.0, b"\xff\xd8")], speech="")
+    monkeypatch.setattr(video_tool, "watch", fake_watch)
+    env.llm.queue("video", {"summary": "Нужен лендинг кофейни", "shown": "", "details": [], "unclear": []})
+    up = await env.pool.fetchval("INSERT INTO video_uploads (token, size, received, status) VALUES ('t', 3, 3, 'complete') RETURNING id")
+    await env.pool.execute("INSERT INTO video_chunks (upload_id, n, data) VALUES ($1, 0, $2)", up, b"abc")
+    order, _ = await env.orch.create_order(client_name="Анна", client_email="anna@example.com",
+                                           request_text="Описание в видео, лендинг", video_upload=up)
+    assert order["state"] == State.NEW and env.llm.calls == []
+    await env.drain()
+    assert env.llm.calls[0] == "video" and "analyst" in env.llm.calls
+    assert await state(env, order["id"]) is State.AWAITING_ESTIMATE
+    history = await env.orch.messages(order["id"])
+    assert any("Нужен лендинг кофейни" in m["text"] for m in history)
