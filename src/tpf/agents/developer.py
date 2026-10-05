@@ -192,7 +192,11 @@ async def _feedback(ctx: Ctx) -> str:
     if last["name"] == "changes_requested":
         return "The client reviewed the staging site and requested changes:\n" + str(last["data"].get("comment", ""))
     if last["name"] == "resume":
-        return "An engineer resumed this order after an escalation. Their note:\n" + str(last["data"].get("note", ""))
+        note = "An engineer resumed this order after an escalation. Their note:\n" + str(last["data"].get("note", ""))
+        report = await ctx.orch.latest_artifact(ctx.order_id, "qa_report")
+        if report and not report.get("passed"):      # what stopped the order is usually still in the last report
+            note += "\n\nThe last QA report, still to be fixed:\n" + json.dumps(report, ensure_ascii=False, indent=2)
+        return note
     return ""
 
 
