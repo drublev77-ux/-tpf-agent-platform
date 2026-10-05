@@ -365,6 +365,23 @@ async def case_zerno() -> FileResponse:
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+SITE_ASSETS = {"apple-touch-icon.png": "image/png", "apple-touch-icon-precomposed.png": "image/png", "icon-192.png": "image/png",
+               "icon-512.png": "image/png", "favicon.png": "image/png", "favicon.ico": "image/png",
+               "manifest.webmanifest": "application/manifest+json"}
+SITE_ALIASES = {"apple-touch-icon-precomposed.png": "apple-touch-icon.png", "favicon.ico": "favicon.png"}
+
+
+def _asset(name: str):
+    async def serve() -> FileResponse:
+        return FileResponse(SITE_DIR / SITE_ALIASES.get(name, name), media_type=SITE_ASSETS[name],
+                            headers={"Cache-Control": "public, max-age=86400"})
+    return serve
+
+
+for _name in SITE_ASSETS:      # the icon a phone puts on its home screen, and what describes the site as an app
+    app.get(f"/{_name}", include_in_schema=False)(_asset(_name))
+
+
 @app.get("/brand-mark.jpg", include_in_schema=False)
 async def brand_mark() -> FileResponse:
     return FileResponse(SITE_DIR / "brand-mark.jpg", media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
