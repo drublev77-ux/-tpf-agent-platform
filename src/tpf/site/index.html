@@ -87,12 +87,13 @@ h2{font-size:clamp(30px,4.2vw,52px);line-height:1.12;letter-spacing:-.01em}
 .why>div:first-child{display:flex;flex-direction:column;gap:22px}.why h2{font-size:clamp(28px,3.4vw,44px)}.why p{color:var(--muted);font-size:17px}
 .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px;align-content:center}
 .stats b{display:block;font:500 clamp(32px,3.6vw,44px) Unbounded,sans-serif;color:var(--accent)}.stats span{color:var(--soft)}
-.case{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:clamp(20px,3vw,40px);align-items:center;padding:clamp(16px,2.4vw,28px);background:var(--panel);border:1px solid var(--line);border-radius:28px;color:var(--ink)}
-.case:hover{border-color:var(--line2);color:var(--ink)}.case img{width:100%;height:auto;border-radius:16px;border:1px solid var(--line);display:block}
-.case>div{display:flex;flex-direction:column;gap:14px}.casetag{font-size:13px;color:var(--accent);letter-spacing:.08em}.case h3{font-size:clamp(22px,2.4vw,30px)}.case p{color:var(--muted)}
+.cases{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.case{display:flex;flex-direction:column;gap:18px;padding:clamp(14px,1.6vw,20px);background:var(--panel);border:1px solid var(--line);border-radius:24px;color:var(--ink)}
+a.case:hover{border-color:var(--line2);color:var(--ink)}.case img{width:100%;height:auto;aspect-ratio:8/5;object-fit:cover;border-radius:14px;border:1px solid var(--line);display:block}
+.case>div{display:flex;flex-direction:column;gap:12px;padding:0 6px 8px;flex:1}.casetag{font-size:12px;color:var(--accent);letter-spacing:.08em}.case h3{font-size:clamp(19px,1.9vw,24px)}.case p{color:var(--muted);font-size:15px}
 .facts{margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:8px;font:13px 'JetBrains Mono','Noto Sans SC',monospace}.facts span{padding:7px 12px;border:1px solid var(--line2);border-radius:999px}
-.case+.case{margin-top:20px}.case .open{color:var(--accent);font-weight:600}
-@media(max-width:820px){.case{grid-template-columns:1fr}}
+.case .open{color:var(--accent);font-weight:600;margin-top:auto}.case .open.off{color:var(--soft);font-weight:500}
+@media(max-width:820px){.cases{grid-template-columns:1fr}}
 .contact{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:clamp(32px,6vw,80px)}
 .contact>div{display:flex;flex-direction:column;gap:26px}.contact h2{font-size:clamp(32px,4.4vw,56px);line-height:1.08}
 form{display:flex;flex-direction:column;gap:20px;padding:clamp(24px,3.5vw,48px);background:var(--panel);border:1px solid var(--line);border-radius:28px}
@@ -167,16 +168,7 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 
 <section id="cases">
 <div class="head"><div><div class="kicker" data-t="cs_kicker"></div><h2 data-t="cs_title"></h2></div><p data-t="cs_lead"></p></div>
-<a class="case" href="https://tpf-order-1.vercel.app" target="_blank" rel="noopener">
-<img src="/case-zerno.jpg" id="caseimg" alt="" width="960" height="600">
-<div><div class="mono casetag" data-t="case1_tag"></div><h3 data-t="case1_title"></h3><p data-t="case1_text"></p>
-<ul class="facts" data-list="case1_facts"></ul><span class="open" data-t="case1_open"></span></div>
-</a>
-<a class="case" href="https://www.globalgainengine.online" target="_blank" rel="noopener">
-<img src="/case-gge.jpg" id="case2img" alt="" width="960" height="600" loading="lazy">
-<div><div class="mono casetag" data-t="case2_tag"></div><h3 data-t="case2_title"></h3><p data-t="case2_text"></p>
-<ul class="facts" data-list="case2_facts"></ul><span class="open" data-t="case2_open"></span></div>
-</a>
+<div class="cases" id="caselist"></div>
 </section>
 
 <section id="contact">
@@ -521,22 +513,23 @@ var ACTUAL = {
 
 // Texts and prices of the current look of the page; merged last.
 var LOOK = {
-  ru: { cs_lead: 'Заказы клиентов проходят весь путь на нашей платформе. Здесь же — собственные продукты команды.', case2_tag: 'ВЕБ‑ПЛАТФОРМА · СОБСТВЕННЫЙ ПРОДУКТ', case2_title: 'Global Gain Engine', case2_text: 'Сервис автоматизации торговли на криптобиржах: ИИ‑агенты, торговые сигналы с планом сделки, демо‑режим, личный кабинет, тарифы и приём оплаты. Собственный продукт команды TPF Technology.', case2_facts: ['React и TypeScript', 'Supabase', 'Подключение 6 бирж'], case2_open: 'Открыть сайт →', case2_alt: 'Главный экран сервиса Global Gain Engine', sv_kicker: '01 / УСЛУГИ', st_kicker: '02 / ТЕХНОЛОГИИ', why_kicker: '03 / ПОЧЕМУ МЫ', cs_kicker: '04 / ПРОЕКТЫ', ct_kicker: '05 / КОНТАКТЫ',
+  ru: { cs_lead: 'Демонстрационные проекты собраны на нашей платформе от заявки до запуска. Здесь же — собственный продукт команды.', case_open: 'Открыть сайт →', case_ask: 'Вход по паролю — покажем по запросу', sv_kicker: '01 / УСЛУГИ', st_kicker: '02 / ТЕХНОЛОГИИ', why_kicker: '03 / ПОЧЕМУ МЫ', cs_kicker: '04 / ПРОЕКТЫ', ct_kicker: '05 / КОНТАКТЫ',
     hero_facts: ['Смета бесплатно и до оплаты', 'Оплата 50/50', 'Код и все права — ваши'],
     usd: ['от $576', 'от $720', 'от $1 900', 'от $2 800', 'от $1 900', 'от $1 900', 'от $544', 'от $1 360', ''],
     f_currency: 'Валюта оплаты',
     pr_note: 'Оплата банковской картой в евро или долларах США — валюту вы выбираете в заявке. Суммы в рублях — ориентир по курсу на октябрь 2026 года. В цену не входят платные сторонние сервисы, если они понадобятся (например, собственный домен).' },
-  en: { cs_lead: 'Client orders run end to end on our platform. Our own products are shown here too.', case2_tag: 'WEB PLATFORM · OUR OWN PRODUCT', case2_title: 'Global Gain Engine', case2_text: 'A service that automates trading on crypto exchanges: AI agents, trading signals with a trade plan, a demo mode, a personal account, plans and payments. A product of the TPF Technology team.', case2_facts: ['React and TypeScript', 'Supabase', '6 exchanges connected'], case2_open: 'Open the site →', case2_alt: 'Home screen of Global Gain Engine', sv_kicker: '01 / SERVICES', st_kicker: '02 / TECHNOLOGY', why_kicker: '03 / WHY US', cs_kicker: '04 / PROJECTS', ct_kicker: '05 / CONTACT',
+  en: { cs_lead: 'The demo projects were built on our platform from request to launch. Our own product is shown here too.', case_open: 'Open the site →', case_ask: 'Sign‑in required — shown on request', sv_kicker: '01 / SERVICES', st_kicker: '02 / TECHNOLOGY', why_kicker: '03 / WHY US', cs_kicker: '04 / PROJECTS', ct_kicker: '05 / CONTACT',
     hero_facts: ['Free estimate before you pay', 'Payment 50/50', 'The code and all rights are yours'],
     usd: ['from $720', 'from $900', 'from $2,400', 'from $3,500', 'from $2,400', 'from $2,400', 'from $800', 'from $2,000', ''],
     f_currency: 'Payment currency',
     pr_note: 'You pay by card in euros or US dollars — choose the currency in the request. Prices do not include paid third‑party services if any are needed (for example, your own domain).' },
-  zh: { cs_lead: '客户订单在我们的平台上全流程完成；这里也展示团队自己的产品。', case2_tag: '网络平台 · 自有产品', case2_title: 'Global Gain Engine', case2_text: '加密货币交易所自动化交易服务：AI 智能体、带交易计划的交易信号、模拟模式、个人账户、套餐与收款。TPF Technology 团队的自有产品。', case2_facts: ['React 与 TypeScript', 'Supabase', '接入 6 家交易所'], case2_open: '打开网站 →', case2_alt: 'Global Gain Engine 首页', sv_kicker: '01 / 服务', st_kicker: '02 / 技术', why_kicker: '03 / 为什么选择我们', cs_kicker: '04 / 项目', ct_kicker: '05 / 联系我们',
+  zh: { cs_lead: '演示项目均在我们的平台上从需求到上线全流程完成；这里也展示团队自己的产品。', case_open: '打开网站 →', case_ask: '需登录 — 可应要求演示', sv_kicker: '01 / 服务', st_kicker: '02 / 技术', why_kicker: '03 / 为什么选择我们', cs_kicker: '04 / 项目', ct_kicker: '05 / 联系我们',
     hero_facts: ['付款前免费报价', '付款 50/50', '代码及全部权利归您'],
     usd: ['$720 起', '$900 起', '$2,400 起', '$3,500 起', '$2,400 起', '$2,400 起', '$800 起', '$2,000 起', ''],
     f_currency: '付款货币',
     pr_note: '可使用银行卡以欧元或美元付款——请在需求中选择货币。价格不含可能需要的第三方付费服务（例如您自己的域名）。' }
 };
+var CASES = [{"img": "/case-brigada.jpg", "href": "", "ru": ["ПРИЛОЖЕНИЕ ДЛЯ КОМАНДЫ · ДЕМО", "«Ремонт‑Бригада»", "Бригадир и рабочие входят со своими ролями. Чат по каждому объекту, чеки с фото, смены с отметкой места по геолокации и табель часов. Ставится на телефон с сайта.", ["Роли и вход", "Чат и файлы", "Геолокация"]], "en": ["TEAM APP · DEMO", "Remont‑Brigada", "A foreman and workers sign in with their own roles. A chat per site, receipts with photos, shifts clocked with the phone's location, and a timesheet. Installs on a phone from the site.", ["Roles and sign‑in", "Chat and files", "Geolocation"]], "zh": ["团队应用 · 演示", "“Remont‑Brigada”", "工长和工人按各自角色登录。每个工地有聊天、带照片的票据、按手机定位打卡的班次和工时表。可从网站安装到手机。", ["角色与登录", "聊天与文件", "定位"]]}, {"img": "/case-gge.jpg", "href": "https://www.globalgainengine.online", "ru": ["ВЕБ‑ПЛАТФОРМА · СОБСТВЕННЫЙ ПРОДУКТ", "Global Gain Engine", "Сервис автоматизации торговли на криптобиржах: ИИ‑агенты, сигналы с планом сделки, демо‑режим, личный кабинет, тарифы и приём оплаты.", ["React и TypeScript", "Supabase", "6 бирж"]], "en": ["WEB PLATFORM · OUR OWN PRODUCT", "Global Gain Engine", "A service that automates trading on crypto exchanges: AI agents, signals with a trade plan, a demo mode, a personal account, plans and payments.", ["React and TypeScript", "Supabase", "6 exchanges"]], "zh": ["网络平台 · 自有产品", "Global Gain Engine", "加密货币交易所自动化交易服务：AI 智能体、带交易计划的信号、模拟模式、个人账户、套餐与收款。", ["React 与 TypeScript", "Supabase", "6 家交易所"]]}, {"img": "/case-glina-shop.jpg", "href": "https://tpf-order-5.vercel.app", "ru": ["ИНТЕРНЕТ‑МАГАЗИН · ДЕМО", "Магазин керамики «Глина»", "Каталог с категориями, корзина, оформление заказа с самовывозом или доставкой и оплата картой через Stripe (в демо — тестовый режим). Товары и заказы ведутся в админке.", ["Каталог и корзина", "Оплата картой", "Админка"]], "en": ["ONLINE SHOP · DEMO", "Glina ceramics shop", "A catalogue with categories, a cart, checkout with pickup or delivery, and card payments through Stripe (test mode in the demo). Products and orders are managed in an admin panel.", ["Catalogue and cart", "Card payments", "Admin panel"]], "zh": ["网店 · 演示", "“Glina”陶瓷店", "带分类的商品目录、购物车、自提或配送下单，以及通过 Stripe 刷卡支付（演示为测试模式）。商品和订单在后台管理。", ["目录与购物车", "刷卡支付", "后台"]]}, {"img": "/case-glina-app.jpg", "href": "https://tpf-order-3.vercel.app", "ru": ["ВЕБ‑ПРИЛОЖЕНИЕ · ДЕМО", "Запись на мастер‑классы «Глина»", "Расписание со свободными местами и запись в два шага. Владелец добавляет мастер‑классы и видит записи в админке; места считаются автоматически.", ["База данных", "Запись онлайн", "Админка"]], "en": ["WEB APP · DEMO", "Glina workshop booking", "A timetable with free places and booking in two steps. The owner adds workshops and sees bookings in an admin panel; places are counted automatically.", ["Database", "Online booking", "Admin panel"]], "zh": ["网络应用 · 演示", "“Glina”课程预约", "显示剩余名额的课程表，两步完成预约。店主在后台添加课程并查看预约，名额自动计算。", ["数据库", "在线预约", "后台"]]}, {"img": "/case-mastera.jpg", "href": "", "ru": ["ПРИЛОЖЕНИЕ ДЛЯ КОМАНДЫ · ДЕМО", "«Мастера»", "Учёт задач и объектов ремонтной бригады. Три роли: рабочий видит свои задачи, бригадир — задачи бригады, менеджер ведёт объекты и сроки.", ["3 роли", "Задачи и объекты", "Телефон и компьютер"]], "en": ["TEAM APP · DEMO", "Mastera", "Tasks and sites for a renovation crew. Three roles: a worker sees their own tasks, a foreman the crew's tasks, a manager runs sites and deadlines.", ["3 roles", "Tasks and sites", "Phone and desktop"]], "zh": ["团队应用 · 演示", "“Mastera”", "装修队的任务与工地管理。三种角色：工人看自己的任务，工长看全队任务，经理管理工地和期限。", ["3 种角色", "任务与工地", "手机与电脑"]]}, {"img": "/case-glina-bot.jpg", "href": "https://tpf-order-4.vercel.app", "ru": ["TELEGRAM‑БОТ · ДЕМО", "Бот студии «Глина»", "Бот показывает расписание, записывает на мастер‑класс по шагам и отвечает на частые вопросы. Записи и тексты владелец ведёт в веб‑админке.", ["Telegram", "Запись по шагам", "Веб‑админка"]], "en": ["TELEGRAM BOT · DEMO", "Glina studio bot", "The bot shows the timetable, books a workshop step by step and answers common questions. The owner manages bookings and texts in a web admin panel.", ["Telegram", "Step‑by‑step booking", "Web admin"]], "zh": ["TELEGRAM 机器人 · 演示", "“Glina”工作室机器人", "机器人显示课程表、分步预约课程并回答常见问题。店主在网页后台管理预约和文本。", ["Telegram", "分步预约", "网页后台"]]}, {"img": "/case-yoga.jpg", "href": "https://tpf-order-2.vercel.app", "ru": ["САЙТ ИЗ НЕСКОЛЬКИХ СТРАНИЦ · ДЕМО", "Студия йоги «Лотос»", "Три страницы: главная с преимуществами, расписание с ценами и контакты с формой заявки.", ["Next.js", "3 страницы", "Форма заявки"]], "en": ["MULTI‑PAGE SITE · DEMO", "Lotos yoga studio", "Three pages: a home page with the studio's strengths, a timetable with prices, and contacts with a request form.", ["Next.js", "3 pages", "Request form"]], "zh": ["多页网站 · 演示", "“Lotos”瑜伽馆", "三个页面：介绍优势的首页、带价格的课程表，以及带咨询表单的联系页。", ["Next.js", "3 个页面", "咨询表单"]]}, {"img": "/case-zerno.jpg", "href": "https://tpf-order-1.vercel.app", "ru": ["ЛЕНДИНГ · ДЕМО", "Кофейня «Зерно»", "Одностраничный сайт: первый экран, меню с ценами, адрес и часы работы, звонок в одно касание.", ["Next.js", "Адаптивная вёрстка", "Исходный код у клиента"]], "en": ["LANDING PAGE · DEMO", "Zerno coffee shop", "A one‑page site: hero, menu with prices, address and opening hours, one‑tap call.", ["Next.js", "Responsive layout", "Client owns the source"]], "zh": ["落地页 · 演示", "“Zerno”咖啡馆", "单页网站：首屏、带价格的菜单、地址与营业时间、一键拨号。", ["Next.js", "响应式布局", "源代码归客户所有"]]}];
 function T() { var t = Object.assign({}, I18N[lang], EXTRA[lang], ACTUAL[lang], LOOK[lang]); return t; }
 function render() {
   var t = T();
@@ -545,8 +538,13 @@ function render() {
   document.querySelectorAll('[data-ph]').forEach(function (n) { n.placeholder = t[n.dataset.ph] || ''; });
   document.querySelectorAll('[data-list]').forEach(function (n) { fill(n, t[n.dataset.list], function (s) { return el('span', s); }); });
   document.getElementById('heroimg').alt = t.img_alt;
-  document.getElementById('caseimg').alt = t.case1_alt;
-  document.getElementById('case2img').alt = t.case2_alt;
+  fill(document.getElementById('caselist'), CASES, function (c) {
+    var x = c[lang], card = el(c.href ? 'a' : 'div', null, 'case'), img = document.createElement('img'), body = el('div'), facts = el('ul', null, 'facts');
+    if (c.href) { card.href = c.href; card.target = '_blank'; card.rel = 'noopener'; }
+    img.src = c.img; img.alt = x[1]; img.width = 960; img.height = 600; img.loading = 'lazy';
+    x[3].forEach(function (f) { facts.append(el('span', f)); });
+    body.append(el('div', x[0], 'mono casetag'), el('h3', x[1]), el('p', x[2]), facts, el('span', c.href ? t.case_open : t.case_ask, c.href ? 'open' : 'open off'));
+    card.append(img, body); return card; });
   document.getElementById('langs').setAttribute('aria-label', t.lang_label);
   fill(document.getElementById('langs'), LANGS, function (l) {
     var b = el('button', l[1]); b.type = 'button'; b.setAttribute('aria-pressed', String(l[0] === lang));

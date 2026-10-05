@@ -257,8 +257,10 @@ CHAT_RULES = (
 
 GEO_RULES = (
     "LOCATION AND HOURS: a worker clocks in and out on site from the phone. Use the platform's form "
-    "`import GeoForm from '@/tpf/GeoForm'`: `<GeoForm action={clockIn} button=\"…\" locating=\"…\" denied=\"…\">hidden "
-    "fields</GeoForm>` asks the phone for its position when pressed and adds lat, lng and accuracy to the form; in "
+    "`import GeoForm from '@/tpf/GeoForm'`: `<GeoForm action={clockIn} button=\"…\" locating=\"…\" denied=\"…\" "
+    "buttonClassName=\"btn btn-primary\" className=\"…\">hidden fields</GeoForm>` (ALWAYS pass buttonClassName with "
+    "your own button classes: the form draws its own button, and without it the button is unstyled and unreadable "
+    "on a dark design) asks the phone for its position when pressed and adds lat, lng and accuracy to the form; in "
     "the action `const where = readPosition(form)` and `distanceMeters(a, b)` come from '@/tpf/geo'. The action "
     "starts with requireUser, takes the time from the database's now() (never from the browser), stores the "
     "position, its accuracy and the distance to the object, and refuses a second open shift for the same person. "
