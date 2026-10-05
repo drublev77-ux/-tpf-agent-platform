@@ -7,7 +7,7 @@ from typing import Any
 from tpf.agents.base import SAFETY_NOTE, Ctx, Outcome
 from tpf.agents.reviewer import review
 from tpf.orchestrator.states import Ev
-from tpf.tools.template import ACCOUNTS_RULES, has_database, kind_of, rules_for
+from tpf.tools.template import ACCOUNTS_RULES, capabilities_of, capability_rules, has_database, kind_of, rules_for
 
 SCHEMA = {
     "type": "object",
@@ -136,7 +136,7 @@ ACCOUNTS_CRITERIA = [
 APP_CRITERIA = [
     "data_model has a table for every kind of record in the spec, with the fields the spec lists",
     "There is /admin, /admin/login and an admin route for every list the owner manages; public routes never expose admin data",
-    "Nothing requires self-registration of visitors, file uploads, external services or packages beyond next, react and postgres; people sign in only when the spec has user_roles; payments appear only in an online shop",
+    "Nothing requires self-registration of visitors, external services or packages beyond next, react and postgres; people sign in only when the spec has user_roles; file uploads, chat and location appear only when the spec lists them in capabilities; payments appear only in an online shop",
 ]
 BOT_CRITERIA = [
     "bot describes every command and dialog in the spec step by step with exact wording, including /start, /help and the reply to unknown text",
@@ -179,8 +179,12 @@ async def run(ctx: Ctx) -> Outcome:
     kind = kind_of(spec)
     accounts = kind == "app" and bool(spec.get("user_roles"))
     system = (SYSTEM + (APP_NOTE if has_database(kind) else "") + (ACCOUNTS_NOTE if accounts else "") + (BOT_NOTE if kind == "bot" else "")
-              + (SHOP_NOTE if kind == "shop" else "") + rules_for(kind) + (ACCOUNTS_RULES if accounts else "") + " " + SAFETY_NOTE)
+              + (SHOP_NOTE if kind == "shop" else "") + rules_for(kind) + (ACCOUNTS_RULES + capability_rules(spec) if accounts else "") + " " + SAFETY_NOTE)
+    extras = capabilities_of(spec) if accounts else []
     criteria = (REVIEW_CRITERIA + (APP_CRITERIA if has_database(kind) else SITE_CRITERIA) + (ACCOUNTS_CRITERIA if accounts else [])
+                + ([f"The design covers the spec's capabilities ({', '.join(extras)}) with the tables, routes and screens the platform "
+                    "rules for them describe: a private /files/[id] route for uploads, a messages table and who takes part for "
+                    "chat, shifts with positions and each object's own position for geolocation"] if extras else [])
                 + (BOT_CRITERIA if kind == "bot" else []) + (SHOP_CRITERIA if kind == "shop" else []))
     base = f"Approved spec:\n{json.dumps(spec, ensure_ascii=False, indent=2)}\n\nDesign the site for this spec."
     issues: list[str] = []

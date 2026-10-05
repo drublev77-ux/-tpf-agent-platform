@@ -881,3 +881,54 @@ async def test_application_with_roles_gets_more_check_rounds(app_env):
     await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
     await env.drain()
     assert State((await env.orch.get_order(oid))["state"]) is State.AWAITING_ACCEPTANCE
+
+
+# --- files, chat and location in applications with accounts ---------------------------------------
+
+def test_capabilities_come_only_from_an_app_spec_and_bring_their_rules():
+    from tpf.tools.template import capabilities_of, capability_rules, platform_files
+
+    spec = ACC_SPEC | {"capabilities": ["geolocation", "uploads", "telepathy"]}
+    assert capabilities_of(spec) == ["uploads", "geolocation"]
+    assert capabilities_of(spec | {"product_type": "shop"}) == [] and capabilities_of(ACC_SPEC) == []
+    rules = capability_rules(spec)
+    assert "saveFile" in rules and "GeoForm" in rules and "AutoRefresh" not in rules
+    files = platform_files("", "app")
+    assert {"tpf/files.ts", "tpf/FileInput.tsx", "tpf/AutoRefresh.tsx", "tpf/GeoForm.tsx", "tpf/geo.ts"} <= set(files)
+    assert "bodySizeLimit" in files["next.config.mjs"] and "tpf/files.ts" not in platform_files("", "site")
+
+
+def test_code_may_not_serve_files_blindly_or_read_location_itself():
+    from tpf.agents.developer import check_accounts
+
+    extra = lambda path, body: ACC_CODE["files"] + [{"path": path, "content": body}]   # noqa: E731
+    open_route = "import { serveFile } from '@/tpf/files';\nexport async function GET() { return serveFile('x'); }"
+    assert "without checking who asks" in " ".join(check_accounts(extra("app/files/[id]/route.ts", open_route), ACC_ARCH))
+    guarded = "import { currentUser } from '@/tpf/users';\n" + open_route.replace("return", "if (!(await currentUser())) return new Response('', { status: 404 }); return")
+    assert check_accounts(extra("app/files/[id]/route.ts", guarded), ACC_ARCH) == []
+    assert "through GeoForm" in " ".join(check_accounts(extra("components/Where.tsx", '"use client";\nnavigator.geolocation.getCurrentPosition(() => {});'), ACC_ARCH))
+    files = [f if f["path"] != "db/schema.sql" else {"path": "db/schema.sql", "content": SCHEMA_SQL + "CREATE TABLE IF NOT EXISTS docs (id SERIAL PRIMARY KEY, body BYTEA);"} for f in ACC_CODE["files"]]
+    assert "bytea" in " ".join(check_accounts(files, ACC_ARCH))
+
+
+async def test_application_that_stores_files_gets_the_platforms_file_table(app_env):
+    env = app_env
+    env.settings.sandbox = "vercel"
+    for agent in ("analyst", "architect", "developer"):
+        env.llm.script[agent].clear()
+    env.llm.queue("analyst", {"in_pilot_scope": True, "questions": [], "spec": ACC_SPEC | {"capabilities": ["uploads"]},
+                              "estimate": {"items": [{"name": "Build", "hours": 50}], "duration_days": 10}})
+    env.llm.queue("architect", ACC_ARCH)
+    route = ("import { currentUser } from '@/tpf/users';\nimport { serveFile } from '@/tpf/files';\n"
+             "export async function GET() { if (!(await currentUser())) return new Response('', { status: 404 }); return serveFile('x'); }")
+    env.llm.queue("developer", {"files": ACC_CODE["files"] + [{"path": "app/files/[id]/route.ts", "content": route}], "notes": "files"})
+    oid = await new_app_order(env)
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    assert State((await env.orch.get_order(oid))["state"]) is State.AWAITING_ACCEPTANCE
+    conn = await asyncpg.connect(env.deployer.env[f"tpf-order-{oid}-preview"]["DATABASE_URL"])
+    await conn.execute("INSERT INTO tpf_files (id, name, mime, size, data) VALUES ('a', 'r.jpg', 'image/jpeg', 3, $1)", b"abc")
+    assert await conn.fetchval("SELECT data FROM tpf_files WHERE id = 'a'") == b"abc"
+    await conn.execute("DELETE FROM tpf_files WHERE id = 'a'")
+    await conn.close()

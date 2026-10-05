@@ -150,6 +150,21 @@ class TenantDB:
         finally:
             await admin.close()
 
+    async def ensure_files_table(self, db: AppDatabase) -> None:
+        """Where an application keeps the photos and documents its people attach (tpf/files.ts is the only
+        code meant to touch it)."""
+        role = db.role
+        if not re.fullmatch(r"o\d+_(stg|prod)", role):
+            raise TenantDBError("unexpected role name")
+        admin = await self._connect(self.admin_url)
+        try:
+            await admin.execute(
+                f"CREATE TABLE IF NOT EXISTS {role}.tpf_files (id TEXT PRIMARY KEY, owner_id INTEGER, name TEXT NOT NULL, "
+                "mime TEXT NOT NULL, size INTEGER NOT NULL, data BYTEA NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now())")
+            await admin.execute(f"GRANT SELECT, INSERT, DELETE ON {role}.tpf_files TO {role}")
+        finally:
+            await admin.close()
+
     async def add_check_users(self, db: AppDatabase, roles: list[str]) -> dict[str, tuple[int, int]]:
         """One account per role for the platform's own access check: {role: (id, session version)}. They have
         no usable password and are removed again with remove_check_users."""

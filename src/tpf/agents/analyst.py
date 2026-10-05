@@ -55,6 +55,12 @@ SCHEMA = {
                         "can": {"type": "string", "description": "What this role may add, change and delete"}},
                         "required": ["name", "sees", "can"]},
                 },
+                "capabilities": {
+                    "type": "array", "items": {"type": "string", "enum": ["uploads", "chat", "geolocation"]},
+                    "description": "Only for an 'app' with user_roles, and only what the client asked for: 'uploads' (people "
+                                   "attach photos and PDF documents), 'chat' (messages between people), 'geolocation' "
+                                   "(clocking in and out on site with the phone's location).",
+                },
                 "languages": {"type": "array", "items": {"type": "string"}},
                 "assumptions": {"type": "array", "items": {"type": "string"}},
                 "client_content": {
@@ -111,7 +117,21 @@ SCOPE_APP = (
     "password. When the client needs this, list every role in user_roles with what it sees and what it may do, "
     "and describe each page per role. There is no self-registration, no password reset by e-mail and no sign-in "
     "through Google or other services: say so in assumptions. Without user_roles an application has no accounts "
-    "besides the owner. An application has no online payments, no chat or messaging between people, no file or photo uploads (images are fixed files or links), no e-mail "
+    "besides the owner. "
+    "An application with user_roles can, when the client asks for it, also have (list each in capabilities): "
+    "'uploads' — signed-in people attach photos and PDF documents to records (a receipt, an estimate, a document), "
+    "up to 4 MB each after the phone shrinks the photo, 300 MB for the whole application, visible only to those who "
+    "may see the record; no other file types, no video, no editing of documents. "
+    "'chat' — messages between the people who sign in, in one common chat or one per project: text only, new "
+    "messages appear within a few seconds while the page is open, with unread counters; no push notifications, "
+    "calls, typing indicators or message search. "
+    "'geolocation' — a worker clocks in and out on site from the phone: the application records the time and the "
+    "phone's position at that moment, shows how far it was from the object and counts hours per person and "
+    "period; a manager sets each object's position and can correct shifts. Location is read only when the button "
+    "is pressed, never in the background; it can be switched off or faked on the phone, so it is a record, not "
+    "proof — say so in assumptions. There are no maps inside the application (an address opens in the phone's "
+    "maps) and no address search. "
+    "An application has no online payments, no file uploads by visitors who are not signed in (images are fixed files or links), no e-mail "
     "or SMS sending apart from the contact form, no integrations with outside services, no scheduled jobs and no "
     "mobile app. In the spec of an application, list the admin area as a page, and state for every kind of record "
     "which fields it has, who creates it (visitor or owner) and what the owner can do with it. "
@@ -186,7 +206,7 @@ def system_prompt(apps_enabled: bool) -> str:
 
 REVIEW_CRITERIA = [
     "Every page has a purpose and concrete sections; nothing essential from the client's request is missing",
-    "The spec fits what the studio builds: a static website (product_type 'site', its only dynamic feature a contact form), a web application (product_type 'app') with a database and an owner-only admin area, a rule-based Telegram bot (product_type 'bot') with a database and a web admin area, or an online shop (product_type 'shop') with card payments through the owner's own payment provider account; no self-registration of visitors, chat, uploads or integrations, and no payments outside a shop; people sign in only in an 'app' whose user_roles lists every role with what it sees and may do",
+    "The spec fits what the studio builds: a static website (product_type 'site', its only dynamic feature a contact form), a web application (product_type 'app') with a database and an owner-only admin area, a rule-based Telegram bot (product_type 'bot') with a database and a web admin area, or an online shop (product_type 'shop') with card payments through the owner's own payment provider account; no self-registration of visitors or integrations, and no payments outside a shop; file uploads, chat and clocking in by location appear only in an 'app' with user_roles and are listed in capabilities; people sign in only in an 'app' whose user_roles lists every role with what it sees and may do",
     "product_type is 'app' only if the client needs data stored or managed and 'bot' only if the client asked for a Telegram bot and 'shop' only if the client sells online; for an app or a bot, every kind of record has its fields and the owner's actions on it described; for a bot, every command and dialog is described step by step",
     "Acceptance criteria are specific and checkable by looking at the site or by talking to the bot",
     "Assumptions are stated where the client did not decide",

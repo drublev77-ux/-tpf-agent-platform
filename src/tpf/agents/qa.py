@@ -20,7 +20,7 @@ from tpf.agents.devops import staging_project
 from tpf.orchestrator.states import Ev
 from tpf.tools.deploy import DeployError
 from tpf.tools.sandbox import RunResult
-from tpf.tools.template import (ROLES_PATH, SCHEMA_PATH, access_of, all_files, has_database, installable, kind_of, materialize,
+from tpf.tools.template import (ROLES_PATH, SCHEMA_PATH, access_of, all_files, capabilities_of, has_database, installable, kind_of, materialize,
                                 route_to_page, uses_accounts)
 from tpf.tools.tenantdb import TenantDBError
 
@@ -86,6 +86,25 @@ ACCOUNT_CRITERIA = [
 ]
 
 
+CAPABILITY_CRITERIA = {
+    "uploads": [
+        "Files are stored only through saveFile from @/tpf/files and only by a signed-in user or the owner; the form uses "
+        "FileInput; every saveFile error ('empty', 'too-large', 'type', 'full') gets its own message",
+        "app/files/[id]/route.ts signs the visitor in, finds the record that holds the file id and checks that this person "
+        "may see that record before serveFile; nothing else serves files, and a deleted or replaced file is removed with deleteFile",
+    ],
+    "chat": [
+        "A person reads and writes only the chats they take part in, checked both in the page and in the server action; "
+        "messages are trimmed, limited to 2000 characters, shown oldest first with author and time, and the page has AutoRefresh",
+    ],
+    "geolocation": [
+        "Clocking in and out goes through GeoForm and readPosition; the time comes from the database, a second open shift is "
+        "refused, the position, accuracy and distance to the object are stored, and a far-away clock-in is recorded and "
+        "marked rather than blocked; hours are computed from closed shifts and a manager's correction is marked",
+    ],
+}
+
+
 def user_cookie(session_secret: str, user_id: int, version: int, ttl_sec: int = 600) -> str:
     """A short-lived user session, signed the way tpf/users.ts signs it."""
     exp = int(time.time()) + ttl_sec
@@ -130,6 +149,8 @@ async def prepare_database(ctx: Ctx, files: list[dict[str, str]], env: str, proj
     await ctx.tenant_db.apply_schema(db, schema)
     if any(f["path"] == ROLES_PATH for f in files):
         await ctx.tenant_db.ensure_users_table(db)
+    if any("@/tpf/files" in f["content"] for f in files):
+        await ctx.tenant_db.ensure_files_table(db)
     if ctx.deployer is not None:
         await ctx.deployer.set_env(project, db.env())
     return db
@@ -304,6 +325,7 @@ async def run(ctx: Ctx) -> Outcome:
                 "Accessible: semantic HTML, alt text on images, labels on form fields",
                 *(APP_CRITERIA if has_database(kind) else []),
                 *(ACCOUNT_CRITERIA if uses_accounts(arch) else []),
+                *(c for cap in capabilities_of(spec) for c in CAPABILITY_CRITERIA[cap]),
                 *(BOT_CRITERIA if kind == "bot" else []),
                 *(SHOP_CRITERIA if kind == "shop" else []),
                 *(["Installable: lib/pwa.ts exports PWA with the design's colours, app/layout.tsx renders <Pwa /> and sets "

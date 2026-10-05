@@ -11,7 +11,7 @@ from tpf.llm.gateway import LLMError
 from tpf.orchestrator.states import Ev
 from tpf.tools.shop_payments_ts import PAYMENT_HOSTS
 from tpf.tools.tenantdb import check_schema_sql
-from tpf.tools.template import ACCOUNTS_RULES, ROLES_PATH, access_of, uses_accounts, PWA_CONFIG_PATH, SHOP_HANDLER_PATH, installable, BOT_HANDLER_PATH, MAX_FILE_BYTES, SCHEMA_PATH, has_database, kind_of, route_to_page, rules_for, validate_path
+from tpf.tools.template import ACCOUNTS_RULES, ROLES_PATH, access_of, capability_rules, uses_accounts, PWA_CONFIG_PATH, SHOP_HANDLER_PATH, installable, BOT_HANDLER_PATH, MAX_FILE_BYTES, SCHEMA_PATH, has_database, kind_of, route_to_page, rules_for, validate_path
 
 SCHEMA = {
     "type": "object",
@@ -89,6 +89,8 @@ def check_accounts(files: list[dict[str, str]], arch: dict) -> list[str]:
     for role in arch.get("roles") or []:
         if not re.search(r"""id:\s*["']""" + re.escape(role["id"]) + r"""["']""", roles_file):
             problems.append(f"{ROLES_PATH} does not list the role '{role['id']}' from the architecture")
+    if re.search(r"\bbytea\b", by_path.get(SCHEMA_PATH, ""), re.I):
+        problems.append("db/schema.sql must not store file contents (bytea): files live in the platform's own table")
     if re.search(r"\bpassword", by_path.get(SCHEMA_PATH, ""), re.I):
         problems.append("db/schema.sql must not store passwords: accounts live in the platform's own table")
     for route in arch.get("routes") or []:
@@ -105,6 +107,12 @@ def check_accounts(files: list[dict[str, str]], arch: dict) -> list[str]:
                 problems.append(f"accounts are reached only through @/tpf/users, not directly: {f['path']}")
             if re.search(r"""from\s+["'](node:)?crypto["']""", f["content"]) and re.search(r"scrypt|pbkdf2|createHash", f["content"]):
                 problems.append(f"passwords are hashed by the platform, not in the application: {f['path']}")
+            if "serveFile(" in f["content"] and not re.search(r"\b(requireUser|requireAdmin|currentUser|isAdmin)\s*\(", f["content"]):
+                problems.append(f"a file is served without checking who asks: sign the visitor in before serveFile: {f['path']}")
+            if "navigator.geolocation" in f["content"]:
+                problems.append(f"the phone's location is read through GeoForm from @/tpf/GeoForm, not directly: {f['path']}")
+            if _imports_values(f["content"], "@/tpf/files") and f["content"].lstrip().startswith(("'use client'", '"use client"')):
+                problems.append(f"@/tpf/files is server-only and is imported in a client component: {f['path']}")
             if _imports_values(f["content"], "@/tpf/users") and f["content"].lstrip().startswith(("'use client'", '"use client"')):
                 problems.append(f"@/tpf/users is server-only and is imported in a client component: {f['path']}")
     return problems
@@ -198,7 +206,7 @@ async def run(ctx: Ctx) -> Outcome:
     routes = [r["path"] for r in arch["routes"]]
     kind = kind_of(spec)
     system = (SYSTEM + (APP_NOTE if has_database(kind) else "") + (BOT_NOTE if kind == "bot" else "")
-              + (SHOP_NOTE if kind == "shop" else "") + rules_for(kind) + (ACCOUNTS_RULES if uses_accounts(arch) else "") + " " + STEP_RULE + SAFETY_NOTE)
+              + (SHOP_NOTE if kind == "shop" else "") + rules_for(kind) + (ACCOUNTS_RULES + capability_rules(spec) if uses_accounts(arch) else "") + " " + STEP_RULE + SAFETY_NOTE)
 
     base = (
         f"Spec:\n{json.dumps(spec, ensure_ascii=False, indent=2)}\n\n"

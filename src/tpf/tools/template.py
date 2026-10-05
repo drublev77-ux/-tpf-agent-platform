@@ -6,6 +6,8 @@ import json
 import re
 from pathlib import Path
 
+from tpf.tools.template_extras import (APP_AUTO_REFRESH, APP_FILE_INPUT, APP_FILES, APP_GEO, APP_GEO_FORM, CHAT_RULES, FILES_PATH,
+                                       GEO_RULES, UPLOADS_RULES)
 from tpf.tools.shop_payments_ts import (SHOP_PAY_CHECK, SHOP_PAY_CHECK_PATH, SHOP_PAY_NOTIFY, SHOP_PAY_NOTIFY_PATH,
                                          SHOP_PAY_RETURN, SHOP_PAY_RETURN_PATH, SHOP_PAYMENTS)
 
@@ -108,7 +110,8 @@ APP_PACKAGE = json.dumps({
     "devDependencies": {"typescript": "^5.4.0", "@types/node": "^22.0.0", "@types/react": "^19.0.0"},
 }, indent=2) + "\n"
 
-APP_NEXT_CONFIG = "/** @type {import('next').NextConfig} */\nconst nextConfig = { images: { unoptimized: true }, poweredByHeader: false };\nexport default nextConfig;\n"
+APP_NEXT_CONFIG = ("/** @type {import('next').NextConfig} */\nconst nextConfig = { images: { unoptimized: true }, poweredByHeader: false,\n"
+                   "  experimental: { serverActions: { bodySizeLimit: '5mb' } } };   // a form may carry a photo or a PDF\nexport default nextConfig;\n")
 
 APP_DB = '''import "server-only";
 import postgres from "postgres";
@@ -893,7 +896,8 @@ def platform_files(form_endpoint: str = "", kind: str = "site") -> dict[str, str
         files |= {
             "package.json": APP_PACKAGE, "next.config.mjs": APP_NEXT_CONFIG,
             "tpf/db.ts": APP_DB, "tpf/auth.ts": APP_AUTH, "tpf/notify.ts": APP_NOTIFY, HEALTH_PATH: APP_HEALTH,
-            USERS_PATH: APP_USERS,
+            USERS_PATH: APP_USERS, FILES_PATH: APP_FILES, "tpf/FileInput.tsx": APP_FILE_INPUT,
+            "tpf/AutoRefresh.tsx": APP_AUTO_REFRESH, "tpf/GeoForm.tsx": APP_GEO_FORM, "tpf/geo.ts": APP_GEO,
             "vercel.json": '{ "regions": ["fra1"] }\n',   # next to the database, not across an ocean from it
             ".env.example": "DATABASE_URL=postgres://user:password@host:6543/postgres\nSESSION_SECRET=\nADMIN_PASSWORD=\n",
         }
@@ -941,6 +945,19 @@ def kind_of(spec: dict | None) -> str:
     with a database and admin area) or 'shop' (an application that sells and takes card payments)."""
     kind = (spec or {}).get("product_type")
     return kind if kind in ("app", "bot", "shop") else "site"
+
+
+CAPABILITIES = {"uploads": UPLOADS_RULES, "chat": CHAT_RULES, "geolocation": GEO_RULES}
+
+
+def capabilities_of(spec: dict | None) -> list[str]:
+    """Which of the optional abilities an application's spec asks for, in a fixed order."""
+    asked = (spec or {}).get("capabilities") or []
+    return [c for c in CAPABILITIES if c in asked] if kind_of(spec) == "app" else []
+
+
+def capability_rules(spec: dict | None) -> str:
+    return "".join(CAPABILITIES[c] for c in capabilities_of(spec))
 
 
 def uses_accounts(arch: dict | None) -> bool:
