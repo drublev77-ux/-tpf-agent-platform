@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, Response
 from tpf.config import get_settings
 from tpf.notifications import EmailNotifier, email_html
 from tpf.orchestrator.states import State
+from tpf.tools import hooks
 
 log = logging.getLogger("tpf.forms")
 router = APIRouter(include_in_schema=False)
@@ -83,4 +84,6 @@ async def form_submit(order_id: int, request: Request) -> JSONResponse:
             await o.pool.execute("UPDATE form_submissions SET delivered = true WHERE id = $1", sub_id)
         except Exception:  # noqa: BLE001 — the message is stored; the visitor still gets a success
             log.exception("form message %s for order %s was stored but not e-mailed", sub_id, order_id)
+    await hooks.emit(o.pool, order_id, "record.created", {
+        "subject": data["name"], "contact": data["contact"], "text": data["message"], "page": data["page"]})
     return _reply(200, {"ok": True})

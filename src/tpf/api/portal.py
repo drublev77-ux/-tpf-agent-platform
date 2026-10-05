@@ -9,6 +9,7 @@ from __future__ import annotations
 import hmac
 import io
 import re
+import secrets
 import zipfile
 from html import escape
 from typing import Any
@@ -23,7 +24,7 @@ import asyncpg
 from tpf.orchestrator import queue
 from tpf.orchestrator.states import Ev, State, TransitionError
 from tpf.config import get_settings
-from tpf.tools import shop_pay
+from tpf.tools import hooks, shop_pay
 from tpf.tools.shop_stripe import KEY_RE, ShopStripe, StripeKeyError, key_mode
 from tpf.tools.telegram import TOKEN_RE, TelegramAPI, TelegramError
 from tpf.tools.template import all_files, form_endpoint, kind_of
@@ -32,7 +33,7 @@ router = APIRouter(include_in_schema=False)
 
 T: dict[str, dict[str, str]] = {
     "ru": {
-        "pay_save": "Подключить оплату", "pay_held": "Рабочий ключ сохранён. К версии для проверки он не подключается, чтобы при проверке не списывались настоящие деньги; оплата заработает после запуска магазина.", "pay": "Приём оплаты картой", "pay_intro": "Покупатели платят картой на ваш собственный счёт у платёжного провайдера — деньги поступают сразу вам, мимо нас. Выберите провайдера и введите его ключи. Ключи хранятся у нас в закрытом виде; не пересылайте их в переписке. Без ключей магазин принимает заказы без онлайн-оплаты.", "pay_provider": "Провайдер", "pay_shop": "Идентификатор магазина (shopId / Shop ID) — для ЮKassa и bePaid", "pay_key": "Секретный ключ", "pay_how_stripe": "Stripe — для продаж за рубеж. В панели Stripe откройте Developers → API keys и скопируйте секретный ключ. Для проверки вставьте тестовый (sk_test…), перед запуском продаж замените на рабочий (sk_live…).", "pay_how_yookassa": "ЮKassa — для бизнеса в России, оплата в рублях. В личном кабинете ЮKassa: shopId — в «Настройки → Магазин», секретный ключ — в «Интеграция → Ключи API». Для проверки введите данные тестового магазина (ключ test_…), перед запуском — рабочего (ключ live_…). Магазин не передаёт в ЮKassa данные для чеков: если у вас включена отправка чеков через ЮKassa, оплата работать не будет.", "pay_how_bepaid": "bePaid — для бизнеса в Беларуси. В личном кабинете bePaid откройте «Магазины → Детали»: там ID магазина и секретный ключ. На версии для проверки платежи проходят как тестовые, после запуска — как настоящие; ключ один и тот же.", "pay_on": "Подключено: {name}.", "pay_hook": "Чтобы оплата засчитывалась, даже если покупатель закрыл страницу, не вернувшись в магазин, добавьте в кабинете ЮKassa («Интеграция → HTTP-уведомления») этот адрес и событие payment.succeeded:", "pay_test": "Тестовый режим: деньги не списываются.", "pay_live": "Рабочий режим: платежи настоящие.", "pay_wait": "Ключи сохранены. Оплата заработает, когда будет готова версия для проверки.", "pay_change": "Сменить провайдера или ключи", "bot": "Telegram-бот", "bot_how": "Создайте бота в Telegram: откройте @BotFather, отправьте /newbot, задайте имя — он пришлёт токен вида 123456789:AA… Вставьте его сюда. Токен хранится у нас в закрытом виде; не пересылайте его в переписке.", "bot_token": "Токен бота", "bot_save": "Подключить бота", "bot_on": "Подключён бот", "bot_wait": "Токен сохранён. Бот заработает, когда будет готова версия для проверки.", "bot_stg": "Сейчас бот работает на проверочной версии.", "bot_change": "Заменить токен", "admin": "Панель управления", "admin_note": "Здесь вы сами добавляете и меняете данные приложения. Пароль никому не передавайте.", "admin_stg_note": "Это проверочная версия: данные из неё в рабочую версию не переносятся, у рабочей будет свой пароль.", "password": "Пароль", "inbox": "Сообщения с формы вашего сайта", "inbox_note": "Каждое сообщение мы также пересылаем вам на почту. Здесь последние 50.", "missing": "Нужно от вас — пока на сайте заглушки", "source": "Исходный код", "zip": "Скачать ZIP", "gh_label": "Ваше имя пользователя на GitHub — пригласим в приватный репозиторий", "gh_btn": "Получить доступ", "title": "Заказ №{id}", "status": "Статус", "conversation": "Переписка", "you": "Вы", "studio": "TPF Technology",
+        "pay_save": "Подключить оплату", "pay_held": "Рабочий ключ сохранён. К версии для проверки он не подключается, чтобы при проверке не списывались настоящие деньги; оплата заработает после запуска магазина.", "pay": "Приём оплаты картой", "pay_intro": "Покупатели платят картой на ваш собственный счёт у платёжного провайдера — деньги поступают сразу вам, мимо нас. Выберите провайдера и введите его ключи. Ключи хранятся у нас в закрытом виде; не пересылайте их в переписке. Без ключей магазин принимает заказы без онлайн-оплаты.", "pay_provider": "Провайдер", "pay_shop": "Идентификатор магазина (shopId / Shop ID) — для ЮKassa и bePaid", "pay_key": "Секретный ключ", "pay_how_stripe": "Stripe — для продаж за рубеж. В панели Stripe откройте Developers → API keys и скопируйте секретный ключ. Для проверки вставьте тестовый (sk_test…), перед запуском продаж замените на рабочий (sk_live…).", "pay_how_yookassa": "ЮKassa — для бизнеса в России, оплата в рублях. В личном кабинете ЮKassa: shopId — в «Настройки → Магазин», секретный ключ — в «Интеграция → Ключи API». Для проверки введите данные тестового магазина (ключ test_…), перед запуском — рабочего (ключ live_…). Магазин не передаёт в ЮKassa данные для чеков: если у вас включена отправка чеков через ЮKassa, оплата работать не будет.", "pay_how_bepaid": "bePaid — для бизнеса в Беларуси. В личном кабинете bePaid откройте «Магазины → Детали»: там ID магазина и секретный ключ. На версии для проверки платежи проходят как тестовые, после запуска — как настоящие; ключ один и тот же.", "pay_on": "Подключено: {name}.", "pay_hook": "Чтобы оплата засчитывалась, даже если покупатель закрыл страницу, не вернувшись в магазин, добавьте в кабинете ЮKassa («Интеграция → HTTP-уведомления») этот адрес и событие payment.succeeded:", "pay_test": "Тестовый режим: деньги не списываются.", "pay_live": "Рабочий режим: платежи настоящие.", "pay_wait": "Ключи сохранены. Оплата заработает, когда будет готова версия для проверки.", "pay_change": "Сменить провайдера или ключи", "hook": "Автоматизация", "hook_how": "Если вы пользуетесь n8n, Zapier, Make или CRM, которая принимает веб-хуки, вставьте сюда адрес веб-хука. Каждую новую заявку, запись или заказ мы будем сразу отправлять на него. Адрес должен начинаться с https://.", "hook_url": "Адрес веб-хука", "hook_save": "Сохранить", "hook_on": "События отправляются на", "hook_key": "Ключ подписи (для проверки, что событие пришло от нас)", "hook_test": "Отправить проверочное событие", "hook_off": "Отключить", "hook_last_ok": "Последняя отправка принята.", "hook_last_bad": "Последняя отправка не принята: ваш адрес ответил ошибкой или не ответил.", "bot": "Telegram-бот", "bot_how": "Создайте бота в Telegram: откройте @BotFather, отправьте /newbot, задайте имя — он пришлёт токен вида 123456789:AA… Вставьте его сюда. Токен хранится у нас в закрытом виде; не пересылайте его в переписке.", "bot_token": "Токен бота", "bot_save": "Подключить бота", "bot_on": "Подключён бот", "bot_wait": "Токен сохранён. Бот заработает, когда будет готова версия для проверки.", "bot_stg": "Сейчас бот работает на проверочной версии.", "bot_change": "Заменить токен", "admin": "Панель управления", "admin_note": "Здесь вы сами добавляете и меняете данные приложения. Пароль никому не передавайте.", "admin_stg_note": "Это проверочная версия: данные из неё в рабочую версию не переносятся, у рабочей будет свой пароль.", "password": "Пароль", "inbox": "Сообщения с формы вашего сайта", "inbox_note": "Каждое сообщение мы также пересылаем вам на почту. Здесь последние 50.", "missing": "Нужно от вас — пока на сайте заглушки", "source": "Исходный код", "zip": "Скачать ZIP", "gh_label": "Ваше имя пользователя на GitHub — пригласим в приватный репозиторий", "gh_btn": "Получить доступ", "title": "Заказ №{id}", "status": "Статус", "conversation": "Переписка", "you": "Вы", "studio": "TPF Technology",
         "spec": "Техническое задание", "pages": "Страницы", "criteria": "Критерии приёмки", "estimate": "Смета",
         "hours": "Трудоёмкость", "price": "Стоимость", "duration": "Срок", "days": "дн.", "h": "ч",
         "pay_pre": "Предоплата", "pay_final": "Остаток перед запуском", "paid": "оплачено", "pay_now": "Оплатить",
@@ -43,7 +44,7 @@ T: dict[str, dict[str, str]] = {
         "err": "Не получилось: {why}", "open_link": "Открыть",
     },
     "en": {
-        "pay_save": "Connect payments", "pay_held": "The live key is saved. It is not connected to the review version, so reviewing cannot charge real money; payments will start working when the shop is released.", "pay": "Card payments", "pay_intro": "Customers pay by card into your own account with a payment provider — the money goes straight to you, not through us. Choose the provider and enter its keys. We store the keys privately; do not send them in messages. Without keys the shop takes orders without online payment.", "pay_provider": "Provider", "pay_shop": "Shop identifier (shopId / Shop ID) — for YooKassa and bePaid", "pay_key": "Secret key", "pay_how_stripe": "Stripe — for international sales. In the Stripe dashboard open Developers → API keys and copy the secret key. For the review paste the test key (sk_test…); before you start selling, replace it with the live one (sk_live…).", "pay_how_yookassa": "YooKassa — for a business in Russia, payments in roubles. In your YooKassa dashboard: shopId is under Settings → Shop, the secret key under Integration → API keys. For the review enter the details of your test shop (key test_…), before release those of the live one (key live_…). The shop does not send receipt data to YooKassa: if you send fiscal receipts through YooKassa, payments will not work.", "pay_how_bepaid": "bePaid — for a business in Belarus. In your bePaid back office open Shops → Details: the Shop ID and the secret key are there. On the review version payments are made as test ones, after release as real ones; the key is the same.", "pay_on": "Connected: {name}.", "pay_hook": "So that a payment counts even when the customer closes the page without returning to the shop, add this address with the event payment.succeeded in your YooKassa dashboard (Integration → HTTP notifications):", "pay_test": "Test mode: no money moves.", "pay_live": "Live mode: payments are real.", "pay_wait": "The keys are saved. Payments will start working when the review version is ready.", "pay_change": "Change the provider or the keys", "bot": "Telegram bot", "bot_how": "Create the bot in Telegram: open @BotFather, send /newbot, choose a name — it replies with a token like 123456789:AA… Paste it here. We store the token privately; do not send it in messages.", "bot_token": "Bot token", "bot_save": "Connect the bot", "bot_on": "Connected bot", "bot_wait": "The token is saved. The bot will start working when the review version is ready.", "bot_stg": "The bot is currently running on the review version.", "bot_change": "Replace the token", "admin": "Admin area", "admin_note": "This is where you add and edit the application's data yourself. Keep the password private.", "admin_stg_note": "This is the review version: its data is not carried over to the live version, which gets its own password.", "password": "Password", "inbox": "Messages from your site's form", "inbox_note": "Each message is also e-mailed to you. The latest 50 are shown here.", "missing": "Needed from you — the site shows placeholders for now", "source": "Source code", "zip": "Download ZIP", "gh_label": "Your GitHub username — we will invite you to the private repository", "gh_btn": "Get access", "title": "Order #{id}", "status": "Status", "conversation": "Conversation", "you": "You", "studio": "TPF Technology",
+        "pay_save": "Connect payments", "pay_held": "The live key is saved. It is not connected to the review version, so reviewing cannot charge real money; payments will start working when the shop is released.", "pay": "Card payments", "pay_intro": "Customers pay by card into your own account with a payment provider — the money goes straight to you, not through us. Choose the provider and enter its keys. We store the keys privately; do not send them in messages. Without keys the shop takes orders without online payment.", "pay_provider": "Provider", "pay_shop": "Shop identifier (shopId / Shop ID) — for YooKassa and bePaid", "pay_key": "Secret key", "pay_how_stripe": "Stripe — for international sales. In the Stripe dashboard open Developers → API keys and copy the secret key. For the review paste the test key (sk_test…); before you start selling, replace it with the live one (sk_live…).", "pay_how_yookassa": "YooKassa — for a business in Russia, payments in roubles. In your YooKassa dashboard: shopId is under Settings → Shop, the secret key under Integration → API keys. For the review enter the details of your test shop (key test_…), before release those of the live one (key live_…). The shop does not send receipt data to YooKassa: if you send fiscal receipts through YooKassa, payments will not work.", "pay_how_bepaid": "bePaid — for a business in Belarus. In your bePaid back office open Shops → Details: the Shop ID and the secret key are there. On the review version payments are made as test ones, after release as real ones; the key is the same.", "pay_on": "Connected: {name}.", "pay_hook": "So that a payment counts even when the customer closes the page without returning to the shop, add this address with the event payment.succeeded in your YooKassa dashboard (Integration → HTTP notifications):", "pay_test": "Test mode: no money moves.", "pay_live": "Live mode: payments are real.", "pay_wait": "The keys are saved. Payments will start working when the review version is ready.", "pay_change": "Change the provider or the keys", "hook": "Automation", "hook_how": "If you use n8n, Zapier, Make or a CRM that accepts webhooks, paste the webhook address here. We will send every new request, booking or order to it at once. The address must start with https://.", "hook_url": "Webhook address", "hook_save": "Save", "hook_on": "Events are sent to", "hook_key": "Signing key (to check that an event came from us)", "hook_test": "Send a test event", "hook_off": "Turn off", "hook_last_ok": "The last delivery was accepted.", "hook_last_bad": "The last delivery was not accepted: your address answered with an error or did not answer.", "bot": "Telegram bot", "bot_how": "Create the bot in Telegram: open @BotFather, send /newbot, choose a name — it replies with a token like 123456789:AA… Paste it here. We store the token privately; do not send it in messages.", "bot_token": "Bot token", "bot_save": "Connect the bot", "bot_on": "Connected bot", "bot_wait": "The token is saved. The bot will start working when the review version is ready.", "bot_stg": "The bot is currently running on the review version.", "bot_change": "Replace the token", "admin": "Admin area", "admin_note": "This is where you add and edit the application's data yourself. Keep the password private.", "admin_stg_note": "This is the review version: its data is not carried over to the live version, which gets its own password.", "password": "Password", "inbox": "Messages from your site's form", "inbox_note": "Each message is also e-mailed to you. The latest 50 are shown here.", "missing": "Needed from you — the site shows placeholders for now", "source": "Source code", "zip": "Download ZIP", "gh_label": "Your GitHub username — we will invite you to the private repository", "gh_btn": "Get access", "title": "Order #{id}", "status": "Status", "conversation": "Conversation", "you": "You", "studio": "TPF Technology",
         "spec": "Specification", "pages": "Pages", "criteria": "Acceptance criteria", "estimate": "Estimate",
         "hours": "Effort", "price": "Price", "duration": "Timeline", "days": "days", "h": "h",
         "pay_pre": "Deposit", "pay_final": "Balance before release", "paid": "paid", "pay_now": "Pay now",
@@ -54,7 +55,7 @@ T: dict[str, dict[str, str]] = {
         "err": "Could not do that: {why}", "open_link": "Open",
     },
     "zh": {
-        "pay_save": "接通付款", "pay_held": "正式密钥已保存。为避免审核时产生真实扣款，它不会连接到审核版本；商店上线后付款将开始生效。", "pay": "刷卡收款", "pay_intro": "顾客刷卡付款，款项直接进入您在支付服务商处的自有账户，不经过我们。请选择服务商并输入其密钥。密钥由我们保密存储；请勿在消息中发送。未提供密钥时，商店仅接收订单，不在线收款。", "pay_provider": "支付服务商", "pay_shop": "商店标识（shopId / Shop ID）——用于 YooKassa 和 bePaid", "pay_key": "密钥", "pay_how_stripe": "Stripe——适用于国际销售。在 Stripe 后台打开 Developers → API keys 并复制密钥。审核时请粘贴测试密钥（sk_test…）；正式销售前请更换为正式密钥（sk_live…）。", "pay_how_yookassa": "YooKassa——适用于俄罗斯的商家，以卢布收款。在 YooKassa 后台：shopId 位于“设置 → 商店”，密钥位于“集成 → API 密钥”。审核时请输入测试商店的信息（密钥 test_…），上线前输入正式商店的信息（密钥 live_…）。商店不会向 YooKassa 传送收据数据：如果您通过 YooKassa 开具税务收据，付款将无法使用。", "pay_how_bepaid": "bePaid——适用于白俄罗斯的商家。在 bePaid 后台打开“商店 → 详情”：其中有商店 ID 和密钥。审核版本中的付款为测试付款，上线后为真实付款；密钥相同。", "pay_on": "已连接：{name}。", "pay_hook": "为确保顾客未返回商店就关闭页面时付款仍能记入，请在 YooKassa 后台（集成 → HTTP 通知）添加此地址并选择事件 payment.succeeded：", "pay_test": "测试模式：不会实际扣款。", "pay_live": "正式模式：付款为真实交易。", "pay_wait": "密钥已保存。审核版本准备好后付款将开始生效。", "pay_change": "更换服务商或密钥", "bot": "Telegram 机器人", "bot_how": "在 Telegram 中创建机器人：打开 @BotFather，发送 /newbot，设置名称——它会回复形如 123456789:AA… 的令牌。请粘贴到此处。令牌由我们保密存储；请勿在消息中发送。", "bot_token": "机器人令牌", "bot_save": "连接机器人", "bot_on": "已连接机器人", "bot_wait": "令牌已保存。审核版本准备好后机器人将开始工作。", "bot_stg": "机器人目前运行在审核版本上。", "bot_change": "更换令牌", "admin": "管理后台", "admin_note": "您可以在这里自行添加和修改应用数据。请勿泄露密码。", "admin_stg_note": "这是审核版本：其中的数据不会带到正式版本，正式版本会有单独的密码。", "password": "密码", "inbox": "您网站表单收到的留言", "inbox_note": "每条留言也会通过邮件发送给您。此处显示最近 50 条。", "missing": "需要您提供——网站目前显示占位符", "source": "源代码", "zip": "下载 ZIP", "gh_label": "您的 GitHub 用户名——我们将邀请您加入私有仓库", "gh_btn": "获取访问权限", "title": "订单 #{id}", "status": "状态", "conversation": "沟通记录", "you": "您", "studio": "TPF Technology",
+        "pay_save": "接通付款", "pay_held": "正式密钥已保存。为避免审核时产生真实扣款，它不会连接到审核版本；商店上线后付款将开始生效。", "pay": "刷卡收款", "pay_intro": "顾客刷卡付款，款项直接进入您在支付服务商处的自有账户，不经过我们。请选择服务商并输入其密钥。密钥由我们保密存储；请勿在消息中发送。未提供密钥时，商店仅接收订单，不在线收款。", "pay_provider": "支付服务商", "pay_shop": "商店标识（shopId / Shop ID）——用于 YooKassa 和 bePaid", "pay_key": "密钥", "pay_how_stripe": "Stripe——适用于国际销售。在 Stripe 后台打开 Developers → API keys 并复制密钥。审核时请粘贴测试密钥（sk_test…）；正式销售前请更换为正式密钥（sk_live…）。", "pay_how_yookassa": "YooKassa——适用于俄罗斯的商家，以卢布收款。在 YooKassa 后台：shopId 位于“设置 → 商店”，密钥位于“集成 → API 密钥”。审核时请输入测试商店的信息（密钥 test_…），上线前输入正式商店的信息（密钥 live_…）。商店不会向 YooKassa 传送收据数据：如果您通过 YooKassa 开具税务收据，付款将无法使用。", "pay_how_bepaid": "bePaid——适用于白俄罗斯的商家。在 bePaid 后台打开“商店 → 详情”：其中有商店 ID 和密钥。审核版本中的付款为测试付款，上线后为真实付款；密钥相同。", "pay_on": "已连接：{name}。", "pay_hook": "为确保顾客未返回商店就关闭页面时付款仍能记入，请在 YooKassa 后台（集成 → HTTP 通知）添加此地址并选择事件 payment.succeeded：", "pay_test": "测试模式：不会实际扣款。", "pay_live": "正式模式：付款为真实交易。", "pay_wait": "密钥已保存。审核版本准备好后付款将开始生效。", "pay_change": "更换服务商或密钥", "hook": "自动化", "hook_how": "如果您使用 n8n、Zapier、Make 或支持 Webhook 的 CRM，请在此粘贴 Webhook 地址。每条新的请求、预约或订单都会立即发送到该地址。地址必须以 https:// 开头。", "hook_url": "Webhook 地址", "hook_save": "保存", "hook_on": "事件发送至", "hook_key": "签名密钥（用于验证事件来自我们）", "hook_test": "发送测试事件", "hook_off": "关闭", "hook_last_ok": "最近一次发送已被接收。", "hook_last_bad": "最近一次发送未被接收：您的地址返回错误或没有响应。", "bot": "Telegram 机器人", "bot_how": "在 Telegram 中创建机器人：打开 @BotFather，发送 /newbot，设置名称——它会回复形如 123456789:AA… 的令牌。请粘贴到此处。令牌由我们保密存储；请勿在消息中发送。", "bot_token": "机器人令牌", "bot_save": "连接机器人", "bot_on": "已连接机器人", "bot_wait": "令牌已保存。审核版本准备好后机器人将开始工作。", "bot_stg": "机器人目前运行在审核版本上。", "bot_change": "更换令牌", "admin": "管理后台", "admin_note": "您可以在这里自行添加和修改应用数据。请勿泄露密码。", "admin_stg_note": "这是审核版本：其中的数据不会带到正式版本，正式版本会有单独的密码。", "password": "密码", "inbox": "您网站表单收到的留言", "inbox_note": "每条留言也会通过邮件发送给您。此处显示最近 50 条。", "missing": "需要您提供——网站目前显示占位符", "source": "源代码", "zip": "下载 ZIP", "gh_label": "您的 GitHub 用户名——我们将邀请您加入私有仓库", "gh_btn": "获取访问权限", "title": "订单 #{id}", "status": "状态", "conversation": "沟通记录", "you": "您", "studio": "TPF Technology",
         "spec": "需求规格书", "pages": "页面", "criteria": "验收标准", "estimate": "报价",
         "hours": "工作量", "price": "价格", "duration": "工期", "days": "天", "h": "小时",
         "pay_pre": "预付款", "pay_final": "上线前尾款", "paid": "已付", "pay_now": "立即付款",
@@ -89,20 +90,20 @@ STATUS: dict[str, dict[str, str]] = {
 
 DONE = {
     "ru": {"message": "ответ отправлен", "approved": "смета утверждена", "rejected": "замечания по смете отправлены",
-           "accepted": "работа принята", "changes": "правки отправлены", "repo": "запрос отправлен, приглашение придёт от GitHub", "bot": "токен принят, подключаем бота", "pay": "ключ принят, подключаем оплату"},
+           "accepted": "работа принята", "changes": "правки отправлены", "repo": "запрос отправлен, приглашение придёт от GitHub", "bot": "токен принят, подключаем бота", "pay": "ключ принят, подключаем оплату", "hook": "адрес сохранён", "hook_test": "проверочное событие отправлено и принято", "hook_off": "отправка событий отключена"},
     "en": {"message": "reply sent", "approved": "estimate approved", "rejected": "estimate comments sent",
-           "accepted": "work accepted", "changes": "change request sent", "repo": "request sent, GitHub will deliver the invitation", "bot": "token accepted, connecting the bot", "pay": "key accepted, connecting payments"},
+           "accepted": "work accepted", "changes": "change request sent", "repo": "request sent, GitHub will deliver the invitation", "bot": "token accepted, connecting the bot", "pay": "key accepted, connecting payments", "hook": "address saved", "hook_test": "test event sent and accepted", "hook_off": "event delivery turned off"},
     "zh": {"message": "回复已发送", "approved": "报价已确认", "rejected": "报价意见已发送",
-           "accepted": "已验收", "changes": "修改意见已发送", "repo": "请求已发送，GitHub 将发出邀请", "bot": "令牌已接受，正在连接机器人", "pay": "密钥已接受，正在接通付款"},
+           "accepted": "已验收", "changes": "修改意见已发送", "repo": "请求已发送，GitHub 将发出邀请", "bot": "令牌已接受，正在连接机器人", "pay": "密钥已接受，正在接通付款", "hook": "地址已保存", "hook_test": "测试事件已发送并被接收", "hook_off": "已关闭事件发送"},
 }
 
 ERR = {
     "ru": {"state": "сейчас это действие недоступно", "comment": "напишите, что нужно изменить", "empty": "пустое сообщение",
-           "gh": "имя пользователя GitHub указано неверно", "token": "Telegram не принял этот токен; скопируйте его из @BotFather ещё раз", "key": "провайдер не принял эти ключи; проверьте идентификатор магазина и скопируйте секретный ключ ещё раз", "busy": "предыдущий запрос ещё выполняется"},
+           "gh": "имя пользователя GitHub указано неверно", "token": "Telegram не принял этот токен; скопируйте его из @BotFather ещё раз", "key": "провайдер не принял эти ключи; проверьте идентификатор магазина и скопируйте секретный ключ ещё раз", "busy": "предыдущий запрос ещё выполняется", "hook": "этот адрес не подходит: нужен общедоступный адрес, начинающийся с https://", "hook_test": "ваш адрес не принял проверочное событие"},
     "en": {"state": "this action is not available right now", "comment": "please tell us what to change", "empty": "the message is empty",
-           "gh": "that GitHub username is not valid", "token": "Telegram did not accept this token; copy it from @BotFather again", "key": "the provider did not accept these keys; check the shop identifier and copy the secret key again", "busy": "the previous request is still running"},
+           "gh": "that GitHub username is not valid", "token": "Telegram did not accept this token; copy it from @BotFather again", "key": "the provider did not accept these keys; check the shop identifier and copy the secret key again", "busy": "the previous request is still running", "hook": "this address cannot be used: it must be a public address starting with https://", "hook_test": "your address did not accept the test event"},
     "zh": {"state": "当前无法执行此操作", "comment": "请说明需要修改的内容", "empty": "消息为空",
-           "gh": "GitHub 用户名无效", "token": "Telegram 未接受此令牌；请从 @BotFather 重新复制", "key": "支付服务商未接受这些密钥；请核对商店标识并重新复制密钥", "busy": "上一个请求仍在处理中"},
+           "gh": "GitHub 用户名无效", "token": "Telegram 未接受此令牌；请从 @BotFather 重新复制", "key": "支付服务商未接受这些密钥；请核对商店标识并重新复制密钥", "busy": "上一个请求仍在处理中", "hook": "此地址无法使用：必须是以 https:// 开头的公开地址", "hook_test": "您的地址未接收测试事件"},
 }
 GH_USER = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$")
 
@@ -198,6 +199,7 @@ async def portal(order_id: int, request: Request, t: str = "", done: str = "", e
         parts.append(f'<section><h2>{tr["live"]}</h2><a href="{escape(order["production_url"])}">{escape(order["production_url"])}</a></section>')
         if st == State.DELIVERED:
             parts.append(await _admin_block(o, order_id, "prod", order["production_url"], tr))
+            parts.append(await _hook_block(o, order_id, t, tr))
 
     if st == State.DELIVERED and await o.latest_artifact(order_id, "code"):
         published = await o.pool.fetchval(
@@ -377,6 +379,65 @@ async def _admin_block(o: Any, order_id: int, env: str, site_url: str, tr: dict[
     return (f'<section><h2>{tr["admin"]}</h2><p class="muted">{escape(note)}</p>'
             f'<dl><dt>{tr["open_link"]}</dt><dd><a href="{escape(url)}" target="_blank" rel="noopener">{escape(url)}</a></dd>'
             f'<dt>{tr["password"]}</dt><dd><code>{escape(password)}</code></dd></dl></section>')
+
+
+async def _hook_block(o: Any, order_id: int, t: str, tr: dict[str, str]) -> str:
+    """For a delivered product: the address its events are sent to for the client's own automation."""
+    hook = await o.pool.fetchrow("SELECT url, secret, last_status FROM automation_hooks WHERE order_id = $1", order_id)
+    field = (f'<label for="hk">{tr["hook_url"]}</label><input id="hk" name="url" type="url" required maxlength="500" '
+             f'placeholder="https://" autocomplete="off" spellcheck="false" value="{escape(hook["url"]) if hook else ""}">')
+    save = _form(f"/portal/{order_id}/hook", t, field + f'<div class="row"><button class="btn{" ghost" if hook else ""}">{tr["hook_save"]}</button></div>')
+    body = f'<p class="muted">{escape(tr["hook_how"])}</p>'
+    if hook is not None:
+        last = hook["last_status"]
+        note = "" if last is None else f'<p class="muted">{escape(tr["hook_last_ok"] if 200 <= last < 300 else tr["hook_last_bad"])}</p>'
+        body += (f'<p>{tr["hook_on"]}: <code>{escape(hook["url"])}</code></p>{note}'
+                 f'<p class="muted">{tr["hook_key"]}: <code>{escape(hook["secret"])}</code></p>'
+                 + _form(f"/portal/{order_id}/hook-test", t, f'<button class="btn">{tr["hook_test"]}</button>')
+                 + _form(f"/portal/{order_id}/hook", t, f'<input type="hidden" name="off" value="1"><button class="btn ghost">{tr["hook_off"]}</button>'))
+    return f'<section><h2>{tr["hook"]}</h2>{body}{save}</section>'
+
+
+@router.post("/portal/{order_id}/hook")
+async def portal_hook(order_id: int, request: Request) -> RedirectResponse:
+    form = await _form_data(request)
+    order = await _load(request, order_id, form.get("t", ""))
+    o = request.app.state.orch
+    if order["state"] != State.DELIVERED:
+        return _back(order_id, form["t"], err="state")
+    if form.get("off"):
+        await o.pool.execute("DELETE FROM automation_hooks WHERE order_id = $1", order_id)
+        await o.log(order_id, "automation_hook_removed", "client", {}, kind="client")
+        return _back(order_id, form["t"], done="hook_off")
+    url = form.get("url", "").strip()
+    try:
+        await hooks.check_public(url)
+    except hooks.HookError:
+        return _back(order_id, form["t"], err="hook")
+    await o.pool.execute(
+        "INSERT INTO automation_hooks (order_id, url, secret) VALUES ($1, $2, $3) "
+        "ON CONFLICT (order_id) DO UPDATE SET url = EXCLUDED.url, last_status = NULL, last_at = NULL, updated_at = now()",
+        order_id, url, secrets.token_urlsafe(32))
+    await o.log(order_id, "automation_hook_set", "client", {"host": hooks.parse(url)[0]}, kind="client")
+    return _back(order_id, form["t"], done="hook")
+
+
+@router.post("/portal/{order_id}/hook-test")
+async def portal_hook_test(order_id: int, request: Request) -> RedirectResponse:
+    form = await _form_data(request)
+    order = await _load(request, order_id, form.get("t", ""))
+    o = request.app.state.orch
+    if order["state"] != State.DELIVERED:
+        return _back(order_id, form["t"], err="state")
+    recent = await o.pool.fetchval(
+        "SELECT last_at > now() - interval '10 seconds' FROM automation_hooks WHERE order_id = $1", order_id)
+    if recent:
+        return _back(order_id, form["t"], err="busy")
+    status = await hooks.emit(o.pool, order_id, "test", {
+        "subject": "Test", "contact": order["client_email"], "text": "TPF Technology test event", "page": ""})
+    if status is None:
+        return _back(order_id, form["t"], err="state")
+    return _back(order_id, form["t"], done="hook_test") if 200 <= status < 300 else _back(order_id, form["t"], err="hook_test")
 
 
 @router.get("/portal/{order_id}/source.zip")

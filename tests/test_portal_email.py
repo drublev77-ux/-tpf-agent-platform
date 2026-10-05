@@ -297,3 +297,71 @@ def test_shop_owner_chooses_a_payment_provider_on_the_order_page(client):
         assert len(events) == 3 and not any(k in str(dict(e)) for e in events for k in (YK_TEST, BEPAID_KEY, TEST_KEY))
     finally:
         del app.state.shop_stripe, app.state.shop_pay
+
+
+# --- events for the client's own automation (n8n, Zapier, Make, a CRM) -----------------------------
+
+def test_hook_addresses_must_be_public_https():
+    import asyncio
+
+    from tpf.tools import hooks
+
+    for bad in ("http://example.com/x", "https://localhost/x", "https://user:pw@example.com/x", "https://intranet/x",
+                "https://db.internal/x", "ftp://example.com", "https://exa mple.com", "https://example.com:99999/"):
+        with pytest.raises(hooks.HookError):
+            hooks.parse(bad)
+    assert hooks.parse("https://n8n.example.com:5678/webhook/abc") == ("n8n.example.com", 5678)
+    for private in ("https://127.0.0.1.nip.io.invalid/x", "https://10.0.0.5/x", "https://169.254.169.254/latest", "https://[::1]/x"):
+        with pytest.raises(hooks.HookError):
+            asyncio.run(hooks.check_public(private))
+    assert hooks.sign("k", "1", b"{}") == hooks.sign("k", "1", b"{}") != hooks.sign("k", "2", b"{}")
+
+
+def test_delivered_product_sends_its_events_to_the_owners_address(client, monkeypatch):
+    from tpf.api.main import app
+    from tpf.tools import hooks
+
+    calls: list[tuple[str, str, dict]] = []
+    answer = [200]
+
+    async def fake_deliver(url, secret, event):
+        calls.append((url, secret, event))
+        return answer[0]
+
+    async def fake_check(url):
+        hooks.parse(url)
+    monkeypatch.setattr(hooks, "deliver", fake_deliver)
+    monkeypatch.setattr(hooks, "check_public", fake_check)
+
+    oid, _ = _order(client)
+    orch = app.state.orch
+    token = client.portal.call(orch.pool.fetchval, "SELECT client_token FROM orders WHERE id=$1", oid)
+    form = {"t": token, "url": "https://n8n.example.com/webhook/abc"}
+    assert "err=state" in client.post(f"/portal/{oid}/hook", data=form, follow_redirects=False).headers["location"]
+    client.portal.call(orch.pool.execute,
+                       "UPDATE orders SET state='delivered', production_url='https://x.example' WHERE id=$1", oid)
+    assert "Автоматизация" in client.get(f"/portal/{oid}", params={"t": token}).text
+    assert "err=hook" in client.post(f"/portal/{oid}/hook", data=form | {"url": "http://n8n.example.com/x"},
+                                     follow_redirects=False).headers["location"]
+    assert client.post(f"/portal/{oid}/hook", data={"t": "wrong", "url": form["url"]}, follow_redirects=False).status_code in (403, 404)
+
+    msg = {"name": "Новая запись", "contact": "+375 29 000-00-00", "message": "Стрижка, суббота 12:00"}
+    assert client.post(f"/forms/{oid}", json=msg).status_code == 200 and not calls        # nothing set: nothing sent
+    assert "done=hook" in client.post(f"/portal/{oid}/hook", data=form, follow_redirects=False).headers["location"]
+    assert client.post(f"/forms/{oid}", json=msg).status_code == 200
+    url, secret, event = calls[-1]
+    assert url == form["url"] and len(secret) > 30 and event["event"] == "record.created" and event["order_id"] == oid
+    assert event["data"] == {"subject": "Новая запись", "contact": "+375 29 000-00-00", "text": "Стрижка, суббота 12:00", "page": ""}
+    page = client.get(f"/portal/{oid}", params={"t": token}).text
+    assert "n8n.example.com/webhook/abc" in page and secret in page and "Последняя отправка принята" in page
+
+    client.portal.call(orch.pool.execute, "UPDATE automation_hooks SET last_at = NULL WHERE order_id=$1", oid)
+    answer[0] = 500                                           # the owner's address is down: the form still works
+    assert "err=hook_test" in client.post(f"/portal/{oid}/hook-test", data={"t": token}, follow_redirects=False).headers["location"]
+    assert calls[-1][2]["event"] == "test"
+    assert client.post(f"/forms/{oid}", json=msg).status_code == 200
+    assert "не принята" in client.get(f"/portal/{oid}", params={"t": token}).text
+
+    assert "done=hook_off" in client.post(f"/portal/{oid}/hook", data={"t": token, "off": "1"}, follow_redirects=False).headers["location"]
+    n = len(calls)
+    assert client.post(f"/forms/{oid}", json=msg).status_code == 200 and len(calls) == n
