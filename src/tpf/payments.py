@@ -86,6 +86,9 @@ class StripeGateway:
             "metadata[stage]": stage,
             "payment_intent_data[metadata][order_id]": str(order_id),
             "payment_intent_data[metadata][stage]": stage,
+            # Work starts on payment, so only methods that confirm at once are offered. A SEPA direct debit is
+            # confirmed days later and can be reversed by the payer's bank for weeks.
+            "excluded_payment_method_types[0]": "sepa_debit",
         }
         async with httpx.AsyncClient(timeout=30) as client:
             r = await client.post(
