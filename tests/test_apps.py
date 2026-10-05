@@ -303,10 +303,10 @@ async def test_developer_builds_a_project_in_steps_and_patches_on_fixes(env):
 def test_each_product_type_has_its_own_rate():
     from tpf.config import Settings
     s = Settings(database_url="postgresql://x/y")
-    assert (s.rate_for("site"), s.rate_for("app"), s.rate_for("bot")) == (45, 70, 50)
+    assert (s.rate_for("site"), s.rate_for("app"), s.rate_for("bot")) == (40, 63, 45)
     assert s.rate_for("something-new") == s.hourly_rate
-    assert (s.rate_for("site", "ru"), s.rate_for("app", "ru"), s.rate_for("bot", "ru")) == (36, 56, 34)
-    assert s.rate_for("site", "en") == 45 and s.rate_for("bot", "zh") == 50
+    assert (s.rate_for("site", "ru"), s.rate_for("app", "ru"), s.rate_for("bot", "ru")) == (32, 50, 30)
+    assert s.rate_for("site", "en") == 40 and s.rate_for("bot", "zh") == 45 and s.currency == "EUR"
 
 
 # --- online shops ---

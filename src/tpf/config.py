@@ -35,24 +35,25 @@ class Settings(BaseSettings):
 
     # Commercial terms
     hourly_rate: float = 40.0          # fallback for a product type without its own rate
-    # Rates per product type, set 20% below the market reference for comparable small-business work
-    # (October 2026): landing ~$900, small web application ~$3,000, Telegram bot with booking ~$2,500.
-    hourly_rate_site: float = 45.0
-    hourly_rate_app: float = 70.0
-    hourly_rate_bot: float = 50.0
-    hourly_rate_shop: float = 37.0     # small shop ~$3,000 on the market; a shop takes about 65 hours
+    # Rates per product type, in euros per hour. They were set in US dollars 20% below the market reference
+    # for comparable small-business work (October 2026: landing ~$900, small web application ~$3,000, Telegram
+    # bot with booking ~$2,500) and converted at 1 EUR = 1.117 USD when the studio began charging in euros.
+    hourly_rate_site: float = 40.0
+    hourly_rate_app: float = 63.0
+    hourly_rate_bot: float = 45.0
+    hourly_rate_shop: float = 33.0     # small shop ~$3,000 on the market; a shop takes about 65 hours
 
     # Orders in Russian are priced against the Russian-speaking market, which is cheaper: landing ~60 000 RUB,
-    # simple bot ~65 000 RUB, bot with booking ~140 000 RUB, small application ~200 000 RUB (USD at ~83 RUB).
-    hourly_rate_ru_site: float = 36.0
-    hourly_rate_ru_app: float = 56.0
-    hourly_rate_ru_bot: float = 34.0
-    hourly_rate_ru_shop: float = 29.0  # small shop ~200 000 RUB
+    # simple bot ~65 000 RUB, bot with booking ~140 000 RUB, small application ~200 000 RUB (EUR at ~93 RUB).
+    hourly_rate_ru_site: float = 32.0
+    hourly_rate_ru_app: float = 50.0
+    hourly_rate_ru_bot: float = 30.0
+    hourly_rate_ru_shop: float = 26.0  # small shop ~200 000 RUB
 
     def rate_for(self, product_type: str, language: str = "") -> float:
         regional = getattr(self, f"hourly_rate_{language}_{product_type}", 0) if language else 0
         return float(regional or getattr(self, f"hourly_rate_{product_type}", 0) or self.hourly_rate)
-    currency: str = "USD"
+    currency: str = "EUR"
     # Payments: off | stripe | manual (the operator confirms bank transfers in /admin)
     payment_provider: str = "off"
     prepayment_share: float = 0.5  # 0.5 = 50% before work + 50% before release; 1 = all upfront; 0 = all at the end
