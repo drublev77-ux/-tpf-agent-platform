@@ -828,6 +828,7 @@ async def test_application_with_accounts_gets_a_users_table_and_an_access_check(
     assert not reports[0]["passed"] and "role worker" in reports[0]["build"]["log_tail"]       # went back to the developer
     assert reports[-1]["passed"] and reports[-1]["access_check"] == {"ok": True, "failed": []}
     assert len(env.deployer.access_cases) == 15
+    assert (await env.orch.get_order(oid))["token_budget"] == env.settings.order_token_budget_accounts   # more room than a plain app
     # the owner's smoke test opened only public and admin pages
     assert set(env.deployer.smoked[-1][1]) == {"/", "/login", "/admin", "/admin/login", "/admin/users"}
 

@@ -23,6 +23,7 @@ class Settings(BaseSettings):
 
     # Budgets and limits
     order_token_budget: int = 2_000_000
+    order_token_budget_accounts: int = 5_000_000   # an application with user roles is several times the code and the rounds of checks
     budget_warning_share: float = 0.8
     max_check_attempts: int = 6
     max_check_attempts_accounts: int = 8   # an application with user roles has more to get right: it gets more rounds

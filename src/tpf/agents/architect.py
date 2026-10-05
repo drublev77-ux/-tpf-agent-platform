@@ -206,6 +206,10 @@ async def run(ctx: Ctx) -> Outcome:
         )
         if verdict["approved"]:
             await ctx.orch.save_artifact(ctx.order_id, "architecture", arch, "architect")
+            if accounts:   # measured on a real order: the ordinary budget runs out halfway through the checks
+                await ctx.orch.pool.execute(
+                    "UPDATE orders SET token_budget = GREATEST(token_budget, $2) WHERE id = $1",
+                    ctx.order_id, ctx.settings.order_token_budget_accounts)
             return Outcome(Ev.DESIGN_READY, data={"routes": [r["path"] for r in arch["routes"]]})
         issues = verdict["issues"]
     return Outcome(escalate="Ревьюер не принял архитектуру: " + "; ".join(issues))
