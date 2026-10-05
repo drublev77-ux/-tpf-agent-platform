@@ -54,7 +54,7 @@ async def look(ctx: Ctx, url: str, routes: list[str], cookie: str = "", about: s
     images = [{"label": f"Page {s.route} — {s.viewport}" + ("".join(f"\nNote: {n}" for n in s.notes + s.defects)),
                "media_type": "image/jpeg", "data": base64.b64encode(s.jpeg).decode()} for s in shots]
     result = await ctx.llm.structured(
-        order_id=ctx.order_id, agent="visual", model_class="reviewer", system=SYSTEM, schema=SCHEMA, max_tokens=4000,
+        order_id=ctx.order_id, agent="visual", model_class="reviewer", system=SYSTEM, schema=SCHEMA, max_tokens=8000,
         prompt=(f"{about}\n\n" if about else "") + f"{len(shots)} screenshots follow. Report what is visibly broken.",
         images=images)
     seen = [i for i in result["issues"] if isinstance(i, dict)]

@@ -35,7 +35,7 @@ async def review(ctx: Ctx, *, author: str, artifact_name: str, artifact: Any, cr
     )
     result = await ctx.llm.structured(
         order_id=ctx.order_id, agent="reviewer", model_class="reviewer",
-        system=SYSTEM, prompt=prompt, schema=SCHEMA, max_tokens=4000,
+        system=SYSTEM, prompt=prompt, schema=SCHEMA, max_tokens=12000,
     )
     await ctx.orch.log(ctx.order_id, "review", "reviewer", {
         "artifact": artifact_name, "approved": result["approved"], "issues": result["issues"],
