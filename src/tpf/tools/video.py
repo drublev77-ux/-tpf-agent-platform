@@ -39,11 +39,18 @@ async def _run(*cmd: str, timeout: int = 180) -> tuple[int, bytes, bytes]:
 
 
 def _transcribe(wav: str, language: str | None = None) -> str:
+    import wave
+
+    import numpy as np
     from faster_whisper import WhisperModel      # heavy: loaded only when a video actually arrives
 
+    # ffmpeg has already written 16 kHz mono 16-bit sound; handing the samples over directly keeps the
+    # recogniser's own audio decoder (and its version quirks) out of the way.
+    with wave.open(wav, "rb") as w:
+        audio = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768.0
     model = WhisperModel(SPEECH_MODEL, device="cpu", compute_type="int8")
     # The language of the order form is a strong hint; without one a short or noisy clip is easily misheard.
-    segments, _ = model.transcribe(wav, vad_filter=True, beam_size=5, language=language)
+    segments, _ = model.transcribe(audio, vad_filter=True, beam_size=5, language=language)
     return " ".join(s.text.strip() for s in segments).strip()
 
 
@@ -78,7 +85,7 @@ async def watch(path: Path, workdir: Path, language: str | None = None) -> Watch
         watched.speech_note = "the video has no sound"
         return watched
     wav = workdir / "speech.wav"
-    code, _, _ = await _run("ffmpeg", "-v", "error", "-y", "-t", str(MAX_SECONDS), "-i", str(path), "-vn", "-ac", "1", "-ar", "16000", str(wav))
+    code, _, _ = await _run("ffmpeg", "-v", "error", "-y", "-t", str(MAX_SECONDS), "-i", str(path), "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(wav))
     if code != 0 or not wav.exists():
         watched.speech_note = "the sound could not be read"
         return watched
