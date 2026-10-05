@@ -42,6 +42,7 @@ class FakeLLM:
         self.budget = budget
         self.script: dict[str, list[dict[str, Any]]] = {}
         self.calls: list[str] = []
+        self.prompts: list[tuple[str, str]] = []
         self.tokens_per_call = 1000
 
     def queue(self, agent: str, *outputs: dict[str, Any]) -> None:
@@ -52,6 +53,7 @@ class FakeLLM:
             self.images = images
         await self.budget.check(order_id)
         self.calls.append(agent)
+        self.prompts.append((agent, prompt))
         await self.budget.record(order_id, agent, f"fake-{model_class}", self.tokens_per_call, 0)
         if self.script.get(agent):
             return self.script[agent].pop(0)

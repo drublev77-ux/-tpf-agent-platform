@@ -933,3 +933,28 @@ async def test_application_that_stores_files_gets_the_platforms_file_table(app_e
     assert await conn.fetchval("SELECT data FROM tpf_files WHERE id = 'a'") == b"abc"
     await conn.execute("DELETE FROM tpf_files WHERE id = 'a'")
     await conn.close()
+
+
+async def test_a_fix_that_takes_several_steps_keeps_the_report_in_front_of_the_developer(app_env):
+    env = app_env
+    env.settings.sandbox = "vercel"
+    for agent in ("analyst", "architect", "developer"):
+        env.llm.script[agent].clear()
+    env.llm.queue("analyst", {"in_pilot_scope": True, "questions": [], "spec": ACC_SPEC,
+                              "estimate": {"items": [{"name": "Build", "hours": 40}], "duration_days": 10}})
+    env.llm.queue("architect", ACC_ARCH)
+    later = {"path": "app/manage/page.tsx", "purpose": "the manager's page"}
+    env.llm.queue("developer", ACC_CODE,
+                  {"files": [f for f in ACC_CODE["files"] if f["path"] == "app/tasks/page.tsx"], "remaining": [later], "notes": ""},
+                  {"files": [f for f in ACC_CODE["files"] if f["path"] == later["path"]], "remaining": [], "notes": ""})
+    env.deployer.access_problems = [["/manage as role worker: opens, although role worker must not see this page"]]
+    oid = await new_app_order(env)
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    assert State((await env.orch.get_order(oid))["state"]) is State.AWAITING_ACCEPTANCE
+    asked = [p for agent, p in env.llm.prompts if agent == "developer"]
+    assert len(asked) == 3 and "FAILED checks" not in asked[0]
+    for prompt in asked[1:]:                       # the second step of the fix used to be asked blind
+        assert "FAILED checks" in prompt and "role worker must not see this page" in prompt
+    assert "Continue: write the next files" in asked[2]

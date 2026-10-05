@@ -215,6 +215,7 @@ async def run(ctx: Ctx) -> Outcome:
     files: dict[str, str] = {f["path"]: f["content"] for f in (previous or {}).get("files", [])}
     changing = bool(files)                    # a fix or a client change request, not a first version
     remaining: list[dict[str, str]] = []
+    written: set[str] = set()                 # files this run has (re)written
     # Work in progress survives a retry or a worker restart: steps already written are not paid for twice.
     base_version = await ctx.orch.pool.fetchval(
         "SELECT coalesce(max(version), 0) FROM artifacts WHERE order_id = $1 AND kind = 'code'", ctx.order_id)
@@ -223,6 +224,7 @@ async def run(ctx: Ctx) -> Outcome:
     if resumed:
         files = {f["path"]: f["content"] for f in draft["files"]}
         remaining = draft["remaining"]
+        written = set(draft.get("written") or [])
     problems: list[str] = []
     too_long = False
     notes: list[str] = []
@@ -239,8 +241,14 @@ async def run(ctx: Ctx) -> Outcome:
             else:
                 task = "Review the code against the spec and architecture and complete it."
         elif remaining:
-            task = ("Continue: write the next files from this list, as many as fit in one step.\n"
+            # a fix that takes several steps keeps the report in front of it: without it the later files were
+            # rewritten blind and the same findings came back round after round
+            task = ((f"{feedback}\n\n" if changing and feedback else "")
+                    + "Continue: write the next files from this list, as many as fit in one step.\n"
                     + json.dumps(remaining, ensure_ascii=False))
+        elif changing and feedback:
+            task = (f"{feedback}\n\nCheck the files written so far against every point above and change whatever "
+                    "is still not fixed. Return only the files you change.")
         else:
             task = "Check that the project is complete; write anything still missing."
         if too_long:
@@ -259,14 +267,17 @@ async def run(ctx: Ctx) -> Outcome:
         too_long = False
         for f in out.get("files", []):
             files[f["path"]] = f["content"]
+            written.add(f["path"])
         for path in out.get("delete") or []:
             files.pop(path, None)
         notes.append(str(out.get("notes", "")))
-        remaining = [r for r in out.get("remaining") or [] if r.get("path") not in files]
+        # In a fix the files to change already exist, so "exists" cannot mean "done": only what this run wrote is.
+        # (It did, and a fix that named its later files stopped after the first step with the rest untouched.)
+        remaining = [r for r in out.get("remaining") or [] if r.get("path") not in (written if changing else files)]
         if remaining:
             problems = []
             await ctx.orch.save_artifact(ctx.order_id, "code_draft", {
-                "base": base_version, "feedback": feedback, "remaining": remaining,
+                "base": base_version, "feedback": feedback, "remaining": remaining, "written": sorted(written),
                 "files": [{"path": p, "content": c} for p, c in files.items()]}, "developer")
             continue
         result = [{"path": p, "content": c} for p, c in files.items()]
