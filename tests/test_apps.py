@@ -853,3 +853,12 @@ async def test_architect_drops_roles_when_the_spec_has_no_accounts(app_env):
     await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
     await env.drain()
     assert "roles" not in await env.orch.latest_artifact(oid, "architecture")
+
+
+def test_client_components_may_import_account_types_but_not_functions():
+    from tpf.agents.developer import check_accounts
+
+    row = lambda body: ACC_CODE["files"] + [{"path": "app/admin/users/UserRow.tsx", "content": '"use client";\n' + body}]   # noqa: E731
+    assert check_accounts(row('import type { ManagedUser } from "@/tpf/users";'), ACC_ARCH) == []
+    assert check_accounts(row('import { type ManagedUser } from "@/tpf/users";'), ACC_ARCH) == []
+    assert "server-only" in " ".join(check_accounts(row('import { roleName, type User } from "@/tpf/users";'), ACC_ARCH))

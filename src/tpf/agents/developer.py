@@ -71,6 +71,14 @@ BOT_NOTE = (
 )
 
 
+def _imports_values(code: str, module: str) -> bool:
+    """True when the file imports something other than types from the module (types vanish at build time)."""
+    for kind, names in re.findall(r"import\s+(type\s+)?\{([^}]*)\}\s*from\s*[\"']" + re.escape(module) + "[\"']", code):
+        if not kind and any(n.strip() and not n.strip().startswith("type ") for n in names.split(",")):
+            return True
+    return bool(re.search(r"import\s+(?!type\b)[\w*][^{}]*?from\s*[\"']" + re.escape(module) + "[\"']", code))
+
+
 def check_accounts(files: list[dict[str, str]], arch: dict) -> list[str]:
     """Static checks for an application whose people sign in."""
     by_path = {f["path"]: f["content"] for f in files}
@@ -97,7 +105,7 @@ def check_accounts(files: list[dict[str, str]], arch: dict) -> list[str]:
                 problems.append(f"accounts are reached only through @/tpf/users, not directly: {f['path']}")
             if re.search(r"""from\s+["'](node:)?crypto["']""", f["content"]) and re.search(r"scrypt|pbkdf2|createHash", f["content"]):
                 problems.append(f"passwords are hashed by the platform, not in the application: {f['path']}")
-            if "@/tpf/users" in f["content"] and f["content"].lstrip().startswith(("'use client'", '"use client"')):
+            if _imports_values(f["content"], "@/tpf/users") and f["content"].lstrip().startswith(("'use client'", '"use client"')):
                 problems.append(f"@/tpf/users is server-only and is imported in a client component: {f['path']}")
     return problems
 
