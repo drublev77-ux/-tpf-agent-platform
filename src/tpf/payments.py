@@ -86,17 +86,23 @@ class StripeGateway:
             "metadata[stage]": stage,
             "payment_intent_data[metadata][order_id]": str(order_id),
             "payment_intent_data[metadata][stage]": stage,
-            # Work starts on payment, so only methods that confirm at once are offered. A SEPA direct debit is
-            # confirmed days later and can be reversed by the payer's bank for weeks.
-            "excluded_payment_method_types[0]": "sepa_debit",
         }
+        # Work starts on payment, so only methods that confirm at once are offered: a SEPA direct debit is
+        # confirmed days later and can be reversed by the payer's bank for weeks. For euros the methods are
+        # named outright, which also brings in iDEAL (how the Netherlands pays) whatever the dashboard shows.
+        instant = {**form, **{f"payment_method_types[{i}]": m for i, m in enumerate(EUR_METHODS)}}
+        fallback = {**form, "excluded_payment_method_types[0]": "sepa_debit"}
+        attempts = [instant, fallback] if currency.lower() == "eur" else [fallback]
         async with httpx.AsyncClient(timeout=30) as client:
-            r = await client.post(
-                f"{self.API}/checkout/sessions", data=form,
-                headers={"Authorization": f"Bearer {self.key}",
-                         # Retrying the same task must not create a second live link.
-                         "Idempotency-Key": f"tpf-{order_id}-{stage}-{int(time.time() // 3600)}"},
-            )
+            for n, body in enumerate(attempts):
+                r = await client.post(
+                    f"{self.API}/checkout/sessions", data=body,
+                    headers={"Authorization": f"Bearer {self.key}",
+                             # Retrying the same task must not create a second live link.
+                             "Idempotency-Key": f"tpf-{order_id}-{stage}-{int(time.time() // 3600)}-{n}"},
+                )
+                if r.status_code < 400 or r.status_code not in (400, 402):
+                    break       # a method the account cannot take: fall back to what the account offers by itself
         if r.status_code >= 400:
             raise PaymentError(f"Stripe {r.status_code}: {r.text[:300]}")
         data = r.json()
@@ -123,6 +129,7 @@ def verify_stripe_webhook(payload: bytes, signature_header: str | None, secret: 
     return json.loads(payload)
 
 
+EUR_METHODS = ("card", "link", "ideal", "bancontact", "eps", "klarna", "revolut_pay")
 WEBHOOK_EVENTS = ("checkout.session.completed", "checkout.session.async_payment_succeeded", "checkout.session.expired")
 SECRET_KEY = "stripe_webhook_secret"
 ENDPOINT_KEY = "stripe_webhook_endpoint_id"
