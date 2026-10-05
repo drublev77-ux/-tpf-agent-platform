@@ -22,6 +22,7 @@ from tpf.orchestrator.states import TASK_FOR_STATE, TransitionError
 from tpf.tools.deploy import Deployer, VercelDeployer
 from tpf.tools.github import GitHubPublisher
 from tpf.tools.sandbox import Sandbox, make_sandbox
+from tpf.tools.screens import Screenshooter
 from tpf.tools.shop_stripe import ShopStripe
 from tpf.tools.telegram import TelegramAPI
 from tpf.tools.tenantdb import make_tenant_db
@@ -36,10 +37,12 @@ class Worker:
         self, *, pool: asyncpg.Pool, settings: Settings, orch: Orchestrator, llm: LLMGateway,
         sandbox: Sandbox, deployer: Deployer | None, github: GitHubPublisher | None,
         payments: PaymentGateway | None = None, tenant_db: object | None = None, telegram: object | None = None, shop_stripe: object | None = None,
+        screens: object | None = None,
     ) -> None:
         self.pool, self.settings, self.orch, self.llm = pool, settings, orch, llm
         self.sandbox, self.deployer, self.github, self.payments = sandbox, deployer, github, payments
         self.tenant_db = tenant_db
+        self.screens = screens
         self.telegram = telegram or TelegramAPI()
         self.shop_stripe = shop_stripe or ShopStripe()
         self.stopping = asyncio.Event()
@@ -60,7 +63,7 @@ class Worker:
         handler = HANDLERS[task["kind"]]
         ctx = Ctx(self.orch, self.llm, self.settings, self.sandbox, self.deployer, self.github, order,
                   payments=self.payments, payload=task["payload"] or {}, tenant_db=self.tenant_db, telegram=self.telegram,
-                  shop_stripe=self.shop_stripe)
+                  shop_stripe=self.shop_stripe, screens=self.screens)
         await self.orch.log(order["id"], "task_started", task["kind"], {"task": task["id"], "attempt": task["attempts"]})
         self.running.add(task["id"])
         heartbeat = asyncio.create_task(self._keep_lease(task["id"]))
@@ -154,6 +157,7 @@ async def main() -> None:
         deployer=VercelDeployer(settings) if settings.vercel_token else None,
         github=GitHubPublisher(settings) if settings.github_token and settings.github_owner else None,
         payments=make_gateway(settings), tenant_db=make_tenant_db(settings),
+        screens=Screenshooter() if settings.visual_check else None,
     )
     if settings.payment_provider == "stripe":
         try:

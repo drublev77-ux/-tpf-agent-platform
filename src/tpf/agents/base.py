@@ -38,6 +38,7 @@ class Ctx:
     tenant_db: Any = None  # tpf.tools.tenantdb.TenantDB, or None when applications are not enabled
     telegram: Any = None   # tpf.tools.telegram.TelegramAPI
     shop_stripe: Any = None  # tpf.tools.shop_stripe.ShopStripe
+    screens: Any = None    # tpf.tools.screens.Screenshooter, or None when the worker has no browser
 
     @property
     def order_id(self) -> int:

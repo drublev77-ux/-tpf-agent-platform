@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     order_token_budget: int = 2_000_000
     budget_warning_share: float = 0.8
     max_check_attempts: int = 6
+    visual_check: bool = True          # QA looks at screenshots of the built pages
+    visual_blocking_rounds: int = 2    # after this many rounds failed only on looks, findings stop blocking
     max_review_rounds: int = 2
     task_max_retries: int = 3
     # How long a task stays claimed without a sign of life from its worker. The worker renews the lease

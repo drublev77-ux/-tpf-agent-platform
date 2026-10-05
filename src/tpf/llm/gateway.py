@@ -34,6 +34,7 @@ class LLMGateway(Protocol):
     async def structured(
         self, *, order_id: int, agent: str, model_class: str, system: str, prompt: str,
         schema: dict[str, Any], max_tokens: int = 8000,
+        images: list[dict[str, str]] | None = None,
     ) -> dict[str, Any]: ...
 
 
@@ -113,12 +114,20 @@ class AnthropicGateway:
     async def structured(
         self, *, order_id: int, agent: str, model_class: str, system: str, prompt: str,
         schema: dict[str, Any], max_tokens: int = 8000,
+        images: list[dict[str, str]] | None = None,
     ) -> dict[str, Any]:
         await self.budget.check(order_id)
         model = self.model_for(model_class)
         # Newer models reject a forced tool_choice, so the tool is offered with "auto" and the
         # instruction to call it; a reply without the call gets one corrective turn.
-        messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
+        content: Any = prompt
+        if images:      # pictures for the model to look at, each under its own caption
+            content = [{"type": "text", "text": prompt}]
+            for image in images:
+                content.append({"type": "text", "text": image["label"]})
+                content.append({"type": "image", "source": {
+                    "type": "base64", "media_type": image["media_type"], "data": image["data"]}})
+        messages: list[dict[str, Any]] = [{"role": "user", "content": content}]
         body = {
             "model": model,
             "max_tokens": max_tokens,

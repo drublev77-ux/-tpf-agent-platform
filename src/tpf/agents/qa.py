@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from tpf.agents import visual
 from tpf.agents.base import Ctx, Outcome
 from tpf.agents.reviewer import review
 from tpf.agents.devops import staging_project
@@ -121,7 +122,23 @@ async def _build_on_vercel(ctx: Ctx, files: list[dict[str, str]], version: int, 
                              "a customer's payment would not be recorded correctly:\n" + "\n".join(f"- {f}" for f in failed)
                              + "\nFix onPaid, createCheckOrder, isPaid or removeCheckOrder in lib/payments.ts.")
     report["preview"] = {"url": dep.url, "deployment_id": dep.id, "code_version": version}
+    report["visual"] = await _visual_gate(ctx, dep.url, routes or ["/"], cookie)
     return RunResult(0, f"Vercel build ok: {dep.url}")
+
+
+async def _visual_gate(ctx: Ctx, url: str, routes: list[str], cookie: str) -> dict[str, Any]:
+    """Look at the built pages. What is visibly broken sends the code back — but not forever: after a few
+    rounds lost to looks alone the findings are kept for the engineer and stop blocking the order."""
+    seen = await visual.look(ctx, url, routes, cookie)
+    if seen["ok"] or "skipped" in seen:
+        return seen
+    earlier = await ctx.orch.pool.fetch(
+        "SELECT content FROM artifacts WHERE order_id = $1 AND kind = 'qa_report' ORDER BY version", ctx.order_id)
+    lost = sum(1 for r in earlier if (c := r["content"]) and not c.get("passed") and not (c.get("visual") or {}).get("ok", True)
+               and all((c.get(g) or {}).get("ok") for g in ("routes", "build", "security", "acceptance")))
+    if lost >= ctx.settings.visual_blocking_rounds:
+        return seen | {"ok": True, "advisory": True}
+    return seen
 
 
 async def _payment_check(ctx: Ctx, url: str) -> list[str]:
@@ -221,10 +238,11 @@ async def run(ctx: Ctx) -> Outcome:
     else:
         report["acceptance"] = {"ok": False, "issues": ["skipped: fix build and routes first"]}
 
-    passed = all(report[g]["ok"] for g in ("routes", "build", "security", "acceptance"))
+    gates = ("routes", "build", "security", "acceptance") + (("visual",) if "visual" in report else ())
+    passed = all(report[g]["ok"] for g in gates)
     report["passed"] = passed
     await ctx.orch.save_artifact(ctx.order_id, "qa_report", report, "qa")
-    failed = [g for g in ("routes", "build", "security", "acceptance") if not report[g]["ok"]]
+    failed = [g for g in gates if not report[g]["ok"]]
     return Outcome(
         Ev.CHECKS_PASSED if passed else Ev.CHECKS_FAILED,
         data={"failed_gates": failed},

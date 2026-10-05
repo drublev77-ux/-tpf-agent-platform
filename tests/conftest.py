@@ -47,7 +47,9 @@ class FakeLLM:
     def queue(self, agent: str, *outputs: dict[str, Any]) -> None:
         self.script.setdefault(agent, []).extend(outputs)
 
-    async def structured(self, *, order_id, agent, model_class, system, prompt, schema, max_tokens=8000):
+    async def structured(self, *, order_id, agent, model_class, system, prompt, schema, max_tokens=8000, images=None):
+        if images:
+            self.images = images
         await self.budget.check(order_id)
         self.calls.append(agent)
         await self.budget.record(order_id, agent, f"fake-{model_class}", self.tokens_per_call, 0)
@@ -57,6 +59,7 @@ class FakeLLM:
             "analyst": {"in_pilot_scope": True, "questions": [], "spec": SPEC,
                         "estimate": {"items": [{"name": "Design", "hours": 6}, {"name": "Build", "hours": 9.5}], "duration_days": 5}},
             "reviewer": {"approved": True, "issues": []},
+            "visual": {"issues": []},
             "architect": ARCH,
             "developer": CODE,
         }[agent]

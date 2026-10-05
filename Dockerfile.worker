@@ -1,9 +1,14 @@
 # Worker for hosts without Docker-in-Docker (Railway, Fly.io, Render):
 # site builds are checked on Vercel (SANDBOX=vercel), so no Docker CLI is needed here.
+# Chromium is here so that QA can look at screenshots of the pages it has built.
 FROM python:3.12-slim
 
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git \
+ && apt-get install -y --no-install-recommends git fonts-noto-cjk \
+ && pip install --no-cache-dir "playwright==1.56.0" \
+ && playwright install --with-deps chromium \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
