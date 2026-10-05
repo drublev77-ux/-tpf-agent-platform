@@ -95,6 +95,18 @@ class Screenshooter:
                 for (let y = 0; y < h; y += 600) { window.scrollTo(0, y); await new Promise(r => setTimeout(r, 60)); }
                 window.scrollTo(0, 0); await new Promise(r => setTimeout(r, 250)); }""")
             facts = await page.evaluate(FACTS_JS)
+            # A whole-page picture draws a bar fixed to the screen where the first screen ends: in the middle of the
+            # page, on top of whatever is there. It was reported as "the menu covers the content" round after round.
+            # Put such bars where a visitor meets them at the end of the scroll: on the last screen of the page.
+            await page.evaluate("""() => { const vh = window.innerHeight, doc = document.documentElement.scrollHeight;
+                if (doc <= vh + 4) return;
+                for (const el of document.querySelectorAll('body *')) {
+                  if (getComputedStyle(el).position !== 'fixed') continue;
+                  const r = el.getBoundingClientRect();
+                  if (r.height === 0 || r.top < vh / 2 || r.height > vh / 2) continue;   // only what hugs the bottom edge
+                  el.style.setProperty('position', 'absolute', 'important');
+                  el.style.setProperty('top', (doc - (vh - r.top)) + 'px', 'important');
+                  el.style.setProperty('bottom', 'auto', 'important'); } }""")
             width = page.viewport_size["width"]
             jpeg = await page.screenshot(type="jpeg", quality=70, full_page=True,
                                          clip={"x": 0, "y": 0, "width": width, "height": min(max(facts["height"], 200), cap)})

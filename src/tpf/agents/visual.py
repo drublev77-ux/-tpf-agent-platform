@@ -13,6 +13,8 @@ log = logging.getLogger("tpf.visual")
 SYSTEM = (
     "You are a QA engineer looking at screenshots of a website that was just built for a client, before the client "
     "sees it. Each screenshot is labelled with its page and screen size (desktop 1280px wide, phone 390px wide). "
+    "A screenshot shows the whole page from top to bottom, not one screen: a bar fixed to the bottom of the screen "
+    "is drawn once, at the very end of the page, and a bar fixed to the top once, at the start. "
     "Report what a visitor would see as broken, and nothing else. "
     "severity 'broken' — the page cannot go to a client like this: text or elements overlapping each other; text cut "
     "off, running out of its box or off the screen; a page or large block rendered without styles; text that cannot "
