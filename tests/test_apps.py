@@ -862,3 +862,22 @@ def test_client_components_may_import_account_types_but_not_functions():
     assert check_accounts(row('import type { ManagedUser } from "@/tpf/users";'), ACC_ARCH) == []
     assert check_accounts(row('import { type ManagedUser } from "@/tpf/users";'), ACC_ARCH) == []
     assert "server-only" in " ".join(check_accounts(row('import { roleName, type User } from "@/tpf/users";'), ACC_ARCH))
+
+
+async def test_application_with_roles_gets_more_check_rounds(app_env):
+    env = app_env
+    env.settings.sandbox = "vercel"
+    env.settings.max_check_attempts, env.settings.max_check_attempts_accounts = 2, 4
+    for agent in ("analyst", "architect", "developer"):
+        env.llm.script[agent].clear()
+    env.llm.queue("analyst", {"in_pilot_scope": True, "questions": [], "spec": ACC_SPEC,
+                              "estimate": {"items": [{"name": "Build", "hours": 40}], "duration_days": 10}})
+    env.llm.queue("architect", ACC_ARCH)
+    env.llm.queue("developer", *[ACC_CODE] * 6)
+    wrong = ["/manage as role worker: opens, although role worker must not see this page"]
+    env.deployer.access_problems = [wrong, wrong, wrong]          # three failed rounds: more than a plain order is allowed
+    oid = await new_app_order(env)
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    assert State((await env.orch.get_order(oid))["state"]) is State.AWAITING_ACCEPTANCE

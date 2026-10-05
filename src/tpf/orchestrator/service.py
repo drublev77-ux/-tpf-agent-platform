@@ -92,10 +92,15 @@ class Orchestrator:
             if row is None:
                 raise KeyError(order_id)
             state = State(row["state"])
+            limit = self.settings.max_check_attempts
+            if event is Ev.CHECKS_FAILED and await conn.fetchval(
+                    "SELECT jsonb_array_length(content->'user_roles') > 0 FROM artifacts WHERE order_id = $1 AND kind = 'spec' "
+                    "AND jsonb_typeof(content->'user_roles') = 'array' ORDER BY version DESC LIMIT 1", order_id):
+                limit = max(limit, self.settings.max_check_attempts_accounts)
             tr = apply(
                 state, event,
                 check_attempts=row["check_attempts"],
-                max_check_attempts=self.settings.max_check_attempts,
+                max_check_attempts=limit,
                 payment_required=self.settings.payment_required,
                 final_payment_required=self.settings.final_payment_required,
                 paused_from=State(row["paused_from"]) if row["paused_from"] else None,
