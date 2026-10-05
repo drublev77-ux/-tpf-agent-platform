@@ -54,6 +54,7 @@ class OrderIn(BaseModel):
     request_text: str = Field(min_length=10, max_length=20_000)
     channel: Literal["site", "telegram", "whatsapp", "wechat", "email", "crm"] = "site"
     language: Literal["ru", "en", "zh"] = "ru"
+    currency: Literal["EUR", "USD"] | None = None   # the client's choice on the form; empty: the studio's default
     video: VideoRef | None = None      # a finished upload (see uploads.py) to watch before the analyst starts
 
 
@@ -362,6 +363,16 @@ async def privacy() -> FileResponse:
 async def case_zerno() -> FileResponse:
     return FileResponse(SITE_DIR / "case-zerno.jpg", media_type="image/jpeg",
                         headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/brand-mark.jpg", include_in_schema=False)
+async def brand_mark() -> FileResponse:
+    return FileResponse(SITE_DIR / "brand-mark.jpg", media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/brand-hero.jpg", include_in_schema=False)
+async def brand_hero() -> FileResponse:
+    return FileResponse(SITE_DIR / "brand-hero.jpg", media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/brand.jpg", include_in_schema=False)

@@ -222,3 +222,23 @@ async def test_webhook_moves_with_the_domain(env):
     assert endpoints["we_2"]["url"] == "https://new.example.com/webhooks/stripe"
     assert await webhook_secret(env.settings, env.pool) == "whsec_2"
     assert (await ensure_stripe_webhook(env.settings, env.pool, client))["webhook"] == "ok"
+
+
+async def test_client_can_be_invoiced_in_dollars(env):
+    from tpf.config import Settings
+
+    s = Settings(database_url="postgresql://x/y")
+    assert [s.rate_in("USD", k) for k in ("site", "app", "bot", "shop")] == [45, 70, 50, 37]       # the dollar rates of before
+    assert [s.rate_in("USD", k, "ru") for k in ("site", "app", "bot", "shop")] == [36, 56, 34, 29]
+    assert s.rate_in("EUR", "site") == 40
+
+    env.settings.currency, env.settings.usd_per_eur = "EUR", 1.117
+    order, _ = await env.orch.create_order(client_name="Ann", client_email="ann@example.com", language="en",
+                                           request_text="A landing page for a bakery, please", currency="USD")
+    await env.drain()
+    estimate = await env.orch.latest_artifact(order["id"], "estimate")
+    assert estimate["currency"] == "USD" and estimate["hourly_rate"] == 45 and estimate["price"] == estimate["total_hours"] * 45
+    other, _ = await env.orch.create_order(client_name="Ann", client_email="ann@example.com", language="en",
+                                           request_text="A landing page for a bakery, please")
+    await env.drain()
+    assert (await env.orch.latest_artifact(other["id"], "estimate"))["currency"] == "EUR"

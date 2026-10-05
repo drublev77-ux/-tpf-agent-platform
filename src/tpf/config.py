@@ -55,6 +55,12 @@ class Settings(BaseSettings):
         regional = getattr(self, f"hourly_rate_{language}_{product_type}", 0) if language else 0
         return float(regional or getattr(self, f"hourly_rate_{product_type}", 0) or self.hourly_rate)
     currency: str = "EUR"
+    usd_per_eur: float = 1.117         # a client may ask to be invoiced in US dollars: the rates above times this
+
+    def rate_in(self, currency: str, product_type: str, language: str = "") -> float:
+        """The hourly rate in the currency of the order; rates are kept in the studio's own currency."""
+        rate = self.rate_for(product_type, language)
+        return float(round(rate * self.usd_per_eur)) if currency == "USD" and self.currency == "EUR" else rate
     # Payments: off | stripe | manual (the operator confirms bank transfers in /admin)
     payment_provider: str = "off"
     prepayment_share: float = 0.5  # 0.5 = 50% before work + 50% before release; 1 = all upfront; 0 = all at the end

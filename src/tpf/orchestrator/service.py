@@ -31,14 +31,15 @@ class Orchestrator:
     async def create_order(
         self, *, client_name: str, client_email: str, request_text: str,
         channel: str = "site", language: str = "ru", video_upload: int | None = None,
+        currency: str | None = None,
     ) -> tuple[dict[str, Any], str]:
         token = secrets.token_urlsafe(24)
         async with self.pool.acquire() as conn, conn.transaction():
             order_id = await conn.fetchval(
                 "INSERT INTO orders (state, client_name, client_email, client_token, channel, language, "
-                "request_text, token_budget) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id",
+                "request_text, token_budget, currency) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id",
                 State.NEW, client_name, client_email, token, channel, language, request_text,
-                self.settings.order_token_budget,
+                self.settings.order_token_budget, currency,
             )
             await conn.execute(
                 "INSERT INTO messages (order_id, direction, text) VALUES ($1, 'in', $2)", order_id, request_text

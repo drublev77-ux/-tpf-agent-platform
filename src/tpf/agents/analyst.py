@@ -272,22 +272,23 @@ async def run(ctx: Ctx) -> Outcome:
         return Outcome(escalate="Ревьюер не принял ТЗ после всех попыток: " + "; ".join(issues))
 
     hours = math.ceil(sum(float(i["hours"]) for i in out["estimate"]["items"]))
-    rate = s.rate_for(out["spec"].get("product_type", "site"), ctx.order["language"])
+    currency = ctx.order.get("currency") or s.currency
+    rate = s.rate_in(currency, out["spec"].get("product_type", "site"), ctx.order["language"])
     price = round(hours * rate, 2)                # price is computed by code, never by the model
     estimate = {
         **out["estimate"], "total_hours": hours, "hourly_rate": rate,
-        "price": price, "currency": s.currency,
+        "price": price, "currency": currency,
     }
     if s.payment_provider != "off":
         split = stage_amounts(price, s.prepayment_share)
         estimate["payments"] = {"prepayment": float(split["prepayment"]), "final": float(split["final"])}
     await ctx.orch.save_artifact(ctx.order_id, "spec", out["spec"], "analyst")
     await ctx.orch.save_artifact(ctx.order_id, "estimate", estimate, "analyst")
-    details = _format_details(ctx.order["language"], hours, price, s.currency, estimate["duration_days"])
+    details = _format_details(ctx.order["language"], hours, price, currency, estimate["duration_days"])
     if "payments" in estimate:
-        details += _payment_terms(ctx.order["language"], estimate["payments"], s.currency)
+        details += _payment_terms(ctx.order["language"], estimate["payments"], currency)
     return Outcome(
-        Ev.SPEC_READY, data={"total_hours": hours, "price": price, "currency": s.currency}, details=details,
+        Ev.SPEC_READY, data={"total_hours": hours, "price": price, "currency": currency}, details=details,
     )
 
 
