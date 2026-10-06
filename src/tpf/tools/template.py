@@ -9,7 +9,7 @@ from pathlib import Path
 from tpf.tools.template_extras import (APP_AUTO_REFRESH, APP_FILE_INPUT, APP_FILES, APP_GEO, APP_GEO_FORM, CHAT_RULES, FILES_PATH,
                                        GEO_RULES, UPLOADS_RULES)
 from tpf.tools.template_caps import (APP_AI, APP_MAIL, APP_PDF, APP_PDF_FONT, APP_PLATFORM, APP_SERVICES, APP_SHEETS, APP_TICK,
-                                     CAPS_PACKAGES, CAPS_RULES, SCHEDULE_PATH, TICK_PATH)
+                                     CAPS_PACKAGES, CAPS_RULES, SCHEDULE_PATH, SEO_CONFIG_PATH, SEO_FILES, SEO_RULES, TICK_PATH)
 from tpf.tools.shop_payments_ts import (SHOP_PAY_CHECK, SHOP_PAY_CHECK_PATH, SHOP_PAY_NOTIFY, SHOP_PAY_NOTIFY_PATH,
                                          SHOP_PAY_RETURN, SHOP_PAY_RETURN_PATH, SHOP_PAYMENTS)
 
@@ -857,7 +857,7 @@ def validate_path(path: str, kind: str = "site") -> str | None:
         return f"file type not allowed: {path}"
     if path.startswith(("app/api/tpf-health/", "app/api/tpf-telegram/", "app/api/tpf-stripe/", "app/api/tpf-pay/",
                         "app/api/tpf-pay-return/", "app/api/tpf-check/", "app/api/tpf-tick/", "app/tpf-icon/")) \
-            or path in ("app/manifest.ts", "public/sw.js", "public/offline.html"):
+            or path in ("app/manifest.ts", "public/sw.js", "public/offline.html", "app/robots.ts", "app/sitemap.ts"):
         return f"path reserved by the platform: {path}"
     if path.startswith("db/") and path != SCHEMA_PATH:
         return f"the only file allowed under db/ is {SCHEMA_PATH}: {path}"
@@ -867,10 +867,10 @@ def validate_path(path: str, kind: str = "site") -> str | None:
 def rules_for(kind: str) -> str:
     """The template rules an agent works under: a static site, or an application with a database."""
     if kind == "bot":
-        return APP_RULES + NOTIFY_RULES + BOT_RULES
+        return APP_RULES + NOTIFY_RULES + BOT_RULES + SEO_RULES
     if kind == "shop":
-        return APP_RULES + NOTIFY_RULES + SHOP_RULES + PWA_RULES + CONTACT_FORM_RULES
-    return (APP_RULES + NOTIFY_RULES + PWA_RULES + CONTACT_FORM_RULES) if kind == "app" else TEMPLATE_RULES
+        return APP_RULES + NOTIFY_RULES + SHOP_RULES + PWA_RULES + CONTACT_FORM_RULES + SEO_RULES
+    return ((APP_RULES + NOTIFY_RULES + PWA_RULES + CONTACT_FORM_RULES) if kind == "app" else TEMPLATE_RULES) + " " + SEO_RULES
 
 
 def route_to_page(route: str) -> str:
@@ -887,14 +887,15 @@ def _for_code(platform: dict[str, str], files: list[dict[str, str]]) -> dict[str
     paths = {f["path"] for f in files}
     # The accounts helper imports the application's lib/roles.ts: it ships only with code that has one.
     skip = ((() if PWA_CONFIG_PATH in paths else PWA_FILES) + (() if ROLES_PATH in paths else (USERS_PATH,))
-            + (() if SCHEDULE_PATH in paths else (TICK_PATH,)))     # the tick route imports the application's lib/schedule.ts
+            + (() if SCHEDULE_PATH in paths else (TICK_PATH,))
+            + (() if SEO_CONFIG_PATH in paths else tuple(SEO_FILES)))       # robots.ts and sitemap.ts import the site's lib/seo.ts     # the tick route imports the application's lib/schedule.ts
     return {p: c for p, c in platform.items() if p not in skip}
 
 
 def platform_files(form_endpoint: str = "", kind: str = "site") -> dict[str, str]:
     """Everything the platform owns in a project: build configuration, the contact form and its endpoint,
     and for an application the database client, the admin session helper and the health check."""
-    files = TEMPLATE_FILES | {
+    files = TEMPLATE_FILES | SEO_FILES | {
         "tpf/ContactForm.tsx": CONTACT_FORM,
         "tpf/config.ts": f"export const FORM_ENDPOINT = {json.dumps(form_endpoint)};\n",
     }

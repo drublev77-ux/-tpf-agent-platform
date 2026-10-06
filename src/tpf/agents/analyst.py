@@ -108,6 +108,16 @@ SCOPE_SITE = (
     "dynamic feature is a contact or request form (name, contact, message) whose messages are e-mailed to the "
     "client; offer it when the client wants visitors to write, leave a request or ask for a callback. "
 )
+SCOPE_SEO = (
+    "Every site, application and shop is built ready for search engines at no extra cost: each public page has its "
+    "own title and description, the site has a sitemap and robots.txt, structured data with the business's real "
+    "contact details, clean headings and fast static pages, and the review version is kept out of search. This is "
+    "the technical base only. Not included, and to be said in assumptions when the client mentions search, "
+    "promotion or 'SEO': a place in the results is never promised; no keyword research, link building, "
+    "advertising, or registration in Google Search Console and Yandex Webmaster (the client does that with their "
+    "own account, in a few minutes, once the site is on their domain). When the client names the searches they "
+    "want to be found by, write them into the spec so that titles and texts use those words naturally. "
+)
 SCOPE_APP = (
     "A web application (product_type 'app'), when the client needs the site to store and manage data: public "
     "pages and forms that write to a database (bookings, requests, orders without payment, sign-ups, reviews "
@@ -233,7 +243,7 @@ RULES = (
 def system_prompt(apps_enabled: bool) -> str:
     return (
         "You are the Analyst at TPF Technology, a studio where AI agents build client software end to end. "
-        + SCOPE_SITE + (SCOPE_APP + SCOPE_BOT + SCOPE_SHOP + SCOPE_MOBILE if apps_enabled else "Applications with a database and Telegram bots are not available: product_type is always 'site'. ")
+        + SCOPE_SITE + SCOPE_SEO + (SCOPE_APP + SCOPE_BOT + SCOPE_SHOP + SCOPE_MOBILE if apps_enabled else "Applications with a database and Telegram bots are not available: product_type is always 'site'. ")
         + SCOPE_END + RULES + SAFETY_NOTE
     )
 

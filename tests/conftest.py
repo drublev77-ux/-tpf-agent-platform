@@ -30,8 +30,9 @@ ARCH = {
                "fonts": {"heading": "Georgia", "body": "system-ui"}, "tone": "warm"},
 }
 CODE = {"files": [
-    {"path": "app/layout.tsx", "content": "export default function L({children}:{children:React.ReactNode}){return <html><body>{children}</body></html>}"},
+    {"path": "app/layout.tsx", "content": "import { siteMetadata } from '@/tpf/seo';\nexport const metadata = siteMetadata();\nexport default function L({children}:{children:React.ReactNode}){return <html><body>{children}</body></html>}"},
     {"path": "app/page.tsx", "content": "export default function P(){return <main><h1>Coffee</h1></main>}"},
+    {"path": "lib/seo.ts", "content": "export const SEO = { name: 'Coffee', title: 'Coffee house in Minsk, fresh roast', description: 'd', locale: 'en_US', pages: ['/'] };"},
 ], "notes": "first version"}
 
 

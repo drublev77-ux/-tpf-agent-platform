@@ -20,7 +20,7 @@ from tpf.agents.devops import staging_project
 from tpf.orchestrator.states import Ev
 from tpf.tools.deploy import DeployError
 from tpf.tools.sandbox import RunResult
-from tpf.tools.template_caps import CAPS_CRITERIA
+from tpf.tools.template_caps import CAPS_CRITERIA, SEO_CRITERIA
 from tpf.tools.template import (ROLES_PATH, SCHEMA_PATH, access_of, all_files, capabilities_of, has_database, installable, kind_of, materialize,
                                 route_to_page, uses_accounts)
 from tpf.tools.tenantdb import TenantDBError
@@ -327,6 +327,7 @@ async def run(ctx: Ctx) -> Outcome:
                 "placeholder in square brackets",
                 "Implements every route and section in the architecture",
                 "Accessible: semantic HTML, alt text on images, labels on form fields",
+                *SEO_CRITERIA,
                 *(APP_CRITERIA if has_database(kind) else []),
                 *(ACCOUNT_CRITERIA if uses_accounts(arch) else []),
                 *(c for cap in capabilities_of(spec) for c in CAPABILITY_CRITERIA[cap]),

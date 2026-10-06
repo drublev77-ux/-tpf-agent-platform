@@ -11,6 +11,7 @@ from tpf.llm.gateway import LLMError
 from tpf.orchestrator.states import Ev
 from tpf.tools.shop_payments_ts import PAYMENT_HOSTS
 from tpf.tools.tenantdb import check_schema_sql
+from tpf.tools.template_caps import SEO_CONFIG_PATH
 from tpf.tools.template import ACCOUNTS_RULES, ROLES_PATH, access_of, capability_rules, uses_accounts, PWA_CONFIG_PATH, SHOP_HANDLER_PATH, installable, BOT_HANDLER_PATH, MAX_FILE_BYTES, SCHEMA_PATH, has_database, kind_of, route_to_page, rules_for, validate_path
 
 SCHEMA = {
@@ -131,7 +132,7 @@ def check_files(files: list[dict[str, str]], routes: list[str], kind: str = "sit
         if f["path"] in paths:
             problems.append(f"duplicate file: {f['path']}")
         paths.add(f["path"])
-    for required in ["app/layout.tsx", *(route_to_page(r) for r in routes), *([SCHEMA_PATH] if has_database(kind) else []), *([BOT_HANDLER_PATH] if kind == "bot" else []), *([SHOP_HANDLER_PATH] if kind == "shop" else []), *([PWA_CONFIG_PATH] if installable(kind) else [])]:
+    for required in ["app/layout.tsx", *(route_to_page(r) for r in routes), *([SCHEMA_PATH] if has_database(kind) else []), *([BOT_HANDLER_PATH] if kind == "bot" else []), *([SHOP_HANDLER_PATH] if kind == "shop" else []), *([PWA_CONFIG_PATH] if installable(kind) else []), SEO_CONFIG_PATH]:
         if required not in paths:
             problems.append(f"missing required file: {required}")
     for f in files:
@@ -141,6 +142,11 @@ def check_files(files: list[dict[str, str]], routes: list[str], kind: str = "sit
             bad = re.findall(r"^export\s+(?:(?:const|let|var|class|enum)\b|\{|\*|(?:default\s+)?function\b).*$", f["content"], re.M)
             if bad:
                 problems.append(f"a 'use server' file may export only async functions: {f['path']}: {bad[0].strip()[:80]}")
+    seo = next((f["content"] for f in files if f["path"] == SEO_CONFIG_PATH), None)
+    if seo is not None and not re.search(r"export\s+const\s+SEO\b", seo):
+        problems.append(f"{SEO_CONFIG_PATH} must export const SEO = {{ name, title, description, locale, pages }}")
+    if "@/tpf/seo" not in next((f["content"] for f in files if f["path"] == "app/layout.tsx"), ""):
+        problems.append("app/layout.tsx must export metadata = siteMetadata() from '@/tpf/seo'")
     if installable(kind):
         by_path = {f["path"]: f["content"] for f in files}
         if PWA_CONFIG_PATH in by_path and not re.search(r"export\s+const\s+PWA\b", by_path[PWA_CONFIG_PATH]):

@@ -21,8 +21,8 @@ APP_ARCH = ARCH | {"routes": ARCH["routes"] + [
     {"path": "/admin", "title": "Admin", "purpose": "manage", "sections": ["Bookings"]},
     {"path": "/admin/login", "title": "Login", "purpose": "sign in", "sections": ["Form"]}]}
 PAGE = "export default function P(){return <main/>}"
-APP_LAYOUT = {"path": "app/layout.tsx", "content": "import Pwa from '@/tpf/Pwa';\nexport default function L({children}:{children:React.ReactNode}){return <html><body><Pwa />{children}</body></html>}"}
-APP_CODE = {"files": [APP_LAYOUT, CODE["files"][1], {"path": "lib/pwa.ts", "content": "export const PWA = { name: 'A', shortName: 'A', themeColor: '#111111', backgroundColor: '#ffffff', letter: 'A' };"}] + [
+APP_LAYOUT = {"path": "app/layout.tsx", "content": "import Pwa from '@/tpf/Pwa';\nimport { siteMetadata } from '@/tpf/seo';\nexport const metadata = siteMetadata();\nexport default function L({children}:{children:React.ReactNode}){return <html><body><Pwa />{children}</body></html>}"}
+APP_CODE = {"files": [APP_LAYOUT, CODE["files"][1], CODE["files"][2], {"path": "lib/pwa.ts", "content": "export const PWA = { name: 'A', shortName: 'A', themeColor: '#111111', backgroundColor: '#ffffff', letter: 'A' };"}] + [
     {"path": "app/admin/page.tsx", "content": PAGE}, {"path": "app/admin/login/page.tsx", "content": PAGE},
     {"path": "db/schema.sql", "content": SCHEMA_SQL}], "notes": "app"}
 
@@ -268,7 +268,7 @@ def test_static_rules_for_bots():
 async def test_developer_builds_a_project_in_steps_and_patches_on_fixes(env):
     from tpf.llm.gateway import LLMError
     first = {"files": [CODE["files"][0]], "remaining": [{"path": "app/page.tsx", "purpose": "home"}], "notes": "layout"}
-    second = {"files": [CODE["files"][1]], "remaining": [], "notes": "home"}
+    second = {"files": CODE["files"][1:], "remaining": [], "notes": "home"}
     env.llm.queue("developer", first, second)
     order, _ = await env.orch.create_order(client_name="A", client_email="a@example.com", request_text="site", language="en")
     oid = order["id"]
@@ -276,7 +276,7 @@ async def test_developer_builds_a_project_in_steps_and_patches_on_fixes(env):
     await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
     await env.drain()
     code = await env.orch.latest_artifact(oid, "code")
-    assert [f["path"] for f in code["files"]] == ["app/layout.tsx", "app/page.tsx"]
+    assert [f["path"] for f in code["files"]] == ["app/layout.tsx", "app/page.tsx", "lib/seo.ts"]
     assert env.llm.calls.count("developer") == 2
 
     # A change request returns only the changed file; the rest of the project is kept. An answer that

@@ -57,3 +57,23 @@ def test_site_serves_language_pages_robots_and_sitemap(pool, settings, monkeypat
             assert "https://tpf-technology.com" + address in sitemap.text
         assert "portal" not in sitemap.text
     get_settings.cache_clear()
+
+
+def test_built_sites_ship_the_search_engine_plumbing_and_the_developer_is_held_to_it():
+    from conftest import CODE
+    from tpf.agents.developer import check_files
+    from tpf.agents.qa import SEO_CRITERIA
+    from tpf.tools.template import all_files, rules_for, validate_path
+
+    for kind in ("site", "app", "shop", "bot"):
+        assert "lib/seo.ts" in rules_for(kind) and "PRIVATE_PAGE" in rules_for(kind)
+        paths = {f["path"] for f in all_files(CODE["files"], "", kind)}
+        assert {"tpf/seo.ts", "tpf/JsonLd.tsx", "app/robots.ts", "app/sitemap.ts"} <= paths
+        # a project written before this has no lib/seo.ts: the files that import it are left out, and it still builds
+        assert not {"app/robots.ts", "tpf/seo.ts"} & {f["path"] for f in all_files(CODE["files"][:2], "", kind)}
+    assert validate_path("app/robots.ts") and validate_path("app/sitemap.ts", "app") and validate_path("lib/seo.ts") is None
+    assert check_files(CODE["files"], ["/"], "site") == []
+    assert any("lib/seo.ts" in p for p in check_files(CODE["files"][:2], ["/"], "site"))
+    bare = [{"path": "app/layout.tsx", "content": "export default function L(){return null}"}, *CODE["files"][1:]]
+    assert any("siteMetadata" in p for p in check_files(bare, ["/"], "site"))
+    assert len(SEO_CRITERIA) == 2

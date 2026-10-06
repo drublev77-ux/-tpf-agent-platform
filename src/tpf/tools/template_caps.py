@@ -673,3 +673,118 @@ CAPS_DESIGN = {
     "integrations": "`services` with every outside service, its base URL, its keys and exactly which calls are made, "
                     "the columns that keep each record's sync outcome, and the /admin page that shows the services",
 }
+
+
+# --- Search engines: every product with public pages is built ready for them. The platform owns the plumbing
+# (where the site lives, robots.txt, the sitemap, safe structured data); the developer writes lib/seo.ts and
+# each page's own title and description. Tested on a static export and on a server build. ---
+
+SEO_LIB = r'''import type { Metadata } from "next";
+import { SEO } from "@/lib/seo";
+
+// Where this site lives. Vercel gives the project's own domain (the client's, once it is attached); the copy
+// the client reviews before release lives in a "…-preview" project and must never appear in search results.
+const host = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL || "";
+export const SITE_URL = host ? `https://${host}` : "http://localhost:3000";
+export const INDEXABLE = Boolean(host) && !host.includes("-preview");
+
+const clip = (text: string, max: number) => (text.length > max ? text.slice(0, max - 1).trimEnd() + "…" : text);
+
+/** The whole site's metadata, for app/layout.tsx: `export const metadata = siteMetadata()`. */
+export function siteMetadata(extra: Metadata = {}): Metadata {
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: { default: clip(SEO.title, 65), template: `%s — ${SEO.name}` },
+    description: clip(SEO.description, 170),
+    applicationName: SEO.name,
+    alternates: { canonical: "/" },
+    robots: INDEXABLE ? { index: true, follow: true } : { index: false, follow: false },
+    openGraph: { type: "website", siteName: SEO.name, locale: SEO.locale, url: "/", title: clip(SEO.title, 65), description: clip(SEO.description, 170) },
+    twitter: { card: "summary" },
+    formatDetection: { telephone: false },
+    ...extra,
+  };
+}
+
+/** One page's metadata: `export const metadata = pageMetadata({ title, description, path: "/menu" })`.
+ *  The title is the page's own (the site's name is added to it); the description is one or two sentences. */
+export function pageMetadata(page: { title: string; description: string; path: string }): Metadata {
+  const title = clip(page.title, 60), description = clip(page.description, 170);
+  return { title, description, alternates: { canonical: page.path }, openGraph: { title, description, url: page.path } };
+}
+
+/** For a page that is nobody's search result: sign-in, the admin area, an account, an order by its link. */
+export const PRIVATE_PAGE: Metadata = { robots: { index: false, follow: false } };
+'''
+
+SEO_JSONLD = r'''/** Structured data for search engines (schema.org): `<JsonLd data={{ "@context": "https://schema.org", "@type":
+ *  "LocalBusiness", name, telephone, address }} />`. Only facts that are on the page itself. */
+export default function JsonLd({ data }: { data: Record<string, unknown> }) {
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\\u003c") }} />;
+}
+'''
+
+SEO_ROBOTS = r'''import type { MetadataRoute } from "next";
+import { INDEXABLE, SITE_URL } from "@/tpf/seo";
+
+export const dynamic = "force-static";
+
+export default function robots(): MetadataRoute.Robots {
+  if (!INDEXABLE) return { rules: { userAgent: "*", disallow: "/" } };         // the review copy stays out of search
+  return { rules: { userAgent: "*", allow: "/", disallow: ["/admin", "/login", "/account", "/api/"] }, sitemap: `${SITE_URL}/sitemap.xml` };
+}
+'''
+
+SEO_SITEMAP = r'''import type { MetadataRoute } from "next";
+import { SEO } from "@/lib/seo";
+import { INDEXABLE, SITE_URL } from "@/tpf/seo";
+
+export const dynamic = "force-static";
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  if (!INDEXABLE) return [];
+  const pages = [...new Set(["/", ...SEO.pages])].filter((p) => /^\/[a-z0-9\-/]*$/.test(p) && !/^\/(admin|login|account|api)(\/|$)/.test(p));
+  return pages.map((path) => ({ url: SITE_URL + (path === "/" ? "/" : path.replace(/\/$/, "")), priority: path === "/" ? 1 : 0.7 }));
+}
+'''
+
+SEO_CONFIG_PATH = "lib/seo.ts"
+SEO_FILES = {"tpf/seo.ts": SEO_LIB, "tpf/JsonLd.tsx": SEO_JSONLD, "app/robots.ts": SEO_ROBOTS, "app/sitemap.ts": SEO_SITEMAP}
+
+SEO_RULES = (
+    "SEARCH ENGINES: the public pages are built to be found. The platform owns app/robots.ts, app/sitemap.ts, "
+    "`@/tpf/seo` and `@/tpf/JsonLd` (do not write them). You write lib/seo.ts: `export const SEO = { name, title, "
+    "description, locale, pages }` — name is the business's name as on the site; title is the home page's title, "
+    "30–60 characters, saying what the business is and where (\"Кофейня «Зерно» в Минске — кофе и десерты\"); "
+    "description is 120–160 characters in plain words; locale is like 'ru_RU' or 'en_US'; pages lists every public "
+    "page a stranger should find in search, as paths ('/', '/menu'), without pages that need signing in and "
+    "without paths that contain [segments]. In app/layout.tsx: `import { siteMetadata } from '@/tpf/seo'` and "
+    "`export const metadata = siteMetadata()` (other metadata the template asks for goes in as its argument: "
+    "`siteMetadata({ appleWebApp: …, icons: … })`), and <html lang> is the site's language. Every other public "
+    "page: `export const metadata = pageMetadata({ title, description, path })` from '@/tpf/seo' — its own title "
+    "of 15–60 characters without the business's name (it is added), its own description of 80–160 characters, "
+    "both different from every other page's and written for a person choosing a result, not as a list of "
+    "keywords. A page whose content comes from the database uses `export async function generateMetadata` "
+    "returning `pageMetadata({...})` built from the record. Every page that is nobody's search result — sign-in, "
+    "everything under /admin, an account, a cart, a checkout, an order or document opened by its link — has "
+    "`export const metadata = PRIVATE_PAGE` from '@/tpf/seo' (in a client component's page, put it in a layout.tsx "
+    "next to it). Each page has exactly one <h1> that says what the page is, headings go h1 → h2 → h3 without "
+    "skipping, the main content is in <main>, navigation in <nav>, and links say where they lead (never \"here\" "
+    "or \"more\"). Images have alt text that describes them (alt=\"\" only for decoration) and width and height. "
+    "On the home page render `<JsonLd data={…} />` from '@/tpf/JsonLd' with schema.org data of the fitting type "
+    "(LocalBusiness or a narrower one such as Restaurant, Store, BeautySalon; Organization when there is no place "
+    "to visit): name, description, and only those of telephone, email, address, openingHours and priceRange that "
+    "the spec's client_content gives — never an invented or placeholder value, no ratings, no reviews. Do not add "
+    "a meta keywords tag, hidden text, or text repeated for search engines. "
+)
+
+# What the reviewer holds the finished code to (see agents/qa.py).
+SEO_CRITERIA = [
+    "Search engines: lib/seo.ts exports SEO with a home title of 30–60 characters, a description of 120–160 and every "
+    "public page in pages; the layout exports siteMetadata() and sets <html lang>; every other public page has its "
+    "own pageMetadata title and description, unlike any other page's; sign-in, admin, account, cart, checkout and "
+    "pages opened by a private link export PRIVATE_PAGE",
+    "Each page has exactly one h1 and headings in order, content in <main>, descriptive link texts and image alt "
+    "texts; the home page has JsonLd whose every value is a fact from the spec's client_content, with no invented "
+    "contact details, ratings or reviews; there is no keywords tag or hidden text",
+]
