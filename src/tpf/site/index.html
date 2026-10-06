@@ -3,10 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TPF Technology — сайты, веб‑приложения, магазины и Telegram‑боты</title>
-<meta name="description" content="TPF Technology: сайты, веб‑приложения, интернет‑магазины и Telegram‑боты от команды ИИ‑агентов под контролем инженеров. Смета бесплатно и до оплаты.">
-<meta property="og:title" content="TPF Technology">
-<meta property="og:image" content="/brand.jpg">
+<title>Сайты, веб‑приложения и Telegram‑боты под ключ — TPF Technology</title>
+<meta name="description" content="Студия TPF Technology: сайты, веб‑приложения, интернет‑магазины и Telegram‑боты под ключ. ТЗ и смета бесплатно и до оплаты, оплата 50/50, исходный код остаётся у вас.">
+<link rel="canonical" href="https://tpf-technology.com/">
+<link rel="alternate" hreflang="ru" href="https://tpf-technology.com/ru">
+<link rel="alternate" hreflang="en" href="https://tpf-technology.com/en">
+<link rel="alternate" hreflang="zh-Hans" href="https://tpf-technology.com/zh">
+<link rel="alternate" hreflang="x-default" href="https://tpf-technology.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="TPF Technology">
+<meta property="og:url" content="https://tpf-technology.com/">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:title" content="Сайты, веб‑приложения и Telegram‑боты под ключ — TPF Technology">
+<meta property="og:description" content="Студия TPF Technology: сайты, веб‑приложения, интернет‑магазины и Telegram‑боты под ключ. ТЗ и смета бесплатно и до оплаты, оплата 50/50, исходный код остаётся у вас.">
+<meta property="og:image" content="https://tpf-technology.com/brand.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="731">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json" id="ld">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://tpf-technology.com/#org","name":"TPF Technology","url":"https://tpf-technology.com/","logo":"https://tpf-technology.com/icon-512.png","image":"https://tpf-technology.com/brand.jpg","email":"orders@tpf-technology.com","description":"Студия TPF Technology: сайты, веб‑приложения, интернет‑магазины и Telegram‑боты под ключ. ТЗ и смета бесплатно и до оплаты, оплата 50/50, исходный код остаётся у вас.","knowsLanguage":["ru","en","zh"]},{"@type":"WebSite","@id":"https://tpf-technology.com/#site","url":"https://tpf-technology.com/","name":"TPF Technology","publisher":{"@id":"https://tpf-technology.com/#org"},"inLanguage":"ru"}]}</script>
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
 <link rel="manifest" href="/manifest.webmanifest">
@@ -31,8 +45,8 @@ header{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-c
 nav{display:flex;gap:clamp(16px,2.4vw,36px);font-size:15px;font-weight:500}nav a{color:var(--soft)}
 .right{display:flex;align-items:center;gap:14px}
 .langs{display:flex;gap:2px;padding:3px;border:1px solid var(--line2);border-radius:999px}
-.langs button{height:38px;min-width:46px;padding:0 12px;border:0;border-radius:999px;background:transparent;color:var(--soft);font:500 13px 'JetBrains Mono','Noto Sans SC',monospace;cursor:pointer;white-space:nowrap}
-.langs button[aria-pressed=true]{background:var(--accent);color:#04161A}
+.langs a{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;height:38px;min-width:46px;padding:0 12px;border:0;border-radius:999px;background:transparent;color:var(--soft);font:500 13px 'JetBrains Mono','Noto Sans SC',monospace;cursor:pointer;white-space:nowrap}
+.langs a[aria-current=true]{background:var(--accent);color:#04161A}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:56px;padding:0 28px;border-radius:999px;font-weight:700;font-size:16px;white-space:nowrap;border:1px solid transparent;cursor:pointer;font-family:inherit}
 .btn.fill{background:var(--accent);color:#04161A}.btn.fill:hover{background:#8BEAF5;color:#04161A}
 .btn.line{border-color:var(--line2);color:var(--ink);font-weight:600}
@@ -111,7 +125,7 @@ footer img{width:240px;height:94px;object-fit:cover;object-position:center 55%;b
 footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 @media(max-width:900px){nav{display:none}.cta-top{display:none}.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.grid3{grid-template-columns:1fr}.card{min-height:0}}
-@media(max-width:420px){header{gap:10px}.logo{font-size:15px;gap:8px}.logo .mark{width:44px;height:44px}.langs button{min-width:36px;padding:0 7px}}
+@media(max-width:420px){header{gap:10px}.logo{font-size:15px;gap:8px}.logo .mark{width:44px;height:44px}.langs a{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;min-width:36px;padding:0 7px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 </style>
 </head>
@@ -387,13 +401,13 @@ var I18N = {
 };
 
 var EXTRA = {
-  ru: { cs_lead: 'Каждый проект проходит весь путь на нашей платформе: заявка, ТЗ и смета, разработка, проверки, запуск.', case1_tag: 'ЛЕНДИНГ', case1_title: 'Кофейня «Зерно»', case1_text: 'Одностраничный сайт: первый экран, меню с ценами, адрес и часы работы, звонок в одно касание. От заявки до рабочей версии — силами ИИ‑агентов, с автоматическими проверками сборки, безопасности и критериев приёмки.', case1_facts: ['Next.js', 'Адаптивная вёрстка', 'Исходный код у клиента'], case1_open: 'Открыть сайт →', case1_alt: 'Главный экран сайта кофейни «Зерно»', privacy: 'Политика обработки данных', f_email: 'E‑mail', f_consent: 'Нажимая кнопку, вы соглашаетесь на обработку указанных данных для ответа на заявку.',
+  ru: { seo_title: 'Сайты, веб‑приложения и Telegram‑боты под ключ — TPF Technology', seo_desc: 'Студия TPF Technology: сайты, веб‑приложения, интернет‑магазины и Telegram‑боты под ключ. ТЗ и смета бесплатно и до оплаты, оплата 50/50, исходный код остаётся у вас.', cs_lead: 'Каждый проект проходит весь путь на нашей платформе: заявка, ТЗ и смета, разработка, проверки, запуск.', case1_tag: 'ЛЕНДИНГ', case1_title: 'Кофейня «Зерно»', case1_text: 'Одностраничный сайт: первый экран, меню с ценами, адрес и часы работы, звонок в одно касание. От заявки до рабочей версии — силами ИИ‑агентов, с автоматическими проверками сборки, безопасности и критериев приёмки.', case1_facts: ['Next.js', 'Адаптивная вёрстка', 'Исходный код у клиента'], case1_open: 'Открыть сайт →', case1_alt: 'Главный экран сайта кофейни «Зерно»', privacy: 'Политика обработки данных', f_email: 'E‑mail', f_consent: 'Нажимая кнопку, вы соглашаетесь на обработку указанных данных для ответа на заявку.',
         f_video: 'Видео (необязательно)', f_video_hint: 'Расскажите о задаче голосом или покажите на экране пример — мы составим по видео ТЗ и смету. До 50 МБ, смотрим первые 5 минут.', in_video: 'Описание — в приложенном видео.', e_video: 'Видео больше 50 МБ. Сократите его или опишите задачу текстом.', e_upload: 'Не получилось загрузить видео. Отправьте заявку без него или попробуйте ещё раз.', uploading: 'Загружаем видео… ', ok_video: 'Заявка принята. Мы посмотрим видео и пришлём ТЗ со сметой на вашу почту. Статус заказа: ', sending: 'Отправляем…', ok: 'Заявка принята. Мы отправили подтверждение на вашу почту. Статус заказа: ', ok_link: 'страница заказа',
         e_fields: 'Заполните имя, e‑mail и опишите задачу (не меньше 10 символов).', e_busy: 'Сейчас слишком много заявок. Попробуйте через час.', e_fail: 'Не получилось отправить. Попробуйте ещё раз чуть позже.' },
-  en: { cs_lead: 'Every project runs end to end on our platform: request, spec and estimate, development, checks, launch.', case1_tag: 'LANDING PAGE', case1_title: 'Zerno coffee shop', case1_text: 'A one‑page site: hero, menu with prices, address and opening hours, one‑tap call. From request to live version by AI agents, with automated build, security and acceptance checks.', case1_facts: ['Next.js', 'Responsive layout', 'Client owns the source'], case1_open: 'Open the site →', case1_alt: 'Home screen of the Zerno coffee shop website', privacy: 'Privacy policy', f_email: 'Email', f_consent: 'By clicking the button, you agree that we process these details to answer your request.',
+  en: { seo_title: 'Websites, web apps and Telegram bots — TPF Technology', seo_desc: 'TPF Technology builds websites, web apps, online shops and Telegram bots with a team of AI agents supervised by engineers. Free spec and estimate before you pay; you own the code.', cs_lead: 'Every project runs end to end on our platform: request, spec and estimate, development, checks, launch.', case1_tag: 'LANDING PAGE', case1_title: 'Zerno coffee shop', case1_text: 'A one‑page site: hero, menu with prices, address and opening hours, one‑tap call. From request to live version by AI agents, with automated build, security and acceptance checks.', case1_facts: ['Next.js', 'Responsive layout', 'Client owns the source'], case1_open: 'Open the site →', case1_alt: 'Home screen of the Zerno coffee shop website', privacy: 'Privacy policy', f_email: 'Email', f_consent: 'By clicking the button, you agree that we process these details to answer your request.',
         f_video: 'Video (optional)', f_video_hint: 'Tell us about the task aloud or show an example on screen — we will write the spec and estimate from the video. Up to 50 MB; we watch the first 5 minutes.', in_video: 'The description is in the attached video.', e_video: 'The video is larger than 50 MB. Shorten it or describe the task in text.', e_upload: 'Could not upload the video. Send the request without it or try again.', uploading: 'Uploading the video… ', ok_video: 'Request received. We will watch the video and email you the spec and estimate. Order status: ', sending: 'Sending…', ok: 'Request received. We have emailed you a confirmation. Order status: ', ok_link: 'your order page',
         e_fields: 'Please fill in your name, email and describe the task (at least 10 characters).', e_busy: 'Too many requests right now. Please try again in an hour.', e_fail: 'Could not send. Please try again a little later.' },
-  zh: { cs_lead: '每个项目都在我们的平台上全流程完成：需求、规格书与报价、开发、检查、上线。', case1_tag: '落地页', case1_title: '“Zerno”咖啡馆', case1_text: '单页网站：首屏、带价格的菜单、地址与营业时间、一键拨号。从需求到正式上线均由 AI 智能体完成，并自动检查构建、安全与验收标准。', case1_facts: ['Next.js', '响应式布局', '源代码归客户所有'], case1_open: '打开网站 →', case1_alt: '“Zerno”咖啡馆网站首页', privacy: '隐私政策', f_email: '邮箱', f_consent: '点击按钮即表示您同意我们为回复需求而处理上述信息。',
+  zh: { seo_title: '网站、网络应用与 Telegram 机器人开发 — TPF Technology', seo_desc: 'TPF Technology 由工程师监督的 AI 智能体团队开发网站、网络应用、网店和 Telegram 机器人。付款前免费提供规格书与报价，源代码归您所有。', cs_lead: '每个项目都在我们的平台上全流程完成：需求、规格书与报价、开发、检查、上线。', case1_tag: '落地页', case1_title: '“Zerno”咖啡馆', case1_text: '单页网站：首屏、带价格的菜单、地址与营业时间、一键拨号。从需求到正式上线均由 AI 智能体完成，并自动检查构建、安全与验收标准。', case1_facts: ['Next.js', '响应式布局', '源代码归客户所有'], case1_open: '打开网站 →', case1_alt: '“Zerno”咖啡馆网站首页', privacy: '隐私政策', f_email: '邮箱', f_consent: '点击按钮即表示您同意我们为回复需求而处理上述信息。',
         f_video: '视频（可选）', f_video_hint: '用语音讲述需求，或在屏幕上展示示例——我们将根据视频编写规格书和报价。最大 50 MB，仅查看前 5 分钟。', in_video: '需求说明见所附视频。', e_video: '视频超过 50 MB。请缩短视频或用文字描述需求。', e_upload: '视频上传失败。请不带视频提交，或稍后重试。', uploading: '正在上传视频… ', ok_video: '需求已收到。我们将查看视频，并把规格书和报价发送到您的邮箱。订单状态：', sending: '正在提交…', ok: '需求已收到，确认邮件已发送至您的邮箱。订单状态：', ok_link: '订单页面',
         e_fields: '请填写姓名、邮箱并描述需求（不少于 10 个字符）。', e_busy: '当前请求过多，请一小时后再试。', e_fail: '提交失败，请稍后再试。' }
 };
@@ -535,6 +549,8 @@ function T() { var t = Object.assign({}, I18N[lang], EXTRA[lang], ACTUAL[lang], 
 function render() {
   var t = T();
   document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang;
+  document.title = t.seo_title;
+  document.querySelector('meta[name=description]').content = t.seo_desc;
   document.querySelectorAll('[data-t]').forEach(function (n) { n.textContent = t[n.dataset.t] || ''; });
   document.querySelectorAll('[data-ph]').forEach(function (n) { n.placeholder = t[n.dataset.ph] || ''; });
   document.querySelectorAll('[data-list]').forEach(function (n) { fill(n, t[n.dataset.list], function (s) { return el('span', s); }); });
@@ -548,8 +564,8 @@ function render() {
     card.append(img, body); return card; });
   document.getElementById('langs').setAttribute('aria-label', t.lang_label);
   fill(document.getElementById('langs'), LANGS, function (l) {
-    var b = el('button', l[1]); b.type = 'button'; b.setAttribute('aria-pressed', String(l[0] === lang));
-    b.onclick = function () { lang = l[0]; try { localStorage.setItem('tpf_lang', lang); } catch (e) {} render(); };
+    var b = el('a', l[1]); b.href = '/' + l[0]; b.hreflang = l[0] === 'zh' ? 'zh-Hans' : l[0]; b.setAttribute('aria-current', String(l[0] === lang));
+    b.onclick = function () { try { localStorage.setItem('tpf_lang', l[0]); } catch (e) {} };
     return b; });
   fill(document.getElementById('services-grid'), t.services, function (s, i) {
     var c = el('div', null, 'card');
@@ -566,7 +582,10 @@ function render() {
   var sel = document.getElementById('types'), keep = sel.selectedIndex;
   fill(sel, t.types, function (s) { return el('option', s); }); if (keep > 0) sel.selectedIndex = keep;
 }
-try { var saved = localStorage.getItem('tpf_lang'); if (I18N[saved]) lang = saved; else if (/^zh/i.test(navigator.language)) lang = 'zh'; else if (!/^(ru|be|uk|kk)/i.test(navigator.language)) lang = 'en'; } catch (e) {}
+// Each language has its own address (/ru, /en, /zh) with the page already filled in for search engines;
+// on the bare address the visitor's own language is chosen here.
+var PAGE_LANG = (location.pathname.match(/^\/(ru|en|zh)\/?$/) || [])[1];
+try { var saved = localStorage.getItem('tpf_lang'); if (PAGE_LANG) lang = PAGE_LANG; else if (I18N[saved]) lang = saved; else if (/^zh/i.test(navigator.language)) lang = 'zh'; else if (!/^(ru|be|uk|kk)/i.test(navigator.language)) lang = 'en'; } catch (e) {}
 render();
 
 document.getElementById('form').addEventListener('submit', function (ev) {

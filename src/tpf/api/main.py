@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+from datetime import datetime, timezone
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -10,7 +11,7 @@ from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 import asyncpg
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse, Response
 from pydantic import BaseModel, EmailStr, Field
 
 from tpf.notifications import portal_url
@@ -346,11 +347,52 @@ def run() -> None:
 SITE_DIR = Path(__file__).resolve().parent.parent / "site"
 
 
+def _page(name: str) -> FileResponse:
+    """A page of the studio site with its text already in the HTML (scripts/prerender_site.py); the source
+    page, which fills itself in the browser, when the copy is missing."""
+    path = SITE_DIR / f"index.{name}.html"
+    return FileResponse(path if path.is_file() else SITE_DIR / "index.html", media_type="text/html; charset=utf-8",
+                        headers={"Cache-Control": "public, max-age=300"})
+
+
 @app.get("/", include_in_schema=False)
 async def site() -> FileResponse:
     """The public TPF Technology site; its contact form posts to /orders."""
-    return FileResponse(SITE_DIR / "index.html", media_type="text/html; charset=utf-8",
-                        headers={"Cache-Control": "public, max-age=300"})
+    return _page("root")
+
+
+SITE_LANGS = {"ru": "ru", "en": "en", "zh": "zh-Hans"}
+SITE_URL = "https://tpf-technology.com"
+
+
+def _lang_page(lang: str):
+    async def serve() -> FileResponse:
+        return _page(lang)
+    return serve
+
+
+for _lang in SITE_LANGS:
+    app.get(f"/{_lang}", include_in_schema=False)(_lang_page(_lang))
+
+
+@app.get("/robots.txt", include_in_schema=False)
+async def robots() -> Response:
+    # Order pages, the admin area and the endpoints forms and applications post to are nobody's search result.
+    lines = ["User-agent: *", "Allow: /", *(f"Disallow: /{p}" for p in ("portal/", "admin", "orders", "forms/", "apps/", "uploads", "webhooks/", "pay/")),
+             "", f"Sitemap: {SITE_URL}/sitemap.xml", ""]
+    return Response("\n".join(lines), media_type="text/plain; charset=utf-8", headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+async def sitemap() -> Response:
+    changed = datetime.fromtimestamp((SITE_DIR / "index.html").stat().st_mtime, tz=timezone.utc).date().isoformat()
+    alternates = "".join(f'<xhtml:link rel="alternate" hreflang="{code}" href="{SITE_URL}/{lang}"/>' for lang, code in SITE_LANGS.items()) \
+        + f'<xhtml:link rel="alternate" hreflang="x-default" href="{SITE_URL}/"/>'
+    urls = "".join(f"<url><loc>{SITE_URL}/{path}</loc><lastmod>{changed}</lastmod>{alternates}</url>" for path in ("", *SITE_LANGS))
+    urls += f"<url><loc>{SITE_URL}/privacy</loc></url>"
+    xml = ('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
+           f'xmlns:xhtml="http://www.w3.org/1999/xhtml">{urls}</urlset>')
+    return Response(xml, media_type="application/xml; charset=utf-8", headers={"Cache-Control": "public, max-age=3600"})
 
 
 @app.get("/privacy", include_in_schema=False)
