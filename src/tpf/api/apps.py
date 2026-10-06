@@ -5,6 +5,7 @@ session secret, and the platform does the work within limits it keeps per applic
 Every limit here stands between one client's application and everyone's bill or sender reputation."""
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -30,6 +31,7 @@ EMAIL = re.compile(r"[^@\s<>\"',;]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za
 AI_FILE_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
 AI_MAX_BODY = 4_400_000          # the host accepts request bodies up to 4.5 MB
 MAIL_MAX_BODY = 60_000
+WORKER_WAIT_SEC = 50.0           # how long a request waits for a worker to answer it
 FOOTER = {
     "ru": "Это письмо отправлено приложением «{app}». Чтобы ответить, просто ответьте на него.",
     "en": "This e-mail was sent by the application “{app}”. To answer, just reply to it.",
@@ -116,6 +118,37 @@ async def app_mail(order_id: int, request: Request, x_tpf_app: str = Header(defa
     return JSONResponse({"ok": True})
 
 
+async def ask_model(s: Any, call: dict[str, Any]) -> dict[str, Any] | None:
+    """One request to the AI provider; the provider's answer, or None when it refused or could not be reached."""
+    try:
+        async with httpx.AsyncClient(base_url=s.anthropic_base_url, timeout=45) as client:
+            r = await client.post("/v1/messages", json=call, headers={
+                "x-api-key": s.anthropic_api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"})
+        if r.status_code >= 400:
+            log.warning("AI provider refused an application's request: %s %s", r.status_code, r.text[:300])
+            return None
+        return r.json()
+    except (httpx.HTTPError, ValueError):
+        log.exception("AI provider could not be reached for an application's request")
+        return None
+
+
+async def _through_worker(pool: Any, order_id: int, call: dict[str, Any]) -> dict[str, Any] | None:
+    """Leave the request for a worker and wait for its answer (see tools/ai_relay.py)."""
+    request_id = await pool.fetchval("INSERT INTO app_ai_requests (order_id, request) VALUES ($1, $2) RETURNING id", order_id, call)
+    waited = 0.0
+    try:
+        while waited < WORKER_WAIT_SEC:
+            await asyncio.sleep(0.4)
+            waited += 0.4
+            row = await pool.fetchrow("SELECT response FROM app_ai_requests WHERE id = $1 AND status = 'done'", request_id)
+            if row is not None:
+                return row["response"] or None
+        return None
+    finally:
+        await pool.execute("DELETE FROM app_ai_requests WHERE id = $1", request_id)
+
+
 @router.post("/apps/{order_id}/ai")
 async def app_ai(order_id: int, request: Request, x_tpf_app: str = Header(default="")) -> JSONResponse:
     raw = await request.body()
@@ -136,7 +169,7 @@ async def app_ai(order_id: int, request: Request, x_tpf_app: str = Header(defaul
     except (ValueError, KeyError, TypeError, AssertionError):
         return _no(400, "failed")
     o, s = request.app.state.orch, get_settings()
-    if not s.anthropic_api_key or not await _allows(o, order_id, "ai"):
+    if not await _allows(o, order_id, "ai"):
         return _no(403, "off")
     used = await o.pool.fetchval(
         "SELECT coalesce(sum(input_tokens + output_tokens), 0) FROM app_ai_usage WHERE order_id = $1 "
@@ -160,16 +193,10 @@ async def app_ai(order_id: int, request: Request, x_tpf_app: str = Header(defaul
         # Newer models refuse a forced tool call (see llm/gateway.py): offer the tool and ask for it.
         call["tool_choice"] = {"type": "auto"}
         call["system"] += " Give your answer only by calling the `answer` tool, exactly once; do not answer in plain text."
-    try:
-        async with httpx.AsyncClient(base_url=s.anthropic_base_url, timeout=50) as client:
-            r = await client.post("/v1/messages", json=call, headers={
-                "x-api-key": s.anthropic_api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"})
-        if r.status_code >= 400:
-            log.warning("order %s: application AI call refused: %s %s", order_id, r.status_code, r.text[:300])
-            return _no(502, "failed")
-        data = r.json()
-    except (httpx.HTTPError, ValueError):
-        log.exception("order %s: application AI call failed", order_id)
+    # This process may hold the provider's key or not (the web side does not): without it a worker asks.
+    data = await ask_model(s, call) if s.anthropic_api_key else await _through_worker(o.pool, order_id, call)
+    if data is None:
+        log.warning("order %s: application AI call failed", order_id)
         return _no(502, "failed")
     usage = data.get("usage") or {}
     await o.pool.execute(

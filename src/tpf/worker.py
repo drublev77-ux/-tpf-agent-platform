@@ -24,7 +24,7 @@ from tpf.tools.github import GitHubPublisher
 from tpf.tools.sandbox import Sandbox, make_sandbox
 from tpf.tools.screens import Screenshooter
 from tpf.tools.shop_stripe import ShopStripe
-from tpf.tools import ticker
+from tpf.tools import ai_relay, ticker
 from tpf.tools.telegram import TelegramAPI
 from tpf.tools.tenantdb import make_tenant_db
 
@@ -179,6 +179,7 @@ async def main() -> None:
     slots = int(os.environ.get("WORKER_CONCURRENCY", "4"))
     log.info("worker started with %s slots", slots)
     loops = [asyncio.create_task(worker.loop(i)) for i in range(slots)]
+    loops.append(asyncio.create_task(ai_relay.run_forever(pool, settings, worker.stopping)))  # applications' questions to the model
     loops.append(asyncio.create_task(ticker.run_forever(pool, settings, worker.stopping)))   # applications' scheduled work
     try:
         # A redeploy gives the process seconds, an agent call takes minutes: do not wait for tasks in

@@ -184,3 +184,37 @@ async def test_scheduled_work_wakes_each_due_application_once(pool, settings):
         assert await pool.fetchval("SELECT failures FROM app_ticks WHERE order_id=$1", ids[0]) == 1
         await pool.execute("UPDATE app_ticks SET last_at = now() - interval '16 minutes'")
         assert await ticker.tick_due(pool, settings, http) == 0                                  # a failing one waits longer
+
+
+def test_without_the_providers_key_the_web_side_asks_through_a_worker(client, monkeypatch):
+    import asyncio
+    import tpf.api.apps as apps
+    from tpf.tools import ai_relay
+    monkeypatch.delenv("ANTHROPIC_API_KEY")
+    get_settings.cache_clear()
+    assert not get_settings().anthropic_api_key
+    oid, _, orch = _app(client, ["ai"])
+    seen: list[dict] = []
+
+    async def model(settings, call):                     # what the worker, which holds the key, gets from the provider
+        seen.append(call)
+        return {"content": [{"type": "text", "text": "Ответ"}], "usage": {"input_tokens": 50, "output_tokens": 5}}
+    monkeypatch.setattr(ai_relay, "ask_model", model)
+
+    async def worker():
+        for _ in range(100):
+            if await ai_relay.answer_one(orch.pool, get_settings()):
+                return
+            await asyncio.sleep(0.05)
+    waiting = client.portal.start_task_soon(worker)
+    r = client.post(f"/apps/{oid}/ai", json={"prompt": "Вопрос"}, headers={"x-tpf-app": app_key(SECRET)})
+    waiting.result(timeout=10)
+    assert r.json() == {"ok": True, "text": "Ответ", "data": None}
+    assert seen[0]["messages"][0]["content"] == [{"type": "text", "text": "Вопрос"}]
+    assert client.portal.call(orch.pool.fetchval, "SELECT count(*) FROM app_ai_requests") == 0          # nothing is kept
+    assert client.portal.call(orch.pool.fetchval, "SELECT sum(input_tokens) FROM app_ai_usage WHERE order_id=$1", oid) == 50
+
+    # no worker answers: the application is told so within the wait, not left hanging
+    monkeypatch.setattr(apps, "WORKER_WAIT_SEC", 0.8)
+    assert client.post(f"/apps/{oid}/ai", json={"prompt": "Вопрос"}, headers={"x-tpf-app": app_key(SECRET)}).json() == {"ok": False, "error": "failed"}
+    assert client.portal.call(orch.pool.fetchval, "SELECT count(*) FROM app_ai_requests") == 0
