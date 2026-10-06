@@ -383,6 +383,17 @@ async def robots() -> Response:
     return Response("\n".join(lines), media_type="text/plain; charset=utf-8", headers={"Cache-Control": "public, max-age=3600"})
 
 
+INDEXNOW_KEY = (SITE_DIR / "indexnow-key.txt").read_text().strip() if (SITE_DIR / "indexnow-key.txt").is_file() else ""
+
+
+@app.get("/indexnow-{key}.txt", include_in_schema=False)
+async def indexnow_key(key: str) -> Response:
+    """Proof for IndexNow (Yandex, Bing) that the pages we report as changed are ours. The key is public by design."""
+    if not INDEXNOW_KEY or key != INDEXNOW_KEY:
+        raise HTTPException(404)
+    return Response(INDEXNOW_KEY, media_type="text/plain; charset=utf-8")
+
+
 @app.get("/sitemap.xml", include_in_schema=False)
 async def sitemap() -> Response:
     changed = datetime.fromtimestamp((SITE_DIR / "index.html").stat().st_mtime, tz=timezone.utc).date().isoformat()
