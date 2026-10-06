@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import re
-from email.utils import parseaddr
+from email.utils import formataddr, parseaddr
 from html import escape
 from typing import Any, Protocol
 from urllib.parse import quote
@@ -137,20 +137,24 @@ class EmailNotifier:
         self.s = settings
         self._client = client
 
-    async def send(self, to: str, subject: str, text: str, html: str) -> None:
+    async def send(self, to: str, subject: str, text: str, html: str, *, sender_name: str = "", reply_to: str = "") -> None:
+        """`sender_name` and `reply_to` are for mail sent on behalf of a client's application: the address stays
+        ours (the only one the provider has verified), the name and the reply address are theirs."""
         s = self.s
         name, addr = parseaddr(s.email_from)
+        name = sender_name or name
+        reply = reply_to or s.email_reply_to
         if s.email_provider == "resend":
             url, headers = "https://api.resend.com/emails", {"Authorization": f"Bearer {s.email_api_key}"}
-            body: dict[str, Any] = {"from": s.email_from, "to": [to], "subject": subject, "text": text, "html": html}
-            if s.email_reply_to:
-                body["reply_to"] = s.email_reply_to
+            body: dict[str, Any] = {"from": formataddr((name, addr)) if sender_name else s.email_from, "to": [to], "subject": subject, "text": text, "html": html}
+            if reply:
+                body["reply_to"] = reply
         else:  # brevo
             url, headers = "https://api.brevo.com/v3/smtp/email", {"api-key": s.email_api_key}
             body = {"sender": {"email": addr, "name": name or "TPF Technology"}, "to": [{"email": to}],
                     "subject": subject, "textContent": text, "htmlContent": html}
-            if s.email_reply_to:
-                body["replyTo"] = {"email": s.email_reply_to}
+            if reply:
+                body["replyTo"] = {"email": reply}
         client = self._client or httpx.AsyncClient(timeout=20)
         try:
             r = await client.post(url, json=body, headers=headers)

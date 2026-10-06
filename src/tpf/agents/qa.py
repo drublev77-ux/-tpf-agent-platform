@@ -20,6 +20,7 @@ from tpf.agents.devops import staging_project
 from tpf.orchestrator.states import Ev
 from tpf.tools.deploy import DeployError
 from tpf.tools.sandbox import RunResult
+from tpf.tools.template_caps import CAPS_CRITERIA
 from tpf.tools.template import (ROLES_PATH, SCHEMA_PATH, access_of, all_files, capabilities_of, has_database, installable, kind_of, materialize,
                                 route_to_page, uses_accounts)
 from tpf.tools.tenantdb import TenantDBError
@@ -103,6 +104,9 @@ CAPABILITY_CRITERIA = {
         "marked rather than blocked; hours are computed from closed shifts and a manager's correction is marked",
     ],
 }
+
+
+CAPABILITY_CRITERIA |= CAPS_CRITERIA
 
 
 def user_cookie(session_secret: str, user_id: int, version: int, ttl_sec: int = 600) -> str:

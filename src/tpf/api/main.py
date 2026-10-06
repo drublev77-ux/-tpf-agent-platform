@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel, EmailStr, Field
 
 from tpf.notifications import portal_url
-from tpf.api import uploads
+from tpf.api import apps, uploads
 from tpf.config import get_settings
 from tpf.db import create_pool
 from tpf.notifications import make_notifier
@@ -411,3 +411,4 @@ from tpf.api.forms import router as forms_router  # noqa: E402
 
 app.include_router(forms_router)
 app.include_router(uploads.router)
+app.include_router(apps.router)

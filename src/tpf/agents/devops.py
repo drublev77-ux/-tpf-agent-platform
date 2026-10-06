@@ -102,10 +102,34 @@ async def connect_shop_to(ctx: Ctx, env: str, site_url: str) -> str | None:
     return row["mode"]
 
 
+async def connect_services_to(ctx: Ctx, env: str) -> list[str]:
+    """Hand the keys of outside services that the client entered on the order page to this deployment's
+    database (tpf/services.ts reads them). Returns the ids handed over."""
+    rows = await ctx.orch.pool.fetch("SELECT key_id, value FROM service_keys WHERE order_id = $1", ctx.order_id)
+    if not rows or ctx.tenant_db is None:
+        return []
+    db = await ctx.tenant_db.ensure(ctx.orch.pool, ctx.order_id, env)
+    await ctx.tenant_db.set_secrets(db, {"svc_" + r["key_id"]: r["value"] for r in rows})
+    await ctx.orch.log(ctx.order_id, "services_connected", "devops", {"env": env, "keys": [r["key_id"] for r in rows]}, kind="tool")
+    return [r["key_id"] for r in rows]
+
+
+async def connect_services(ctx: Ctx) -> Outcome:
+    """Side task (does not move the order): the client entered or replaced a key of an outside service."""
+    target = _live_target(ctx)
+    if target is None:
+        return Outcome(data={"result": "saved"})        # the next deployment hands the keys over
+    return Outcome(data={"result": "connected", "env": target[0], "keys": await connect_services_to(ctx, target[0])})
+
+
 async def _connect_after_deploy(ctx: Ctx, env: str, url: str) -> None:
     """A bot is useless until Telegram points at the deployment, and a shop cannot take payments until Stripe
     does; a refused token or key must not stop the release."""
     kind = await _kind(ctx)
+    try:
+        await connect_services_to(ctx, env)
+    except Exception as e:  # noqa: BLE001 — the application says "not connected yet" and works without the service
+        await ctx.orch.log(ctx.order_id, "services_connect_failed", "devops", {"env": env, "error": str(e)[:300]}, kind="tool")
     connect = {"bot": connect_bot_to, "shop": connect_shop_to}.get(kind)
     if connect is None:
         return

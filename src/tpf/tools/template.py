@@ -8,6 +8,8 @@ from pathlib import Path
 
 from tpf.tools.template_extras import (APP_AUTO_REFRESH, APP_FILE_INPUT, APP_FILES, APP_GEO, APP_GEO_FORM, CHAT_RULES, FILES_PATH,
                                        GEO_RULES, UPLOADS_RULES)
+from tpf.tools.template_caps import (APP_AI, APP_MAIL, APP_PDF, APP_PDF_FONT, APP_PLATFORM, APP_SERVICES, APP_SHEETS, APP_TICK,
+                                     CAPS_PACKAGES, CAPS_RULES, SCHEDULE_PATH, TICK_PATH)
 from tpf.tools.shop_payments_ts import (SHOP_PAY_CHECK, SHOP_PAY_CHECK_PATH, SHOP_PAY_NOTIFY, SHOP_PAY_NOTIFY_PATH,
                                          SHOP_PAY_RETURN, SHOP_PAY_RETURN_PATH, SHOP_PAYMENTS)
 
@@ -109,6 +111,9 @@ APP_PACKAGE = json.dumps({
     "dependencies": {"next": "^16.3.6", "react": "^19.0.0", "react-dom": "^19.0.0", "postgres": "^3.4.5"},
     "devDependencies": {"typescript": "^5.4.0", "@types/node": "^22.0.0", "@types/react": "^19.0.0"},
 }, indent=2) + "\n"
+
+APP_PACKAGE_CAPS = json.dumps(json.loads(APP_PACKAGE) | {
+    "dependencies": json.loads(APP_PACKAGE)["dependencies"] | CAPS_PACKAGES}, indent=2) + "\n"
 
 APP_NEXT_CONFIG = ("/** @type {import('next').NextConfig} */\nconst nextConfig = { images: { unoptimized: true }, poweredByHeader: false,\n"
                    "  experimental: { serverActions: { bodySizeLimit: '5mb' } } };   // a form may carry a photo or a PDF\nexport default nextConfig;\n")
@@ -851,7 +856,7 @@ def validate_path(path: str, kind: str = "site") -> str | None:
     if not path.endswith(APP_SUFFIXES if app else ALLOWED_SUFFIXES):
         return f"file type not allowed: {path}"
     if path.startswith(("app/api/tpf-health/", "app/api/tpf-telegram/", "app/api/tpf-stripe/", "app/api/tpf-pay/",
-                        "app/api/tpf-pay-return/", "app/api/tpf-check/", "app/tpf-icon/")) \
+                        "app/api/tpf-pay-return/", "app/api/tpf-check/", "app/api/tpf-tick/", "app/tpf-icon/")) \
             or path in ("app/manifest.ts", "public/sw.js", "public/offline.html"):
         return f"path reserved by the platform: {path}"
     if path.startswith("db/") and path != SCHEMA_PATH:
@@ -881,7 +886,8 @@ def _for_code(platform: dict[str, str], files: list[dict[str, str]]) -> dict[str
     no lib/pwa.ts, and the manifest that imports it would break its build."""
     paths = {f["path"] for f in files}
     # The accounts helper imports the application's lib/roles.ts: it ships only with code that has one.
-    skip = (() if PWA_CONFIG_PATH in paths else PWA_FILES) + (() if ROLES_PATH in paths else (USERS_PATH,))
+    skip = ((() if PWA_CONFIG_PATH in paths else PWA_FILES) + (() if ROLES_PATH in paths else (USERS_PATH,))
+            + (() if SCHEDULE_PATH in paths else (TICK_PATH,)))     # the tick route imports the application's lib/schedule.ts
     return {p: c for p, c in platform.items() if p not in skip}
 
 
@@ -900,6 +906,12 @@ def platform_files(form_endpoint: str = "", kind: str = "site") -> dict[str, str
             "tpf/AutoRefresh.tsx": APP_AUTO_REFRESH, "tpf/GeoForm.tsx": APP_GEO_FORM, "tpf/geo.ts": APP_GEO,
             "vercel.json": '{ "regions": ["fra1"] }\n',   # next to the database, not across an ocean from it
             ".env.example": "DATABASE_URL=postgres://user:password@host:6543/postgres\nSESSION_SECRET=\nADMIN_PASSWORD=\n",
+        }
+    if kind == "app":       # what an application's spec may ask for in capabilities; unused helpers cost nothing
+        files |= {
+            "package.json": APP_PACKAGE_CAPS, "tpf/platform.ts": APP_PLATFORM, "tpf/mail.ts": APP_MAIL, "tpf/ai.ts": APP_AI,
+            "tpf/services.ts": APP_SERVICES, "tpf/pdf.ts": APP_PDF, "tpf/pdf-font.ts": APP_PDF_FONT, "tpf/sheets.ts": APP_SHEETS,
+            TICK_PATH: APP_TICK,
         }
     if kind == "bot":
         files |= {"tpf/telegram.ts": BOT_TELEGRAM, BOT_WEBHOOK_PATH: BOT_WEBHOOK}
@@ -947,13 +959,17 @@ def kind_of(spec: dict | None) -> str:
     return kind if kind in ("app", "bot", "shop") else "site"
 
 
-CAPABILITIES = {"uploads": UPLOADS_RULES, "chat": CHAT_RULES, "geolocation": GEO_RULES}
+CAPABILITIES = {"uploads": UPLOADS_RULES, "chat": CHAT_RULES, "geolocation": GEO_RULES} | CAPS_RULES
+ACCOUNT_CAPABILITIES = ("uploads", "chat", "geolocation")    # these need people who sign in; the rest any application can have
 
 
 def capabilities_of(spec: dict | None) -> list[str]:
     """Which of the optional abilities an application's spec asks for, in a fixed order."""
     asked = (spec or {}).get("capabilities") or []
-    return [c for c in CAPABILITIES if c in asked] if kind_of(spec) == "app" else []
+    if kind_of(spec) != "app":
+        return []
+    accounts = bool((spec or {}).get("user_roles"))
+    return [c for c in CAPABILITIES if c in asked and (accounts or c not in ACCOUNT_CAPABILITIES)]
 
 
 def capability_rules(spec: dict | None) -> str:

@@ -56,10 +56,15 @@ SCHEMA = {
                         "required": ["name", "sees", "can"]},
                 },
                 "capabilities": {
-                    "type": "array", "items": {"type": "string", "enum": ["uploads", "chat", "geolocation"]},
-                    "description": "Only for an 'app' with user_roles, and only what the client asked for: 'uploads' (people "
-                                   "attach photos and PDF documents), 'chat' (messages between people), 'geolocation' "
-                                   "(clocking in and out on site with the phone's location).",
+                    "type": "array", "items": {"type": "string", "enum": ["uploads", "chat", "geolocation", "documents", "email",
+                                                                      "schedule", "ai", "integrations"]},
+                    "description": "Only for an 'app', and only what the client asked for. With user_roles: 'uploads' "
+                                   "(people attach photos and PDF documents), 'chat' (messages between people), 'geolocation' "
+                                   "(clocking in and out on site with the phone's location). For any application: "
+                                   "'documents' (PDF documents, Excel export and import), 'email' (letters to staff and "
+                                   "customers), 'schedule' (reminders and other work done at a set time), 'ai' (a "
+                                   "language model reads documents or answers questions), 'integrations' (named "
+                                   "outside services, with the client's own keys).",
                 },
                 "languages": {"type": "array", "items": {"type": "string"}},
                 "assumptions": {"type": "array", "items": {"type": "string"}},
@@ -131,9 +136,38 @@ SCOPE_APP = (
     "is pressed, never in the background; it can be switched off or faked on the phone, so it is a record, not "
     "proof — say so in assumptions. There are no maps inside the application (an address opens in the phone's "
     "maps) and no address search. "
-    "An application has no online payments, no file uploads by visitors who are not signed in (images are fixed files or links), no e-mail "
-    "or SMS sending apart from the contact form, no integrations with outside services, no scheduled jobs and no "
-    "mobile app. In the spec of an application, list the admin area as a page, and state for every kind of record "
+    "Any application can, when the client asks for it, also have (list each in capabilities): "
+    "'documents' — the application makes PDF documents from its records (an estimate, an invoice, an act, a "
+    "report: a title, details, a table with totals, places to sign; A4, Latin and Cyrillic text only, no logo or "
+    "custom layout) and exchanges tables with Excel: any list can be downloaded as .xlsx, and records can be "
+    "loaded from an .xlsx or .csv file of up to 4 MB whose columns the spec names. No Word files, no editing of "
+    "documents in the browser, no electronic signature. "
+    "'email' — the application writes plain-text letters to the staff and to a customer about their own request, "
+    "booking or document: up to 200 letters a day and 10 a day to one address, sent from the application's name "
+    "through our mail service, with replies going to the client. No newsletters or advertising, no attachments "
+    "(a letter links to the document), no letters from the client's own mailbox or domain — say so in assumptions. "
+    "'schedule' — work done at a set time: reminders before a date, a daily or weekly summary, closing what is "
+    "overdue. It runs about every 15 minutes, so 'at 9:00' means between 9:00 and 9:15. Reminders by e-mail need "
+    "'email' as well. "
+    "'ai' — a language model inside the application: it reads a photo or a PDF and fills in a form for the person "
+    "to check (a receipt, an invoice, a business card), summarises or drafts text, or answers questions about the "
+    "records the person may see. Its answers can be wrong, so a person always confirms them — say so in "
+    "assumptions. Only signed-in people or the owner use it, each up to 30 requests a day; the application has a "
+    "monthly allowance of requests that covers ordinary use by a small team, and when it is used up these features "
+    "pause until the next month while everything else works. No image or voice generation, no training on the "
+    "client's data. Name each AI feature in the spec with what goes in and what comes out. "
+    "'integrations' — the application sends data to, or reads data from, outside services that have a public "
+    "HTTPS API and that the client has an account with (a CRM, an accounting or messaging service, a calendar). "
+    "The client enters the service's keys on the order page, never in messages. In the spec name every service, "
+    "exactly what is sent or read and when; ask the client which service and which account plan they have if they "
+    "did not say. We build from the service's public documentation and cannot try it without the client's keys, "
+    "so the client checks every integration on the review version, and corrections found there are part of the "
+    "work — say so in assumptions. Not available: services without a public API, banks, government systems, "
+    "1C or other software installed on the client's own computers, and requests coming in from a service. "
+    "For each of these capabilities add its work to the estimate as its own line. "
+    "An application has no online payments, no file uploads by visitors who are not signed in (images are fixed files or links), no SMS "
+    "sending, and no mobile app; e-mail beyond the contact form, scheduled work, AI and outside services appear only "
+    "when listed in capabilities. In the spec of an application, list the admin area as a page, and state for every kind of record "
     "which fields it has, who creates it (visitor or owner) and what the owner can do with it. "
 )
 SCOPE_BOT = (
@@ -206,7 +240,7 @@ def system_prompt(apps_enabled: bool) -> str:
 
 REVIEW_CRITERIA = [
     "Every page has a purpose and concrete sections; nothing essential from the client's request is missing",
-    "The spec fits what the studio builds: a static website (product_type 'site', its only dynamic feature a contact form), a web application (product_type 'app') with a database and an owner-only admin area, a rule-based Telegram bot (product_type 'bot') with a database and a web admin area, or an online shop (product_type 'shop') with card payments through the owner's own payment provider account; no self-registration of visitors or integrations, and no payments outside a shop; file uploads, chat and clocking in by location appear only in an 'app' with user_roles and are listed in capabilities; people sign in only in an 'app' whose user_roles lists every role with what it sees and may do",
+    "The spec fits what the studio builds: a static website (product_type 'site', its only dynamic feature a contact form), a web application (product_type 'app') with a database and an owner-only admin area, a rule-based Telegram bot (product_type 'bot') with a database and a web admin area, or an online shop (product_type 'shop') with card payments through the owner's own payment provider account; no self-registration of visitors, and no payments outside a shop; file uploads, chat and clocking in by location appear only in an 'app' with user_roles and are listed in capabilities; documents and Excel, e-mail from the application, scheduled work, AI features and outside services appear only in an 'app' and only when listed in capabilities, each within the limits the studio states (for 'integrations' every service is named with what is sent or read, and the assumptions say the client checks it on the review version; for 'ai' the assumptions say a person confirms the model's answers); people sign in only in an 'app' whose user_roles lists every role with what it sees and may do",
     "product_type is 'app' only if the client needs data stored or managed and 'bot' only if the client asked for a Telegram bot and 'shop' only if the client sells online; for an app or a bot, every kind of record has its fields and the owner's actions on it described; for a bot, every command and dialog is described step by step",
     "Acceptance criteria are specific and checkable by looking at the site or by talking to the bot",
     "Assumptions are stated where the client did not decide",

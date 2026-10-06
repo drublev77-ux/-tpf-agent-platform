@@ -7,6 +7,7 @@ from typing import Any
 from tpf.agents.base import SAFETY_NOTE, Ctx, Outcome
 from tpf.agents.reviewer import review
 from tpf.orchestrator.states import Ev
+from tpf.tools.template_caps import CAPS_DESIGN as _CAPS_DESIGN
 from tpf.tools.template import ACCOUNTS_RULES, capabilities_of, capability_rules, has_database, kind_of, rules_for
 
 SCHEMA = {
@@ -68,6 +69,23 @@ SCHEMA = {
             },
             "required": ["trigger", "purpose", "steps"],
         }},
+        "services": {"type": "array", "description": "Only when the spec's capabilities include 'integrations': every outside service.", "items": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,30}$"},
+                "name": {"type": "string", "description": "The service's name as the client knows it"},
+                "base_url": {"type": "string", "pattern": "^https://[A-Za-z0-9.-]+(/[^\\s]*)?$"},
+                "purpose": {"type": "string", "description": "Exactly which calls the application makes, and when"},
+                "keys": {"type": "array", "minItems": 1, "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,40}$", "description": "Unique across all services, e.g. crm_token"},
+                        "label": {"type": "string", "description": "What the client sees next to the field, in the client's language"},
+                        "where": {"type": "string", "description": "Where in the service's own settings the client finds this value, in the client's language"}},
+                    "required": ["id", "label", "where"]}},
+            },
+            "required": ["id", "name", "base_url", "purpose", "keys"],
+        }},
         "roles": {"type": "array", "description": "Only when the spec has people who sign in: every role.", "items": {
             "type": "object",
             "properties": {"id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,30}$"}, "name": {"type": "string"},
@@ -121,6 +139,8 @@ SHOP_NOTE = (
     "cookie is shaped. "
 )
 
+CAPS_DESIGN = {"uploads": "a private /files/[id] route for uploads", "chat": "a messages table and who takes part in each chat",
+               "geolocation": "shifts with positions and each object's own position"} | _CAPS_DESIGN
 REVIEW_CRITERIA = [
     "Every page in the spec maps to a route, and every route's sections cover the spec's sections for it",
     "Route paths are lowercase, unique, and '/' exists",
@@ -136,7 +156,7 @@ ACCOUNTS_CRITERIA = [
 APP_CRITERIA = [
     "data_model has a table for every kind of record in the spec, with the fields the spec lists",
     "There is /admin, /admin/login and an admin route for every list the owner manages; public routes never expose admin data",
-    "Nothing requires self-registration of visitors, external services or packages beyond next, react and postgres; people sign in only when the spec has user_roles; file uploads, chat and location appear only when the spec lists them in capabilities; payments appear only in an online shop",
+    "Nothing requires self-registration of visitors or packages beyond next, react and postgres; people sign in only when the spec has user_roles; file uploads, chat, location, documents and Excel, e-mail, scheduled work, AI and outside services appear only when the spec lists them in capabilities; payments appear only in an online shop",
 ]
 BOT_CRITERIA = [
     "bot describes every command and dialog in the spec step by step with exact wording, including /start, /help and the reply to unknown text",
@@ -172,6 +192,18 @@ def access_problems(arch: dict[str, Any]) -> list[str]:
     return problems
 
 
+def service_problems(arch: dict[str, Any]) -> list[str]:
+    """What must hold before a design with outside services goes on: the client's order page builds its key
+    fields from this list, and the application reads the keys by these ids."""
+    services = arch.get("services") or []
+    if not services:
+        return ["The spec asks for outside services: `services` must list each one with its base_url, its keys and the calls made"]
+    ids = [k.get("id", "") for s in services for k in s.get("keys") or []]
+    problems = [f"services: key id '{i}' is used twice; ids must be unique across all services" for i in sorted({i for i in ids if ids.count(i) > 1})]
+    problems += [f"services: service '{s.get('id')}' needs at least one key" for s in services if not s.get("keys")]
+    return problems
+
+
 async def run(ctx: Ctx) -> Outcome:
     spec = await ctx.orch.latest_artifact(ctx.order_id, "spec")
     if spec is None:
@@ -179,12 +211,11 @@ async def run(ctx: Ctx) -> Outcome:
     kind = kind_of(spec)
     accounts = kind == "app" and bool(spec.get("user_roles"))
     system = (SYSTEM + (APP_NOTE if has_database(kind) else "") + (ACCOUNTS_NOTE if accounts else "") + (BOT_NOTE if kind == "bot" else "")
-              + (SHOP_NOTE if kind == "shop" else "") + rules_for(kind) + (ACCOUNTS_RULES + capability_rules(spec) if accounts else "") + " " + SAFETY_NOTE)
-    extras = capabilities_of(spec) if accounts else []
+              + (SHOP_NOTE if kind == "shop" else "") + rules_for(kind) + (ACCOUNTS_RULES if accounts else "") + capability_rules(spec) + " " + SAFETY_NOTE)
+    extras = capabilities_of(spec)
     criteria = (REVIEW_CRITERIA + (APP_CRITERIA if has_database(kind) else SITE_CRITERIA) + (ACCOUNTS_CRITERIA if accounts else [])
                 + ([f"The design covers the spec's capabilities ({', '.join(extras)}) with the tables, routes and screens the platform "
-                    "rules for them describe: a private /files/[id] route for uploads, a messages table and who takes part for "
-                    "chat, shifts with positions and each object's own position for geolocation"] if extras else [])
+                    "rules for them describe: " + "; ".join(CAPS_DESIGN[c] for c in extras)] if extras else [])
                 + (BOT_CRITERIA if kind == "bot" else []) + (SHOP_CRITERIA if kind == "shop" else []))
     base = f"Approved spec:\n{json.dumps(spec, ensure_ascii=False, indent=2)}\n\nDesign the site for this spec."
     issues: list[str] = []
@@ -196,7 +227,9 @@ async def run(ctx: Ctx) -> Outcome:
         )
         if not accounts:
             arch.pop("roles", None)          # nobody signs in unless the spec says who
-        wrong = access_problems(arch) if accounts else []
+        if "integrations" not in extras:
+            arch.pop("services", None)       # no outside service unless the spec names one
+        wrong = (access_problems(arch) if accounts else []) + (service_problems(arch) if "integrations" in extras else [])
         if wrong:
             issues = wrong
             continue

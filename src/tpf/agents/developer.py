@@ -210,7 +210,7 @@ async def run(ctx: Ctx) -> Outcome:
     routes = [r["path"] for r in arch["routes"]]
     kind = kind_of(spec)
     system = (SYSTEM + (APP_NOTE if has_database(kind) else "") + (BOT_NOTE if kind == "bot" else "")
-              + (SHOP_NOTE if kind == "shop" else "") + rules_for(kind) + (ACCOUNTS_RULES + capability_rules(spec) if uses_accounts(arch) else "") + " " + STEP_RULE + SAFETY_NOTE)
+              + (SHOP_NOTE if kind == "shop" else "") + rules_for(kind) + (ACCOUNTS_RULES if uses_accounts(arch) else "") + capability_rules(spec) + " " + STEP_RULE + SAFETY_NOTE)
 
     base = (
         f"Spec:\n{json.dumps(spec, ensure_ascii=False, indent=2)}\n\n"

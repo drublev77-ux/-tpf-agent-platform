@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     budget_warning_share: float = 0.8
     max_check_attempts: int = 6
     max_check_attempts_accounts: int = 8   # an application with user roles has more to get right: it gets more rounds
+    # What a delivered application may ask of the platform (see api/apps.py)
+    app_mail_per_day: int = 200        # e-mails one live application sends in a day
+    app_mail_per_day_review: int = 30  # and its review version
+    app_mail_per_recipient_day: int = 10
+    app_ai_monthly_tokens: int = 2_000_000    # the model's tokens one application may use in a calendar month
+    app_ai_max_output: int = 4000
+    app_tick_minutes: int = 15         # how often applications with scheduled work are woken
     visual_check: bool = True          # QA looks at screenshots of the built pages
     visual_blocking_rounds: int = 2    # after this many rounds failed only on looks, findings stop blocking
     max_review_rounds: int = 2
