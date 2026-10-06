@@ -15,6 +15,7 @@ import http.server
 import json
 import re
 import threading
+from datetime import date
 from functools import partial
 from pathlib import Path
 
@@ -78,6 +79,7 @@ def main() -> None:
             page.close()
         browser.close()
     server.shutdown()
+    (SITE / "lastmod.txt").write_text(date.today().isoformat() + "\n")       # the sitemap's <lastmod>
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import hmac
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -394,9 +394,21 @@ async def indexnow_key(key: str) -> Response:
     return Response(INDEXNOW_KEY, media_type="text/plain; charset=utf-8")
 
 
+def _site_changed() -> str:
+    """The day the site's pages last changed, as scripts/prerender_site.py recorded it. The file's own time is no
+    use for this: the host resets it on deploy, and the sitemap then dated every page 2018."""
+    stamp = SITE_DIR / "lastmod.txt"
+    if stamp.is_file():
+        try:
+            return date.fromisoformat(stamp.read_text().strip()).isoformat()
+        except ValueError:
+            pass
+    return datetime.now(tz=timezone.utc).date().isoformat()
+
+
 @app.get("/sitemap.xml", include_in_schema=False)
 async def sitemap() -> Response:
-    changed = datetime.fromtimestamp((SITE_DIR / "index.html").stat().st_mtime, tz=timezone.utc).date().isoformat()
+    changed = _site_changed()
     alternates = "".join(f'<xhtml:link rel="alternate" hreflang="{code}" href="{SITE_URL}/{lang}"/>' for lang, code in SITE_LANGS.items()) \
         + f'<xhtml:link rel="alternate" hreflang="x-default" href="{SITE_URL}/"/>'
     urls = "".join(f"<url><loc>{SITE_URL}/{path}</loc><lastmod>{changed}</lastmod>{alternates}</url>" for path in ("", *SITE_LANGS))

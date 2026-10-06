@@ -56,6 +56,8 @@ def test_site_serves_language_pages_robots_and_sitemap(pool, settings, monkeypat
         for address in ("/</loc>", "/ru</loc>", "/en</loc>", "/zh</loc>", "/privacy</loc>"):
             assert "https://tpf-technology.com" + address in sitemap.text
         assert "portal" not in sitemap.text
+        changed = set(re.findall(r"<lastmod>(.*?)</lastmod>", sitemap.text))
+        assert changed == {(SITE / "lastmod.txt").read_text().strip()} and min(changed) >= "2026-10-06"
     get_settings.cache_clear()
 
 
