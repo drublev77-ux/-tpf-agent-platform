@@ -74,7 +74,10 @@ def _require(request: Request) -> None:
 
 def _page(title: str, body: str, status: int = 200) -> HTMLResponse:
     html = (f'<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            f'<meta name="robots" content="noindex"><title>{escape(title)} — TPF</title><style>{ADMIN_CSS}</style></head><body><main>'
+            f'<meta name="robots" content="noindex"><title>{escape(title)} — TPF</title>'
+            f'<script>window.si = window.si || function () {{ (window.siq = window.siq || []).push(arguments); }};</script>'
+            f'<script defer src="/_vercel/speed-insights/script.js"></script>'
+            f'<style>{ADMIN_CSS}</style></head><body><main>'
             f'<header><a class="brand" href="/admin" style="color:inherit;text-decoration:none">TPF<span>technology</span> · оператор</a></header>'
             f'{body}</main></body></html>')
     return HTMLResponse(html, status_code=status, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})

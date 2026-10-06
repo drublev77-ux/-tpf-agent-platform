@@ -255,7 +255,10 @@ async def portal(order_id: int, request: Request, t: str = "", done: str = "", e
     status = STATUS[lang].get(st, st)
     html = (f'<!doctype html><html lang="{lang}"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">'
-            f'<title>{escape(tr["title"].format(id=order_id))} — TPF Technology</title><style>{CSS}</style></head><body><main>'
+            f'<title>{escape(tr["title"].format(id=order_id))} — TPF Technology</title>'
+            f'<script>window.si = window.si || function () {{ (window.siq = window.siq || []).push(arguments); }};</script>'
+            f'<script defer src="/_vercel/speed-insights/script.js"></script>'
+            f'<style>{CSS}</style></head><body><main>'
             f'<header><div class="brand">TPF<span>technology</span></div><span class="pill">{escape(status)}</span></header>'
             f'<h1>{escape(tr["title"].format(id=order_id))}</h1><p class="muted">{escape(order["client_name"])}</p>'
             + "".join(parts) + "</main></body></html>")
