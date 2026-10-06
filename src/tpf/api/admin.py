@@ -141,7 +141,42 @@ async def admin_home(request: Request, sent: str = "", err: str = "") -> HTMLRes
         '<textarea id="t" name="request_text" required minlength="10" maxlength="20000"></textarea>'
         '<div class="row"><button class="btn">Создать заказ</button></div></form></section>')
     note = f'<section class="error" role="alert">Не получилось: {escape(err)}</section>' if err else ""
-    return _page("Заказы", head + note + table + form + '<div class="row">' + _post("/admin/logout", "Выйти", "ghost") + "</div>")
+    return _page("Заказы", head + note + table + await _apps_block(pool) + form + '<div class="row">' + _post("/admin/logout", "Выйти", "ghost") + "</div>")
+
+
+async def _apps_block(pool: Any) -> str:
+    """What delivered applications asked of the platform lately: letters, the AI model, scheduled work.
+    The AI allowance is the operator's own bill, so its use is shown against the limit."""
+    limit = get_settings().app_ai_monthly_tokens
+    rows = await pool.fetch(
+        "SELECT o.id, "
+        "(SELECT count(*) FROM app_mail m WHERE m.order_id = o.id AND m.created_at > now() - interval '1 day') AS mail_day, "
+        "(SELECT count(*) FROM app_mail m WHERE m.order_id = o.id AND m.created_at > now() - interval '30 days') AS mail_month, "
+        "(SELECT count(*) FROM app_mail m WHERE m.order_id = o.id AND NOT m.delivered AND m.created_at > now() - interval '30 days') AS mail_lost, "
+        "(SELECT coalesce(sum(input_tokens + output_tokens), 0) FROM app_ai_usage u WHERE u.order_id = o.id AND u.created_at >= date_trunc('month', now())) AS ai, "
+        "(SELECT count(*) FROM app_ai_usage u WHERE u.order_id = o.id AND u.created_at >= date_trunc('month', now())) AS ai_calls, "
+        "(SELECT max(last_at) FROM app_ticks t WHERE t.order_id = o.id) AS tick_at, "
+        "(SELECT max(failures) FROM app_ticks t WHERE t.order_id = o.id) AS tick_fail "
+        "FROM orders o WHERE o.id IN (SELECT order_id FROM app_mail WHERE created_at > now() - interval '30 days' "
+        "UNION SELECT order_id FROM app_ai_usage WHERE created_at > now() - interval '30 days' UNION SELECT order_id FROM app_ticks) "
+        "ORDER BY o.id DESC LIMIT 100")
+    if not rows:
+        return ""
+    body = ""
+    for r in rows:
+        share = r["ai"] / limit if limit else 0
+        ai = f'{r["ai"]:,}'.replace(",", " ") + f' ({share:.0%} лимита, запросов: {r["ai_calls"]})' if r["ai_calls"] else "—"
+        ai = f'<span style="color:var(--warn)">{ai}</span>' if share >= 0.8 else ai
+        mail = f'{r["mail_day"]} за сутки, {r["mail_month"]} за 30 дней' if r["mail_month"] else "—"
+        if r["mail_lost"]:
+            mail += f' · <span style="color:var(--warn)">не доставлено: {r["mail_lost"]}</span>'
+        tick = "—" if r["tick_at"] is None else (_dt(r["tick_at"]) if not r["tick_fail"]
+                                               else f'<span style="color:var(--warn)">сбоев подряд: {r["tick_fail"]}</span>')
+        body += (f'<tr><td class="n"><a href="/admin/order/{r["id"]}">№{r["id"]}</a></td><td>{mail}</td><td>{ai}</td><td>{tick}</td></tr>')
+    return ('<section class="scroll"><h2>Приложения в работе</h2><p class="muted">Что готовые приложения запрашивали у платформы: письма, '
+            'ИИ (токены в этом месяце, оплачиваются с вашего баланса) и работа по расписанию (последний вызов, UTC).</p>'
+            '<table><thead><tr><th>Заказ</th><th>Письма</th><th>ИИ</th><th>Расписание</th></tr></thead>'
+            f'<tbody>{body}</tbody></table></section>')
 
 
 @router.post("/admin/login")

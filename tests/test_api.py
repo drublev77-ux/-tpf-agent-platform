@@ -107,6 +107,17 @@ def test_operator_console(client, monkeypatch):
     auth = {"Cookie": f"{admin.COOKIE}={cookie}"}
     assert secure and f"№{oid}" in client.get("/admin", headers=auth).text
 
+    # what delivered applications asked of the platform is on the operator's first page, AI use against its limit
+    assert "Приложения в работе" not in client.get("/admin", headers=auth).text
+    from tpf.api.main import app as admin_app
+    pool = admin_app.state.orch.pool
+    client.portal.call(pool.execute, "INSERT INTO app_mail (order_id, env, recipient, subject) VALUES ($1, 'prod', 'x@example.com', 's')", oid)
+    client.portal.call(pool.execute, "INSERT INTO app_ai_usage (order_id, env, input_tokens, output_tokens) VALUES ($1, 'prod', $2, 0)",
+                       oid, int(get_settings().app_ai_monthly_tokens * 0.9))
+    client.portal.call(pool.execute, "INSERT INTO app_ticks (order_id, env, failures) VALUES ($1, 'prod', 3)", oid)
+    usage = client.get("/admin", headers=auth).text
+    assert "Приложения в работе" in usage and "90% лимита" in usage and "не доставлено: 1" in usage and "сбоев подряд: 3" in usage
+
     page = client.get(f"/admin/order/{oid}", headers=auth).text
     assert "Отменить заказ" in page and "a@example.com" in page
     assert client.post(f"/admin/order/{oid}/cancel", data={"sure": "1"}, headers=auth | {"Origin": "https://evil.example"}).status_code == 403

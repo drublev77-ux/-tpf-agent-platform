@@ -63,6 +63,7 @@ class VercelDeployer:
         }
         if production:
             body["target"] = "production"
+        await self._make_public(project, create=True)      # before the build: the site reads its own address while it builds
         r = await self.client.post("/v13/deployments", params=self.params | {"skipAutoDetectionConfirmation": "1"}, json=body)
         if r.status_code >= 400:
             raise DeployError(f"Vercel {r.status_code}: {r.text[:500]}")
@@ -146,12 +147,17 @@ class VercelDeployer:
             return [f"{path} answered {r.status_code}: {r.text[:300]}"]
         return [f"{s.get('name')}: {s.get('detail') or 'failed'}" for s in body["steps"] if not s.get("ok")]
 
-    async def _make_public(self, project: str) -> None:
-        """New Vercel projects hide previews behind a Vercel login; the client must see staging."""
+    async def _make_public(self, project: str, create: bool = False) -> None:
+        """New Vercel projects hide previews behind a Vercel login; the client must see staging. The same call
+        makes sure the build is told the project's own address (VERCEL_PROJECT_PRODUCTION_URL): a site without
+        it cannot know whether it is the live one, and keeps itself out of search engines (tpf/seo.ts)."""
         if project in self._public:
             return
         try:
-            r = await self.client.patch(f"/v9/projects/{project}", params=self.params, json={"ssoProtection": None})
+            if create:      # 409: the project already exists
+                await self.client.post("/v11/projects", params=self.params, json={"name": project, "framework": "nextjs"})
+            r = await self.client.patch(f"/v9/projects/{project}", params=self.params,
+                                        json={"ssoProtection": None, "autoExposeSystemEnvs": True})
             if r.status_code < 400:
                 self._public.add(project)
         except httpx.HTTPError:
