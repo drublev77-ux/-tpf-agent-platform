@@ -79,3 +79,16 @@ def test_built_sites_ship_the_search_engine_plumbing_and_the_developer_is_held_t
     bare = [{"path": "app/layout.tsx", "content": "export default function L(){return null}"}, *CODE["files"][1:]]
     assert any("siteMetadata" in p for p in check_files(bare, ["/"], "site"))
     assert len(SEO_CRITERIA) == 2
+
+
+@pytest.mark.parametrize("name,choice", [("ru", "Автоматизация процессов"), ("en", "Process automation"), ("zh", "流程自动化")])
+def test_the_site_offers_process_automation_and_the_form_can_ask_for_it(name, choice):
+    from tpf.agents.analyst import system_prompt
+
+    html = (SITE / f"index.{name}.html").read_text(encoding="utf-8")
+    section = re.search(r'<section id="automation">(.*?)</section>', html, re.S).group(1)
+    assert section.count('class="agent"') == 6 and 'id="auto-cta"' in section and 'href="#automation"' in html
+    options = re.findall(r"<option>(.*?)</option>", re.search(r'<select name="type" id="types">(.*?)</select>', html, re.S).group(1))
+    source = (SITE / "index.html").read_text(encoding="utf-8")
+    assert options.index(choice) == int(re.search(r"var AUTO_TYPE = (\d+);", source).group(1))   # the button picks this one
+    assert "PROCESS AUTOMATION" in system_prompt(True) and "PROCESS AUTOMATION" not in system_prompt(False)

@@ -113,6 +113,16 @@ class Settings(BaseSettings):
     email_reply_to: str = ""
     intake_hourly_limit: int = 20  # new orders per hour across all channels
     operator_email: str = ""   # escalations and new orders; empty = log only
+    # Days of the client's silence after which an order that waits for them gets a reminder; empty = no reminders
+    client_reminder_days: str = "2,5"
+    indexnow: bool = True      # the worker reports the studio site's changed pages to Yandex and Bing
+
+    @property
+    def reminder_days(self) -> list[float]:
+        try:
+            return sorted(float(d) for d in self.client_reminder_days.split(",") if d.strip())
+        except ValueError:
+            return []
 
     @property
     def email_enabled(self) -> bool:

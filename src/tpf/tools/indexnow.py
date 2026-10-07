@@ -1,0 +1,105 @@
+"""Tell search engines that the studio site changed, without anyone pressing a button.
+
+IndexNow (Yandex, Bing and the engines that share with them) takes a list of changed addresses and crawls them
+soon after, instead of whenever its robot next comes by. The worker reports the site's pages once per version of
+the site, and only after the public site really serves that version: the worker and the site are published
+separately, and a report sent ahead of the site would make the robot fetch the old pages."""
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import logging
+from pathlib import Path
+
+import asyncpg
+import httpx
+
+from tpf.config import Settings
+
+log = logging.getLogger("tpf.indexnow")
+
+SITE_DIR = Path(__file__).resolve().parent.parent / "site"
+SITE_URL = "https://tpf-technology.com"
+PAGES = ("", "ru", "en", "zh", "privacy")       # the addresses in /sitemap.xml (tests keep the two in step)
+ENDPOINTS = ("https://yandex.com/indexnow", "https://api.indexnow.org/indexnow")
+EVERY_SEC = 900
+
+
+def key() -> str:
+    path = SITE_DIR / "indexnow-key.txt"
+    return path.read_text().strip() if path.is_file() else ""
+
+
+def urls() -> list[str]:
+    return [f"{SITE_URL}/{page}" for page in PAGES]
+
+
+def source_hash() -> str:
+    """The mark scripts/prerender_site.py puts into every page it writes (<meta name="tpf-source">)."""
+    return hashlib.sha256((SITE_DIR / "index.html").read_bytes()).hexdigest()[:16]
+
+
+def version() -> str:
+    """What the site's pages are right now: changes whenever a page a search engine indexes does."""
+    privacy = hashlib.sha256((SITE_DIR / "privacy.html").read_bytes()).hexdigest()[:8]
+    return f"{source_hash()}-{privacy}"
+
+
+async def is_live(client: httpx.AsyncClient) -> bool:
+    """Does the public site already serve the pages this worker was built with?"""
+    try:
+        page = await client.get(f"{SITE_URL}/")
+    except httpx.HTTPError:
+        return False
+    return page.status_code == 200 and f'name="tpf-source" content="{source_hash()}"' in page.text
+
+
+async def submit(pool: asyncpg.Pool, client: httpx.AsyncClient | None = None) -> list[str]:
+    """Report the site's pages to every engine that has not heard of this version yet. Returns the endpoints
+    that accepted the report now; an engine that refused or did not answer is asked again on the next round."""
+    k, v = key(), version()
+    if not k:
+        return []
+    names = {endpoint: f"indexnow:{endpoint}" for endpoint in ENDPOINTS}
+    told = {r["key"]: r["value"] for r in await pool.fetch(
+        "SELECT key, value FROM app_settings WHERE key = ANY($1::text[])", list(names.values()))}
+    pending = [e for e in ENDPOINTS if told.get(names[e]) != v]
+    if not pending:
+        return []
+    own = client is None
+    client = client or httpx.AsyncClient(timeout=20, follow_redirects=True)
+    accepted: list[str] = []
+    try:
+        if not await is_live(client):
+            return []
+        body = {"host": SITE_URL.split("//")[1], "key": k, "keyLocation": f"{SITE_URL}/indexnow-{k}.txt", "urlList": urls()}
+        for endpoint in pending:
+            try:
+                reply = await client.post(endpoint, json=body, headers={"content-type": "application/json; charset=utf-8"})
+                status = reply.status_code
+            except httpx.HTTPError:
+                status = 0
+            if status in (200, 202):        # 202: accepted, the key file is still being checked
+                await pool.execute(
+                    "INSERT INTO app_settings (key, value) VALUES ($1, $2) "
+                    "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()", names[endpoint], v)
+                accepted.append(endpoint)
+                log.info("indexnow: %s accepted %s pages (site version %s)", endpoint, len(body["urlList"]), v)
+            else:
+                log.warning("indexnow: %s answered %s", endpoint, status)
+    finally:
+        if own:
+            await client.aclose()
+    return accepted
+
+
+async def run_forever(pool: asyncpg.Pool, settings: Settings, stopping: asyncio.Event) -> None:
+    while settings.indexnow and not stopping.is_set():
+        try:
+            await submit(pool)
+        except Exception:  # noqa: BLE001 — a passing database or network error; the next round tries again
+            log.exception("indexnow round failed")
+        try:
+            await asyncio.wait_for(stopping.wait(), timeout=EVERY_SEC)
+        except asyncio.TimeoutError:
+            pass
