@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="zh-CN"><head>
-<meta name="tpf-source" content="20c5c467a7b50085">
+<meta name="tpf-source" content="360db6c0278110bb">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>网站、网络应用与 Telegram 机器人开发 — TPF Technology</title>
-<meta name="description" content="TPF Technology 由工程师监督的 AI 智能体团队开发网站、网络应用、网店和 Telegram 机器人。付款前免费提供规格书与报价，源代码归您所有。">
+<meta name="description" content="TPF Technology 由工程师监督的 AI 智能体团队开发网站、网络应用、网店和 Telegram 机器人，并实现业务流程自动化。付款前免费提供规格书与报价，源代码归您所有。">
 <link rel="canonical" href="https://tpf-technology.com/zh">
 <link rel="alternate" hreflang="ru" href="https://tpf-technology.com/ru">
 <link rel="alternate" hreflang="en" href="https://tpf-technology.com/en">
@@ -15,12 +15,12 @@
 <meta property="og:url" content="https://tpf-technology.com/zh">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:title" content="网站、网络应用与 Telegram 机器人开发 — TPF Technology">
-<meta property="og:description" content="TPF Technology 由工程师监督的 AI 智能体团队开发网站、网络应用、网店和 Telegram 机器人。付款前免费提供规格书与报价，源代码归您所有。">
+<meta property="og:description" content="TPF Technology 由工程师监督的 AI 智能体团队开发网站、网络应用、网店和 Telegram 机器人，并实现业务流程自动化。付款前免费提供规格书与报价，源代码归您所有。">
 <meta property="og:image" content="https://tpf-technology.com/brand.jpg">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="731">
 <meta name="twitter:card" content="summary_large_image">
-<script type="application/ld+json" id="ld">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://tpf-technology.com/#org","name":"TPF Technology","url":"https://tpf-technology.com/","logo":"https://tpf-technology.com/icon-512.png","image":"https://tpf-technology.com/brand.jpg","email":"orders@tpf-technology.com","description":"TPF Technology 由工程师监督的 AI 智能体团队开发网站、网络应用、网店和 Telegram 机器人。付款前免费提供规格书与报价，源代码归您所有。","knowsLanguage":["ru","en","zh"]},{"@type":"WebSite","@id":"https://tpf-technology.com/#site","url":"https://tpf-technology.com/","name":"TPF Technology","publisher":{"@id":"https://tpf-technology.com/#org"},"inLanguage":"zh-Hans"}]}</script>
+<script type="application/ld+json" id="ld">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://tpf-technology.com/#org","name":"TPF Technology","url":"https://tpf-technology.com/","logo":"https://tpf-technology.com/icon-512.png","image":"https://tpf-technology.com/brand.jpg","email":"orders@tpf-technology.com","description":"TPF Technology 由工程师监督的 AI 智能体团队开发网站、网络应用、网店和 Telegram 机器人，并实现业务流程自动化。付款前免费提供规格书与报价，源代码归您所有。","knowsLanguage":["ru","en","zh"]},{"@type":"WebSite","@id":"https://tpf-technology.com/#site","url":"https://tpf-technology.com/","name":"TPF Technology","publisher":{"@id":"https://tpf-technology.com/#org"},"inLanguage":"zh-Hans"}]}</script>
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
 <link rel="manifest" href="/manifest.webmanifest">
@@ -89,6 +89,8 @@ h2{font-size:clamp(30px,4.2vw,52px);line-height:1.12;letter-spacing:-.01em}
 .agent .top{display:flex;justify-content:space-between;align-items:center;font:13px 'JetBrains Mono',monospace;color:var(--accent)}
 .agent .top i{width:8px;height:8px;border-radius:50%;background:var(--accent)}
 .agent h3{font-size:18px;line-height:1.25}.agent p{font-size:15px;line-height:1.55;color:var(--muted)}
+.agents{grid-template-columns:repeat(3,minmax(0,1fr))}.agents .agent:first-child{border-color:var(--line2)}
+@media(max-width:900px){.agents{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.agents{grid-template-columns:1fr}}
 .hitl{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-top:16px;padding:24px 28px;border:1px solid var(--warm);border-radius:20px;background:#0E0C09}
 .hitl>div:nth-child(2){flex:1 1 320px}.hitl b{display:block;font:500 18px Unbounded,'Noto Sans SC',sans-serif;margin-bottom:4px}.hitl p{font-size:15px;color:var(--soft)}
 .pills{display:flex;gap:8px;flex-wrap:wrap;font:13px 'JetBrains Mono','Noto Sans SC',monospace}
@@ -138,7 +140,7 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 <img class="mark" src="/brand-mark.jpg" alt="" width="52" height="52">
 <div>TPF<span>technology</span></div></a>
 <nav>
-<a href="#services" data-t="nav_services">服务</a><a href="#prices" data-t="nav_prices">价格</a><a href="#stack" data-t="nav_stack">技术</a><a href="#cases" data-t="nav_cases">项目</a><a href="#contact" data-t="nav_contact">联系我们</a>
+<a href="#services" data-t="nav_services">服务</a><a href="#automation" data-t="nav_auto">自动化</a><a href="#prices" data-t="nav_prices">价格</a><a href="#stack" data-t="nav_stack">技术</a><a href="#cases" data-t="nav_cases">项目</a><a href="#contact" data-t="nav_contact">联系我们</a>
 </nav>
 <div class="right">
 <div class="langs" role="group" id="langs" aria-label="语言"><a href="/ru" hreflang="ru" aria-current="false">RU</a><a href="/en" hreflang="en" aria-current="false">EN</a><a href="/zh" hreflang="zh-Hans" aria-current="true">中文</a></div>
@@ -165,6 +167,17 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 <div class="grid3" id="services-grid"><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5CE1F0" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg><h3>落地页与网站</h3><p>单页或多页：设计、根据您提供的信息撰写文案、移动端适配，咨询表单的留言发送到您的邮箱。</p></div><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5CE1F0" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="2" y1="9" x2="22" y2="9"></line></svg><h3>Web 应用</h3><p>带数据库和管理后台的网站：预约、申请、目录、日程。数据由您自行管理，无需开发人员。员工或客户可登录，各有各的角色。</p></div><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5CE1F0" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2.5"></rect><line x1="10.5" y1="18.5" x2="13.5" y2="18.5"></line></svg><h3>网上商店</h3><p>商品目录、购物车、下单、库存管理和刷卡付款。商品与订单都在您的管理后台中。</p></div><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#FFB35C" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><circle cx="4" cy="5" r="1.6"></circle><circle cx="20" cy="5" r="1.6"></circle><circle cx="4" cy="19" r="1.6"></circle><circle cx="20" cy="19" r="1.6"></circle><line x1="5.3" y1="6.2" x2="9.8" y2="10"></line><line x1="18.7" y1="6.2" x2="14.2" y2="10"></line><line x1="5.3" y1="17.8" x2="9.8" y2="14"></line><line x1="18.7" y1="17.8" x2="14.2" y2="14"></line></svg><h3>Telegram 机器人</h3><p>按钮菜单、常见问题解答、分步预约或下单、向店主发送通知，并配有网页管理后台。</p></div><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5CE1F0" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18h10.5a4.5 4.5 0 0 0 .6-8.96A6 6 0 0 0 6.4 10.1 4 4 0 0 0 7 18z"></path></svg><h3>手机端应用</h3><p>应用或商店可安装到手机主屏幕，拥有独立图标并全屏打开——无需应用商店。</p></div><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5CE1F0" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l8 4v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6z"></path><polyline points="8.5,12 11,14.5 15.5,9.5"></polyline></svg><h3>在线收款</h3><p>我们将 Stripe、YooKassa 或 bePaid 接入您自己的账户：顾客的款项直接进入您的账户，不经过我们。</p></div></div>
 </section>
 
+<section id="automation">
+<div class="head"><div><div class="kicker" data-t="au_kicker">02 / 自动化</div><h2 data-t="au_title">让重复性流程自动运行</h2></div><p data-t="au_lead">咨询、提醒、文档以及各服务之间的数据交换都自动完成——在我们按您的流程定制的应用中。您只需检查结果。</p></div>
+<div class="agents" id="auto-grid"><div class="agent"><div class="top"><span>01</span><i></i></div><h3>咨询不遗漏</h3><p>每一条咨询、预约或订单都会立即存入数据库、发送到您的邮箱，并通过 Webhook 传到您的 n8n、Zapier、Make 或 CRM。</p></div><div class="agent"><div class="top"><span>02</span><i></i></div><h3>提醒与汇总</h3><p>应用按计划提醒到期事项，发送每日或每周汇总，并关闭逾期事项。</p></div><div class="agent"><div class="top"><span>03</span><i></i></div><h3>邮件自动发送</h3><p>预约确认、状态变更、文档生成——发给客户或员工的邮件自动发出，回复则发到您这里。</p></div><div class="agent"><div class="top"><span>04</span><i></i></div><h3>文档与 Excel</h3><p>报价单、发票、验收单或报告一键根据您的数据生成 PDF。列表可导出到 Excel，也可从 Excel 导入。</p></div><div class="agent"><div class="top"><span>05</span><i></i></div><h3>流程中的 AI</h3><p>模型读取票据照片或 PDF 并填写表单、起草文本、回答有关您数据的问题。结果由人确认。</p></div><div class="agent"><div class="top"><span>06</span><i></i></div><h3>连接您的服务</h3><p>通过服务的公开 API 和您自己的账户，把数据发送到 CRM、财务系统、日历或即时通讯工具，并从中读取。</p></div></div>
+<div class="hitl">
+<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#FFB35C" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17,2 21,6 17,10"></polyline><path d="M3 11V9a3 3 0 0 1 3-3h15"></path><polyline points="7,22 3,18 7,14"></polyline><path d="M21 13v2a3 3 0 0 1-3 3H3"></path></svg>
+<div><b data-t="au_how_title">从哪里开始</b><p data-t="au_how">描述目前哪些工作靠手工完成、用到哪些服务。我们会把规格书和报价发送到您的邮箱，通常在一小时内——免费，且在付款之前。</p></div>
+<a class="btn fill" href="#contact" id="auto-cta" data-t="au_cta">描述流程</a>
+</div>
+<p class="pr-note" data-t="au_note">我们不接入银行、政府系统、安装在您自己电脑上的软件，以及没有公开 API 的服务。每项集成都由您在支付尾款前于审核版本上检查。</p>
+</section>
+
 <section id="prices">
 <div class="head"><div><div class="kicker" data-t="pr_kicker">价格</div><h2 data-t="pr_title">费用说明</h2></div><p data-t="pr_lead">价格取决于工作量。报价免费，且在付款前提供；开工前支付一半，上线前支付一半。</p></div>
 <div class="plist" id="prices-grid"><div class="prow"><h3>落地页</h3><p>带咨询表单的单页：设计、根据您提供的信息撰写文案、移动端适配、发布上线。</p><div class="cost"><div class="sum">€448 起</div><div class="alt">$496 起</div></div></div><div class="prow"><h3>多页网站</h3><p>三页及以上：服务、价格、联系方式，表单留言发送到您的邮箱。</p><div class="cost"><div class="sum">€560 起</div><div class="alt">$620 起</div></div></div><div class="prow"><h3>Web 应用</h3><p>带数据库和管理后台的网站：预约、申请、目录、日程——数据由您自行管理。</p><div class="cost"><div class="sum">€2,150 起</div><div class="alt">$2,400 起</div></div></div><div class="prow"><h3>带用户账号的应用</h3><p>员工或客户使用邮箱和密码登录，每人拥有各自的角色：工人只看到自己的任务，经理可查看全部。人员由您自行添加。</p><div class="cost"><div class="sum">€3,150 起</div><div class="alt">$3,500 起</div></div></div><div class="prow"><h3>网上商店</h3><p>商品目录、购物车、下单以及刷卡付款直接进入您自己的 Stripe、YooKassa 或 bePaid 账户。</p><div class="cost"><div class="sum">€2,150 起</div><div class="alt">$2,400 起</div></div></div><div class="prow"><h3>手机应用</h3><p>可像普通应用一样安装到手机主屏幕的 Web 应用：独立图标、全屏运行，无需应用商店。</p><div class="cost"><div class="sum">€2,150 起</div><div class="alt">$2,400 起</div></div></div><div class="prow"><h3>简单 Telegram 机器人</h3><p>按钮菜单、常见问题解答、联系方式、收集申请。</p><div class="cost"><div class="sum">€720 起</div><div class="alt">$800 起</div></div></div><div class="prow"><h3>带预约功能的 Telegram 机器人</h3><p>分步预约或下单、向店主发送通知、用于管理数据的网页后台。</p><div class="cost"><div class="sum">€1,800 起</div><div class="alt">$2,000 起</div></div></div><div class="prow"><h3>其他项目</h3><p>描述您的需求——我们将在一小时内评估工作量和费用。</p><div class="cost"><div class="sum">按报价</div></div></div></div>
@@ -172,26 +185,26 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 </section>
 
 <section id="stack">
-<div class="head" style="margin-bottom:0"><div><div class="kicker" data-t="st_kicker">02 / 技术</div><h2 data-t="st_title">我们使用的技术</h2><p style="max-width:760px;font-size:17px;color:var(--muted)" data-t="st_lead">一套成熟的技术：产品加载快、适配手机，且不依赖我们——您可以带走代码并在任何地方继续开发。</p></div></div>
+<div class="head" style="margin-bottom:0"><div><div class="kicker" data-t="st_kicker">03 / 技术</div><h2 data-t="st_title">我们使用的技术</h2><p style="max-width:760px;font-size:17px;color:var(--muted)" data-t="st_lead">一套成熟的技术：产品加载快、适配手机，且不依赖我们——您可以带走代码并在任何地方继续开发。</p></div></div>
 <div class="chips hot" data-list="integrations"><span>Telegram</span><span>Stripe</span><span>YooKassa</span><span>bePaid</span><span>邮件通知</span><span>安装到手机</span><span>GitHub</span></div>
 <div class="chips" style="margin-top:12px"><span>React</span><span>Next.js</span><span>TypeScript</span><span>Node.js</span><span>PostgreSQL</span><span>Supabase</span><span>Vercel</span><span>PWA</span><span class="warm">LLM API</span></div>
 </section>
 
 <section>
 <div class="why">
-<div><div class="kicker" data-t="why_kicker">03 / 为什么选择我们</div><h2 data-t="why_title">透明，绝不盲目付款</h2><p data-t="why_lead">您可以随时在订单页面查看状态。您在支付尾款前先验收成果，源代码和全部权利归您所有。</p></div>
+<div><div class="kicker" data-t="why_kicker">04 / 为什么选择我们</div><h2 data-t="why_title">透明，绝不盲目付款</h2><p data-t="why_lead">您可以随时在订单页面查看状态。您在支付尾款前先验收成果，源代码和全部权利归您所有。</p></div>
 <div class="stats" id="stats"><div><b>100%</b><span>代码归您所有</span></div><div><b>50/50</b><span>付款：开工前与验收后</span></div><div><b>¥0</b><span>规格书与报价免费</span></div><div><b>3</b><span>种语言：中文、English、русский</span></div></div>
 </div>
 </section>
 
 <section id="cases">
-<div class="head"><div><div class="kicker" data-t="cs_kicker">04 / 项目</div><h2 data-t="cs_title">精选案例</h2></div><p data-t="cs_lead">演示项目均在我们的平台上从需求到上线全流程完成；这里也展示团队自己的产品。</p></div>
+<div class="head"><div><div class="kicker" data-t="cs_kicker">05 / 项目</div><h2 data-t="cs_title">精选案例</h2></div><p data-t="cs_lead">演示项目均在我们的平台上从需求到上线全流程完成；这里也展示团队自己的产品。</p></div>
 <div class="cases" id="caselist"><div class="case"><img src="/case-brigada.jpg" alt="“Remont‑Brigada”" width="960" height="600" loading="lazy"><div><div class="mono casetag">团队应用 · 演示</div><h3>“Remont‑Brigada”</h3><p>工长和工人按各自角色登录。每个工地有聊天、带照片的票据、按手机定位打卡的班次和工时表。可从网站安装到手机。</p><ul class="facts"><span>角色与登录</span><span>聊天与文件</span><span>定位</span></ul><span class="open off">需登录 — 可应要求演示</span></div></div><a class="case" href="https://www.globalgainengine.online" target="_blank" rel="noopener"><img src="/case-gge.jpg" alt="Global Gain Engine" width="960" height="600" loading="lazy"><div><div class="mono casetag">网络平台 · 自有产品</div><h3>Global Gain Engine</h3><p>加密货币交易所自动化交易服务：AI 智能体、带交易计划的信号、模拟模式、个人账户、套餐与收款。</p><ul class="facts"><span>React 与 TypeScript</span><span>Supabase</span><span>6 家交易所</span></ul><span class="open">打开网站 →</span></div></a><a class="case" href="https://tpf-order-5.vercel.app" target="_blank" rel="noopener"><img src="/case-glina-shop.jpg" alt="“Glina”陶瓷店" width="960" height="600" loading="lazy"><div><div class="mono casetag">网店 · 演示</div><h3>“Glina”陶瓷店</h3><p>带分类的商品目录、购物车、自提或配送下单，以及通过 Stripe 刷卡支付（演示为测试模式）。商品和订单在后台管理。</p><ul class="facts"><span>目录与购物车</span><span>刷卡支付</span><span>后台</span></ul><span class="open">打开网站 →</span></div></a><a class="case" href="https://tpf-order-3.vercel.app" target="_blank" rel="noopener"><img src="/case-glina-app.jpg" alt="“Glina”课程预约" width="960" height="600" loading="lazy"><div><div class="mono casetag">网络应用 · 演示</div><h3>“Glina”课程预约</h3><p>显示剩余名额的课程表，两步完成预约。店主在后台添加课程并查看预约，名额自动计算。</p><ul class="facts"><span>数据库</span><span>在线预约</span><span>后台</span></ul><span class="open">打开网站 →</span></div></a><div class="case"><img src="/case-mastera.jpg" alt="“Mastera”" width="960" height="600" loading="lazy"><div><div class="mono casetag">团队应用 · 演示</div><h3>“Mastera”</h3><p>装修队的任务与工地管理。三种角色：工人看自己的任务，工长看全队任务，经理管理工地和期限。</p><ul class="facts"><span>3 种角色</span><span>任务与工地</span><span>手机与电脑</span></ul><span class="open off">需登录 — 可应要求演示</span></div></div><a class="case" href="https://tpf-order-4.vercel.app" target="_blank" rel="noopener"><img src="/case-glina-bot.jpg" alt="“Glina”工作室机器人" width="960" height="600" loading="lazy"><div><div class="mono casetag">TELEGRAM 机器人 · 演示</div><h3>“Glina”工作室机器人</h3><p>机器人显示课程表、分步预约课程并回答常见问题。店主在网页后台管理预约和文本。</p><ul class="facts"><span>Telegram</span><span>分步预约</span><span>网页后台</span></ul><span class="open">打开网站 →</span></div></a><a class="case" href="https://tpf-order-2.vercel.app" target="_blank" rel="noopener"><img src="/case-yoga.jpg" alt="“Lotos”瑜伽馆" width="960" height="600" loading="lazy"><div><div class="mono casetag">多页网站 · 演示</div><h3>“Lotos”瑜伽馆</h3><p>三个页面：介绍优势的首页、带价格的课程表，以及带咨询表单的联系页。</p><ul class="facts"><span>Next.js</span><span>3 个页面</span><span>咨询表单</span></ul><span class="open">打开网站 →</span></div></a><a class="case" href="https://tpf-order-1.vercel.app" target="_blank" rel="noopener"><img src="/case-zerno.jpg" alt="“Zerno”咖啡馆" width="960" height="600" loading="lazy"><div><div class="mono casetag">落地页 · 演示</div><h3>“Zerno”咖啡馆</h3><p>单页网站：首屏、带价格的菜单、地址与营业时间、一键拨号。</p><ul class="facts"><span>Next.js</span><span>响应式布局</span><span>源代码归客户所有</span></ul><span class="open">打开网站 →</span></div></a></div>
 </section>
 
 <section id="contact">
 <div class="contact">
-<div><div class="kicker" data-t="ct_kicker">05 / 联系我们</div><h2 data-t="ct_title">告诉我们您的想法</h2><p class="lead" style="color:var(--muted)" data-t="ct_lead">描述您的需求——我们会把规格书、报价和工期发送到您的邮箱，通常在一小时内。完全免费。</p>
+<div><div class="kicker" data-t="ct_kicker">06 / 联系我们</div><h2 data-t="ct_title">告诉我们您的想法</h2><p class="lead" style="color:var(--muted)" data-t="ct_lead">描述您的需求——我们会把规格书、报价和工期发送到您的邮箱，通常在一小时内。完全免费。</p>
 <a href="mailto:orders@tpf-technology.com" style="font-size:18px">orders@tpf-technology.com</a></div>
 <form id="form" novalidate="">
 <div class="two">
@@ -199,7 +212,7 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 <label><span data-t="f_email">邮箱</span><input name="email" type="email" autocomplete="email" required="" data-ph="f_contact_ph" placeholder="便于我们联系您"></label>
 </div>
 <div class="two">
-<label><span data-t="f_type">项目类型</span><select name="type" id="types"><option>落地页或网站</option><option>Web 应用</option><option>网上商店</option><option>Telegram 机器人</option><option>手机端应用</option><option>其他</option></select></label>
+<label><span data-t="f_type">项目类型</span><select name="type" id="types"><option>落地页或网站</option><option>Web 应用</option><option>网上商店</option><option>Telegram 机器人</option><option>手机端应用</option><option>流程自动化</option><option>其他</option></select></label>
 <label><span data-t="f_currency">付款货币</span><select name="currency" id="currency"><option value="EUR">EUR — €</option><option value="USD">USD — $</option></select></label>
 </div>
 <label><span data-t="f_about">项目简介</span><textarea name="about" rows="5" required="" minlength="10" maxlength="15000" data-ph="f_about_ph" placeholder="简要描述您的需求"></textarea></label>
@@ -404,13 +417,13 @@ var I18N = {
 };
 
 var EXTRA = {
-  ru: { seo_title: 'Сайты, веб‑приложения и Telegram‑боты под ключ — TPF Technology', seo_desc: 'Студия TPF Technology: сайты, веб‑приложения, интернет‑магазины и Telegram‑боты под ключ. ТЗ и смета бесплатно и до оплаты, оплата 50/50, исходный код остаётся у вас.', cs_lead: 'Каждый проект проходит весь путь на нашей платформе: заявка, ТЗ и смета, разработка, проверки, запуск.', case1_tag: 'ЛЕНДИНГ', case1_title: 'Кофейня «Зерно»', case1_text: 'Одностраничный сайт: первый экран, меню с ценами, адрес и часы работы, звонок в одно касание. От заявки до рабочей версии — силами ИИ‑агентов, с автоматическими проверками сборки, безопасности и критериев приёмки.', case1_facts: ['Next.js', 'Адаптивная вёрстка', 'Исходный код у клиента'], case1_open: 'Открыть сайт →', case1_alt: 'Главный экран сайта кофейни «Зерно»', privacy: 'Политика обработки данных', f_email: 'E‑mail', f_consent: 'Нажимая кнопку, вы соглашаетесь на обработку указанных данных для ответа на заявку.',
+  ru: { seo_title: 'Сайты, веб‑приложения и Telegram‑боты под ключ — TPF Technology', seo_desc: 'Студия TPF Technology: сайты, веб‑приложения, интернет‑магазины, Telegram‑боты и автоматизация процессов под ключ. ТЗ и смета бесплатно и до оплаты, оплата 50/50, исходный код остаётся у вас.', cs_lead: 'Каждый проект проходит весь путь на нашей платформе: заявка, ТЗ и смета, разработка, проверки, запуск.', case1_tag: 'ЛЕНДИНГ', case1_title: 'Кофейня «Зерно»', case1_text: 'Одностраничный сайт: первый экран, меню с ценами, адрес и часы работы, звонок в одно касание. От заявки до рабочей версии — силами ИИ‑агентов, с автоматическими проверками сборки, безопасности и критериев приёмки.', case1_facts: ['Next.js', 'Адаптивная вёрстка', 'Исходный код у клиента'], case1_open: 'Открыть сайт →', case1_alt: 'Главный экран сайта кофейни «Зерно»', privacy: 'Политика обработки данных', f_email: 'E‑mail', f_consent: 'Нажимая кнопку, вы соглашаетесь на обработку указанных данных для ответа на заявку.',
         f_video: 'Видео (необязательно)', f_video_hint: 'Расскажите о задаче голосом или покажите на экране пример — мы составим по видео ТЗ и смету. До 50 МБ, смотрим первые 5 минут.', in_video: 'Описание — в приложенном видео.', e_video: 'Видео больше 50 МБ. Сократите его или опишите задачу текстом.', e_upload: 'Не получилось загрузить видео. Отправьте заявку без него или попробуйте ещё раз.', uploading: 'Загружаем видео… ', ok_video: 'Заявка принята. Мы посмотрим видео и пришлём ТЗ со сметой на вашу почту. Статус заказа: ', sending: 'Отправляем…', ok: 'Заявка принята. Мы отправили подтверждение на вашу почту. Статус заказа: ', ok_link: 'страница заказа',
         e_fields: 'Заполните имя, e‑mail и опишите задачу (не меньше 10 символов).', e_busy: 'Сейчас слишком много заявок. Попробуйте через час.', e_fail: 'Не получилось отправить. Попробуйте ещё раз чуть позже.' },
-  en: { seo_title: 'Websites, web apps and Telegram bots — TPF Technology', seo_desc: 'TPF Technology builds websites, web apps, online shops and Telegram bots with a team of AI agents supervised by engineers. Free spec and estimate before you pay; you own the code.', cs_lead: 'Every project runs end to end on our platform: request, spec and estimate, development, checks, launch.', case1_tag: 'LANDING PAGE', case1_title: 'Zerno coffee shop', case1_text: 'A one‑page site: hero, menu with prices, address and opening hours, one‑tap call. From request to live version by AI agents, with automated build, security and acceptance checks.', case1_facts: ['Next.js', 'Responsive layout', 'Client owns the source'], case1_open: 'Open the site →', case1_alt: 'Home screen of the Zerno coffee shop website', privacy: 'Privacy policy', f_email: 'Email', f_consent: 'By clicking the button, you agree that we process these details to answer your request.',
+  en: { seo_title: 'Websites, web apps and Telegram bots — TPF Technology', seo_desc: 'TPF Technology builds websites, web apps, online shops, Telegram bots and process automation with AI agents supervised by engineers. Free spec and estimate before you pay; you own the code.', cs_lead: 'Every project runs end to end on our platform: request, spec and estimate, development, checks, launch.', case1_tag: 'LANDING PAGE', case1_title: 'Zerno coffee shop', case1_text: 'A one‑page site: hero, menu with prices, address and opening hours, one‑tap call. From request to live version by AI agents, with automated build, security and acceptance checks.', case1_facts: ['Next.js', 'Responsive layout', 'Client owns the source'], case1_open: 'Open the site →', case1_alt: 'Home screen of the Zerno coffee shop website', privacy: 'Privacy policy', f_email: 'Email', f_consent: 'By clicking the button, you agree that we process these details to answer your request.',
         f_video: 'Video (optional)', f_video_hint: 'Tell us about the task aloud or show an example on screen — we will write the spec and estimate from the video. Up to 50 MB; we watch the first 5 minutes.', in_video: 'The description is in the attached video.', e_video: 'The video is larger than 50 MB. Shorten it or describe the task in text.', e_upload: 'Could not upload the video. Send the request without it or try again.', uploading: 'Uploading the video… ', ok_video: 'Request received. We will watch the video and email you the spec and estimate. Order status: ', sending: 'Sending…', ok: 'Request received. We have emailed you a confirmation. Order status: ', ok_link: 'your order page',
         e_fields: 'Please fill in your name, email and describe the task (at least 10 characters).', e_busy: 'Too many requests right now. Please try again in an hour.', e_fail: 'Could not send. Please try again a little later.' },
-  zh: { seo_title: '网站、网络应用与 Telegram 机器人开发 — TPF Technology', seo_desc: 'TPF Technology 由工程师监督的 AI 智能体团队开发网站、网络应用、网店和 Telegram 机器人。付款前免费提供规格书与报价，源代码归您所有。', cs_lead: '每个项目都在我们的平台上全流程完成：需求、规格书与报价、开发、检查、上线。', case1_tag: '落地页', case1_title: '“Zerno”咖啡馆', case1_text: '单页网站：首屏、带价格的菜单、地址与营业时间、一键拨号。从需求到正式上线均由 AI 智能体完成，并自动检查构建、安全与验收标准。', case1_facts: ['Next.js', '响应式布局', '源代码归客户所有'], case1_open: '打开网站 →', case1_alt: '“Zerno”咖啡馆网站首页', privacy: '隐私政策', f_email: '邮箱', f_consent: '点击按钮即表示您同意我们为回复需求而处理上述信息。',
+  zh: { seo_title: '网站、网络应用与 Telegram 机器人开发 — TPF Technology', seo_desc: 'TPF Technology 由工程师监督的 AI 智能体团队开发网站、网络应用、网店和 Telegram 机器人，并实现业务流程自动化。付款前免费提供规格书与报价，源代码归您所有。', cs_lead: '每个项目都在我们的平台上全流程完成：需求、规格书与报价、开发、检查、上线。', case1_tag: '落地页', case1_title: '“Zerno”咖啡馆', case1_text: '单页网站：首屏、带价格的菜单、地址与营业时间、一键拨号。从需求到正式上线均由 AI 智能体完成，并自动检查构建、安全与验收标准。', case1_facts: ['Next.js', '响应式布局', '源代码归客户所有'], case1_open: '打开网站 →', case1_alt: '“Zerno”咖啡馆网站首页', privacy: '隐私政策', f_email: '邮箱', f_consent: '点击按钮即表示您同意我们为回复需求而处理上述信息。',
         f_video: '视频（可选）', f_video_hint: '用语音讲述需求，或在屏幕上展示示例——我们将根据视频编写规格书和报价。最大 50 MB，仅查看前 5 分钟。', in_video: '需求说明见所附视频。', e_video: '视频超过 50 MB。请缩短视频或用文字描述需求。', e_upload: '视频上传失败。请不带视频提交，或稍后重试。', uploading: '正在上传视频… ', ok_video: '需求已收到。我们将查看视频，并把规格书和报价发送到您的邮箱。订单状态：', sending: '正在提交…', ok: '需求已收到，确认邮件已发送至您的邮箱。订单状态：', ok_link: '订单页面',
         e_fields: '请填写姓名、邮箱并描述需求（不少于 10 个字符）。', e_busy: '当前请求过多，请一小时后再试。', e_fail: '提交失败，请稍后再试。' }
 };
@@ -459,7 +472,7 @@ var ACTUAL = {
     why_title: 'Прозрачно и без оплаты вслепую', why_lead: 'Статус заказа виден на вашей странице в любой момент. Вы принимаете работу до окончательной оплаты, а исходный код и все права — ваши.',
     stats: [ { num: '100%', label: 'прав на код — у вас' }, { num: '50/50', label: 'оплата: перед стартом и после приёмки' }, { num: '0 ₽', label: 'за ТЗ и смету' }, { num: '3', label: 'языка: русский, English, 中文' } ],
     ct_lead: 'Опишите задачу — ТЗ, смету и сроки пришлём на почту, обычно в течение часа. Бесплатно.',
-    types: ['Лендинг или сайт', 'Веб‑приложение', 'Интернет‑магазин', 'Telegram‑бот', 'Приложение на телефон', 'Другое']
+    types: ['Лендинг или сайт', 'Веб‑приложение', 'Интернет‑магазин', 'Telegram‑бот', 'Приложение на телефон', 'Автоматизация процессов', 'Другое']
   },
   en: {
     hero_lead: 'We build websites, web applications, online shops and Telegram bots with a team of AI agents overseen by engineers — from request to launch.',
@@ -492,7 +505,7 @@ var ACTUAL = {
     why_title: 'Transparent, and you never pay blind', why_lead: 'Your order page shows the status at any moment. You accept the work before the final payment, and the source code and all rights are yours.',
     stats: [ { num: '100%', label: 'code ownership is yours' }, { num: '50/50', label: 'payment: before start and after acceptance' }, { num: '€0', label: 'for the spec and estimate' }, { num: '3', label: 'languages: English, русский, 中文' } ],
     ct_lead: 'Describe the task — we will e‑mail the spec, estimate and timeline, usually within an hour. Free of charge.',
-    types: ['Landing page or website', 'Web application', 'Online shop', 'Telegram bot', 'App on the phone', 'Other']
+    types: ['Landing page or website', 'Web application', 'Online shop', 'Telegram bot', 'App on the phone', 'Process automation', 'Other']
   },
   zh: {
     hero_lead: '我们由 AI 智能体团队在工程师监督下开发网站、Web 应用、网上商店和 Telegram 机器人——从需求到上线。',
@@ -525,30 +538,80 @@ var ACTUAL = {
     why_title: '透明，绝不盲目付款', why_lead: '您可以随时在订单页面查看状态。您在支付尾款前先验收成果，源代码和全部权利归您所有。',
     stats: [ { num: '100%', label: '代码归您所有' }, { num: '50/50', label: '付款：开工前与验收后' }, { num: '¥0', label: '规格书与报价免费' }, { num: '3', label: '种语言：中文、English、русский' } ],
     ct_lead: '描述您的需求——我们会把规格书、报价和工期发送到您的邮箱，通常在一小时内。完全免费。',
-    types: ['落地页或网站', 'Web 应用', '网上商店', 'Telegram 机器人', '手机端应用', '其他']
+    types: ['落地页或网站', 'Web 应用', '网上商店', 'Telegram 机器人', '手机端应用', '流程自动化', '其他']
+  }
+};
+
+// Process automation: what a built application does on its own. Every line is something the platform builds
+// today (see the Analyst's rules for 'schedule', 'email', 'documents', 'ai' and 'integrations'), with its limits.
+var AUTOMATION = {
+  ru: {
+    nav_auto: 'Автоматизация', au_kicker: '02 / АВТОМАТИЗАЦИЯ', au_title: 'Автоматизируем рутинные процессы',
+    au_lead: 'Заявки, напоминания, документы и обмен данными между сервисами работают сами — в приложении, которое мы делаем под ваш процесс. Вам остаётся проверять результат.',
+    automation: [
+      { title: 'Заявки без потерь', text: 'Каждая заявка, запись или заказ сразу попадает в базу, приходит вам на почту и уходит по вебхуку в ваш n8n, Zapier, Make или CRM.' },
+      { title: 'Напоминания и сводки', text: 'Приложение по расписанию напоминает о сроках, присылает сводку за день или неделю и закрывает просроченное.' },
+      { title: 'Письма без ручной рассылки', text: 'Подтверждение записи, смена статуса, готовый документ — письмо клиенту или сотруднику уходит само, ответы приходят вам.' },
+      { title: 'Документы и Excel', text: 'Смета, счёт, акт или отчёт в PDF — в одно нажатие из ваших данных. Списки выгружаются в Excel и загружаются из него.' },
+      { title: 'ИИ внутри процесса', text: 'Модель читает фото чека или PDF и заполняет форму, готовит черновик текста, отвечает на вопросы по вашим данным. Результат подтверждает человек.' },
+      { title: 'Связь с вашими сервисами', text: 'Передаём данные в CRM, учёт, календарь или мессенджер и читаем их оттуда — через открытый API сервиса и ваш аккаунт в нём.' }
+    ],
+    au_how_title: 'С чего начать', au_how: 'Опишите, что сейчас делается вручную и в каких сервисах. ТЗ и смету пришлём на почту, обычно в течение часа, — бесплатно и до оплаты.',
+    au_cta: 'Описать процесс',
+    au_note: 'Не подключаем банки, государственные системы, программы, установленные на ваших компьютерах (например, 1С), и сервисы без открытого API. Каждую интеграцию вы проверяете на версии для проверки до окончательной оплаты.'
+  },
+  en: {
+    nav_auto: 'Automation', au_kicker: '02 / AUTOMATION', au_title: 'We automate routine processes',
+    au_lead: 'Requests, reminders, documents and data exchange between services run by themselves — in an application we build around your process. You only check the result.',
+    automation: [
+      { title: 'No request gets lost', text: 'Every request, booking or order lands in the database at once, is e‑mailed to you and goes by webhook to your n8n, Zapier, Make or CRM.' },
+      { title: 'Reminders and summaries', text: 'On a schedule the application reminds people of deadlines, sends a daily or weekly summary and closes what is overdue.' },
+      { title: 'Letters without manual mailing', text: 'A booking confirmation, a status change, a finished document — the letter to a customer or a colleague goes out by itself, and replies come to you.' },
+      { title: 'Documents and Excel', text: 'An estimate, an invoice, an act or a report as a PDF — one click from your own data. Lists are exported to Excel and imported from it.' },
+      { title: 'AI inside the process', text: 'A model reads a photo of a receipt or a PDF and fills in the form, drafts a text, answers questions about your records. A person confirms the result.' },
+      { title: 'Connected to your services', text: 'We send data to a CRM, accounting, a calendar or a messenger and read it back — through the service’s public API and your own account.' }
+    ],
+    au_how_title: 'Where to start', au_how: 'Describe what is done by hand today and in which services. We will e‑mail the spec and estimate, usually within an hour — free and before any payment.',
+    au_cta: 'Describe the process',
+    au_note: 'We do not connect banks, government systems, software installed on your own computers, or services without a public API. You check every integration on the review version before the final payment.'
+  },
+  zh: {
+    nav_auto: '自动化', au_kicker: '02 / 自动化', au_title: '让重复性流程自动运行',
+    au_lead: '咨询、提醒、文档以及各服务之间的数据交换都自动完成——在我们按您的流程定制的应用中。您只需检查结果。',
+    automation: [
+      { title: '咨询不遗漏', text: '每一条咨询、预约或订单都会立即存入数据库、发送到您的邮箱，并通过 Webhook 传到您的 n8n、Zapier、Make 或 CRM。' },
+      { title: '提醒与汇总', text: '应用按计划提醒到期事项，发送每日或每周汇总，并关闭逾期事项。' },
+      { title: '邮件自动发送', text: '预约确认、状态变更、文档生成——发给客户或员工的邮件自动发出，回复则发到您这里。' },
+      { title: '文档与 Excel', text: '报价单、发票、验收单或报告一键根据您的数据生成 PDF。列表可导出到 Excel，也可从 Excel 导入。' },
+      { title: '流程中的 AI', text: '模型读取票据照片或 PDF 并填写表单、起草文本、回答有关您数据的问题。结果由人确认。' },
+      { title: '连接您的服务', text: '通过服务的公开 API 和您自己的账户，把数据发送到 CRM、财务系统、日历或即时通讯工具，并从中读取。' }
+    ],
+    au_how_title: '从哪里开始', au_how: '描述目前哪些工作靠手工完成、用到哪些服务。我们会把规格书和报价发送到您的邮箱，通常在一小时内——免费，且在付款之前。',
+    au_cta: '描述流程',
+    au_note: '我们不接入银行、政府系统、安装在您自己电脑上的软件，以及没有公开 API 的服务。每项集成都由您在支付尾款前于审核版本上检查。'
   }
 };
 
 // Texts and prices of the current look of the page; merged last.
 var LOOK = {
-  ru: { cs_lead: 'Демонстрационные проекты собраны на нашей платформе от заявки до запуска. Здесь же — собственный продукт команды.', case_open: 'Открыть сайт →', case_ask: 'Вход по паролю — покажем по запросу', sv_kicker: '01 / УСЛУГИ', st_kicker: '02 / ТЕХНОЛОГИИ', why_kicker: '03 / ПОЧЕМУ МЫ', cs_kicker: '04 / ПРОЕКТЫ', ct_kicker: '05 / КОНТАКТЫ',
+  ru: { cs_lead: 'Демонстрационные проекты собраны на нашей платформе от заявки до запуска. Здесь же — собственный продукт команды.', case_open: 'Открыть сайт →', case_ask: 'Вход по паролю — покажем по запросу', sv_kicker: '01 / УСЛУГИ', st_kicker: '03 / ТЕХНОЛОГИИ', why_kicker: '04 / ПОЧЕМУ МЫ', cs_kicker: '05 / ПРОЕКТЫ', ct_kicker: '06 / КОНТАКТЫ',
     hero_facts: ['Смета бесплатно и до оплаты', 'Оплата 50/50', 'Код и все права — ваши'],
     usd: ['от $496', 'от $620', 'от $1 900', 'от $2 800', 'от $1 900', 'от $1 900', 'от $544', 'от $1 360', ''],
     f_currency: 'Валюта оплаты',
     pr_note: 'Оплата банковской картой в евро или долларах США — валюту вы выбираете в заявке. Суммы в рублях — ориентир по курсу на октябрь 2026 года. В цену не входят платные сторонние сервисы, если они понадобятся (например, собственный домен).' },
-  en: { cs_lead: 'The demo projects were built on our platform from request to launch. Our own product is shown here too.', case_open: 'Open the site →', case_ask: 'Sign‑in required — shown on request', sv_kicker: '01 / SERVICES', st_kicker: '02 / TECHNOLOGY', why_kicker: '03 / WHY US', cs_kicker: '04 / PROJECTS', ct_kicker: '05 / CONTACT',
+  en: { cs_lead: 'The demo projects were built on our platform from request to launch. Our own product is shown here too.', case_open: 'Open the site →', case_ask: 'Sign‑in required — shown on request', sv_kicker: '01 / SERVICES', st_kicker: '03 / TECHNOLOGY', why_kicker: '04 / WHY US', cs_kicker: '05 / PROJECTS', ct_kicker: '06 / CONTACT',
     hero_facts: ['Free estimate before you pay', 'Payment 50/50', 'The code and all rights are yours'],
     usd: ['from $496', 'from $620', 'from $2,400', 'from $3,500', 'from $2,400', 'from $2,400', 'from $800', 'from $2,000', ''],
     f_currency: 'Payment currency',
     pr_note: 'You pay by card in euros or US dollars — choose the currency in the request. Prices do not include paid third‑party services if any are needed (for example, your own domain).' },
-  zh: { cs_lead: '演示项目均在我们的平台上从需求到上线全流程完成；这里也展示团队自己的产品。', case_open: '打开网站 →', case_ask: '需登录 — 可应要求演示', sv_kicker: '01 / 服务', st_kicker: '02 / 技术', why_kicker: '03 / 为什么选择我们', cs_kicker: '04 / 项目', ct_kicker: '05 / 联系我们',
+  zh: { cs_lead: '演示项目均在我们的平台上从需求到上线全流程完成；这里也展示团队自己的产品。', case_open: '打开网站 →', case_ask: '需登录 — 可应要求演示', sv_kicker: '01 / 服务', st_kicker: '03 / 技术', why_kicker: '04 / 为什么选择我们', cs_kicker: '05 / 项目', ct_kicker: '06 / 联系我们',
     hero_facts: ['付款前免费报价', '付款 50/50', '代码及全部权利归您'],
     usd: ['$496 起', '$620 起', '$2,400 起', '$3,500 起', '$2,400 起', '$2,400 起', '$800 起', '$2,000 起', ''],
     f_currency: '付款货币',
     pr_note: '可使用银行卡以欧元或美元付款——请在需求中选择货币。价格不含可能需要的第三方付费服务（例如您自己的域名）。' }
 };
 var CASES = [{"img": "/case-brigada.jpg", "href": "", "ru": ["ПРИЛОЖЕНИЕ ДЛЯ КОМАНДЫ · ДЕМО", "«Ремонт‑Бригада»", "Бригадир и рабочие входят со своими ролями. Чат по каждому объекту, чеки с фото, смены с отметкой места по геолокации и табель часов. Ставится на телефон с сайта.", ["Роли и вход", "Чат и файлы", "Геолокация"]], "en": ["TEAM APP · DEMO", "Remont‑Brigada", "A foreman and workers sign in with their own roles. A chat per site, receipts with photos, shifts clocked with the phone's location, and a timesheet. Installs on a phone from the site.", ["Roles and sign‑in", "Chat and files", "Geolocation"]], "zh": ["团队应用 · 演示", "“Remont‑Brigada”", "工长和工人按各自角色登录。每个工地有聊天、带照片的票据、按手机定位打卡的班次和工时表。可从网站安装到手机。", ["角色与登录", "聊天与文件", "定位"]]}, {"img": "/case-gge.jpg", "href": "https://www.globalgainengine.online", "ru": ["ВЕБ‑ПЛАТФОРМА · СОБСТВЕННЫЙ ПРОДУКТ", "Global Gain Engine", "Сервис автоматизации торговли на криптобиржах: ИИ‑агенты, сигналы с планом сделки, демо‑режим, личный кабинет, тарифы и приём оплаты.", ["React и TypeScript", "Supabase", "6 бирж"]], "en": ["WEB PLATFORM · OUR OWN PRODUCT", "Global Gain Engine", "A service that automates trading on crypto exchanges: AI agents, signals with a trade plan, a demo mode, a personal account, plans and payments.", ["React and TypeScript", "Supabase", "6 exchanges"]], "zh": ["网络平台 · 自有产品", "Global Gain Engine", "加密货币交易所自动化交易服务：AI 智能体、带交易计划的信号、模拟模式、个人账户、套餐与收款。", ["React 与 TypeScript", "Supabase", "6 家交易所"]]}, {"img": "/case-glina-shop.jpg", "href": "https://tpf-order-5.vercel.app", "ru": ["ИНТЕРНЕТ‑МАГАЗИН · ДЕМО", "Магазин керамики «Глина»", "Каталог с категориями, корзина, оформление заказа с самовывозом или доставкой и оплата картой через Stripe (в демо — тестовый режим). Товары и заказы ведутся в админке.", ["Каталог и корзина", "Оплата картой", "Админка"]], "en": ["ONLINE SHOP · DEMO", "Glina ceramics shop", "A catalogue with categories, a cart, checkout with pickup or delivery, and card payments through Stripe (test mode in the demo). Products and orders are managed in an admin panel.", ["Catalogue and cart", "Card payments", "Admin panel"]], "zh": ["网店 · 演示", "“Glina”陶瓷店", "带分类的商品目录、购物车、自提或配送下单，以及通过 Stripe 刷卡支付（演示为测试模式）。商品和订单在后台管理。", ["目录与购物车", "刷卡支付", "后台"]]}, {"img": "/case-glina-app.jpg", "href": "https://tpf-order-3.vercel.app", "ru": ["ВЕБ‑ПРИЛОЖЕНИЕ · ДЕМО", "Запись на мастер‑классы «Глина»", "Расписание со свободными местами и запись в два шага. Владелец добавляет мастер‑классы и видит записи в админке; места считаются автоматически.", ["База данных", "Запись онлайн", "Админка"]], "en": ["WEB APP · DEMO", "Glina workshop booking", "A timetable with free places and booking in two steps. The owner adds workshops and sees bookings in an admin panel; places are counted automatically.", ["Database", "Online booking", "Admin panel"]], "zh": ["网络应用 · 演示", "“Glina”课程预约", "显示剩余名额的课程表，两步完成预约。店主在后台添加课程并查看预约，名额自动计算。", ["数据库", "在线预约", "后台"]]}, {"img": "/case-mastera.jpg", "href": "", "ru": ["ПРИЛОЖЕНИЕ ДЛЯ КОМАНДЫ · ДЕМО", "«Мастера»", "Учёт задач и объектов ремонтной бригады. Три роли: рабочий видит свои задачи, бригадир — задачи бригады, менеджер ведёт объекты и сроки.", ["3 роли", "Задачи и объекты", "Телефон и компьютер"]], "en": ["TEAM APP · DEMO", "Mastera", "Tasks and sites for a renovation crew. Three roles: a worker sees their own tasks, a foreman the crew's tasks, a manager runs sites and deadlines.", ["3 roles", "Tasks and sites", "Phone and desktop"]], "zh": ["团队应用 · 演示", "“Mastera”", "装修队的任务与工地管理。三种角色：工人看自己的任务，工长看全队任务，经理管理工地和期限。", ["3 种角色", "任务与工地", "手机与电脑"]]}, {"img": "/case-glina-bot.jpg", "href": "https://tpf-order-4.vercel.app", "ru": ["TELEGRAM‑БОТ · ДЕМО", "Бот студии «Глина»", "Бот показывает расписание, записывает на мастер‑класс по шагам и отвечает на частые вопросы. Записи и тексты владелец ведёт в веб‑админке.", ["Telegram", "Запись по шагам", "Веб‑админка"]], "en": ["TELEGRAM BOT · DEMO", "Glina studio bot", "The bot shows the timetable, books a workshop step by step and answers common questions. The owner manages bookings and texts in a web admin panel.", ["Telegram", "Step‑by‑step booking", "Web admin"]], "zh": ["TELEGRAM 机器人 · 演示", "“Glina”工作室机器人", "机器人显示课程表、分步预约课程并回答常见问题。店主在网页后台管理预约和文本。", ["Telegram", "分步预约", "网页后台"]]}, {"img": "/case-yoga.jpg", "href": "https://tpf-order-2.vercel.app", "ru": ["САЙТ ИЗ НЕСКОЛЬКИХ СТРАНИЦ · ДЕМО", "Студия йоги «Лотос»", "Три страницы: главная с преимуществами, расписание с ценами и контакты с формой заявки.", ["Next.js", "3 страницы", "Форма заявки"]], "en": ["MULTI‑PAGE SITE · DEMO", "Lotos yoga studio", "Three pages: a home page with the studio's strengths, a timetable with prices, and contacts with a request form.", ["Next.js", "3 pages", "Request form"]], "zh": ["多页网站 · 演示", "“Lotos”瑜伽馆", "三个页面：介绍优势的首页、带价格的课程表，以及带咨询表单的联系页。", ["Next.js", "3 个页面", "咨询表单"]]}, {"img": "/case-zerno.jpg", "href": "https://tpf-order-1.vercel.app", "ru": ["ЛЕНДИНГ · ДЕМО", "Кофейня «Зерно»", "Одностраничный сайт: первый экран, меню с ценами, адрес и часы работы, звонок в одно касание.", ["Next.js", "Адаптивная вёрстка", "Исходный код у клиента"]], "en": ["LANDING PAGE · DEMO", "Zerno coffee shop", "A one‑page site: hero, menu with prices, address and opening hours, one‑tap call.", ["Next.js", "Responsive layout", "Client owns the source"]], "zh": ["落地页 · 演示", "“Zerno”咖啡馆", "单页网站：首屏、带价格的菜单、地址与营业时间、一键拨号。", ["Next.js", "响应式布局", "源代码归客户所有"]]}];
-function T() { var t = Object.assign({}, I18N[lang], EXTRA[lang], ACTUAL[lang], LOOK[lang]); return t; }
+function T() { var t = Object.assign({}, I18N[lang], EXTRA[lang], ACTUAL[lang], AUTOMATION[lang], LOOK[lang]); return t; }
 function render() {
   var t = T();
   document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang;
@@ -577,6 +640,10 @@ function render() {
     svg.setAttribute('stroke', i === 3 ? '#FFB35C' : '#5CE1F0'); svg.setAttribute('stroke-width', '1.4'); svg.setAttribute('stroke-linecap', 'round'); svg.setAttribute('stroke-linejoin', 'round'); svg.setAttribute('aria-hidden', 'true');
     svg.innerHTML = ICONS[i];
     c.append(svg, el('h3', s.title), el('p', s.text)); return c; });
+  fill(document.getElementById('auto-grid'), t.automation, function (a, i) {
+    var c = el('div', null, 'agent'), top = el('div', null, 'top');
+    top.append(el('span', '0' + (i + 1)), el('i'));
+    c.append(top, el('h3', a.title), el('p', a.text)); return c; });
   fill(document.getElementById('prices-grid'), t.prices, function (p, i) {
     var c = el('div', null, 'prow'), cost = el('div', null, 'cost'), also = [t.usd[i], p.alt].filter(Boolean).join('  ·  ');
     cost.append(el('div', p.sum, 'sum')); if (also) cost.append(el('div', also, 'alt'));
@@ -590,6 +657,9 @@ function render() {
 var PAGE_LANG = (location.pathname.match(/^\/(ru|en|zh)\/?$/) || [])[1];
 try { var saved = localStorage.getItem('tpf_lang'); if (PAGE_LANG) lang = PAGE_LANG; else if (I18N[saved]) lang = saved; else if (/^zh/i.test(navigator.language)) lang = 'zh'; else if (!/^(ru|be|uk|kk)/i.test(navigator.language)) lang = 'en'; } catch (e) {}
 render();
+// 'Describe the process' leads to the form with that kind of project already chosen.
+var AUTO_TYPE = 5;
+document.getElementById('auto-cta').addEventListener('click', function () { document.getElementById('types').selectedIndex = AUTO_TYPE; });
 
 document.getElementById('form').addEventListener('submit', function (ev) {
   ev.preventDefault();

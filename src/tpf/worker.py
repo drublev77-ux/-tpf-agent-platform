@@ -24,7 +24,8 @@ from tpf.tools.github import GitHubPublisher
 from tpf.tools.sandbox import Sandbox, make_sandbox
 from tpf.tools.screens import Screenshooter
 from tpf.tools.shop_stripe import ShopStripe
-from tpf.tools import ai_relay, ticker
+from tpf.orchestrator import reminders
+from tpf.tools import ai_relay, indexnow, ticker
 from tpf.tools.telegram import TelegramAPI
 from tpf.tools.tenantdb import make_tenant_db
 
@@ -181,6 +182,8 @@ async def main() -> None:
     loops = [asyncio.create_task(worker.loop(i)) for i in range(slots)]
     loops.append(asyncio.create_task(ai_relay.run_forever(pool, settings, worker.stopping)))  # applications' questions to the model
     loops.append(asyncio.create_task(ticker.run_forever(pool, settings, worker.stopping)))   # applications' scheduled work
+    loops.append(asyncio.create_task(reminders.run_forever(orch, worker.stopping)))          # orders that wait for their client
+    loops.append(asyncio.create_task(indexnow.run_forever(pool, settings, worker.stopping)))  # the studio site's changed pages, to search engines
     try:
         # A redeploy gives the process seconds, an agent call takes minutes: do not wait for tasks in
         # flight. Hand them back, so the new worker picks them up at once, and leave.

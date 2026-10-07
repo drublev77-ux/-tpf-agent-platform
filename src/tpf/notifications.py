@@ -53,6 +53,42 @@ TEMPLATES: dict[str, dict[str, str]] = {
 }
 
 
+# Sent when an order has waited for the client for days (orchestrator/reminders.py). The e-mail carries the
+# button to the order page, where every one of these decisions is made.
+REMINDERS: dict[str, dict[str, str]] = {
+    "awaiting_client_info": {
+        "ru": "Напоминаем о заказе №{id}: мы ждём ваших ответов на вопросы, чтобы подготовить ТЗ и смету. Ответить можно на странице заказа.",
+        "en": "A reminder about order #{id}: we are waiting for your answers to prepare the spec and the estimate. You can reply on your order page.",
+        "zh": "关于订单 #{id} 的提醒：我们正在等待您的答复，以便准备需求规格书与报价。您可以在订单页面回复。",
+    },
+    "awaiting_estimate": {
+        "ru": "Напоминаем: ТЗ и смета по заказу №{id} готовы и ждут вашего решения. Утвердите смету или напишите, что изменить, — на странице заказа.",
+        "en": "A reminder: the spec and estimate for order #{id} are ready and waiting for your decision. Approve the estimate or tell us what to change on your order page.",
+        "zh": "提醒：订单 #{id} 的需求规格书与报价已完成，等待您的决定。请在订单页面确认报价，或告诉我们需要修改之处。",
+    },
+    "awaiting_payment": {
+        "ru": "Напоминаем: заказ №{id} ждёт предоплату — после неё мы сразу начнём работу. Все детали — на странице заказа.",
+        "en": "A reminder: order #{id} is waiting for the prepayment — we start work as soon as it arrives. The details are on your order page.",
+        "zh": "提醒：订单 #{id} 正在等待预付款——收到后我们会立即开工。详情请见订单页面。",
+    },
+    "awaiting_acceptance": {
+        "ru": "Напоминаем: заказ №{id} готов и ждёт вашей проверки. Посмотрите результат и примите работу или напишите замечания — на странице заказа.",
+        "en": "A reminder: order #{id} is ready and waiting for your review. Look at the result and accept the work or send your comments on your order page.",
+        "zh": "提醒：订单 #{id} 已完成，等待您验收。请在订单页面查看成果，然后验收或提出修改意见。",
+    },
+    "awaiting_final_payment": {
+        "ru": "Напоминаем: заказ №{id} принят и ждёт оплаты остатка — после неё мы опубликуем рабочую версию. Все детали — на странице заказа.",
+        "en": "A reminder: order #{id} is accepted and waiting for the final payment — we publish the live version as soon as it arrives. The details are on your order page.",
+        "zh": "提醒：订单 #{id} 已验收，正在等待尾款——收到后我们会发布正式版本。详情请见订单页面。",
+    },
+}
+REMINDER_LAST = {
+    "ru": "Это последнее напоминание: заказ останется на вашей странице, и вы сможете вернуться к нему, когда будет удобно.",
+    "en": "This is the last reminder: the order stays on your page, and you can come back to it whenever it suits you.",
+    "zh": "这是最后一次提醒：订单会保留在您的页面上，您可以在方便时随时回来处理。",
+}
+
+
 SUBJECT = {"ru": "TPF Technology — заказ №{id}", "en": "TPF Technology — order #{id}", "zh": "TPF Technology — 订单 #{id}"}
 BUTTON = {"ru": "Открыть заказ", "en": "Open your order", "zh": "查看订单"}
 FOOTER = {
