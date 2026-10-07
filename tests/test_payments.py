@@ -228,9 +228,9 @@ async def test_client_can_be_invoiced_in_dollars(env):
     from tpf.config import Settings
 
     s = Settings(database_url="postgresql://x/y")
-    assert [s.rate_in("USD", k) for k in ("site", "app", "bot", "shop")] == [45, 70, 50, 37]       # the dollar rates of before
-    assert [s.rate_in("USD", k, "ru") for k in ("site", "app", "bot", "shop")] == [36, 56, 34, 29]
-    assert s.rate_in("EUR", "site") == 40
+    assert [s.rate_in("USD", k) for k in ("site", "app", "bot", "shop")] == [31, 70, 50, 37]       # sites were lowered in October 2026; the rest are the dollar rates of before
+    assert [s.rate_in("USD", k, "ru") for k in ("site", "app", "bot", "shop")] == [31, 56, 34, 29]
+    assert s.rate_in("EUR", "site") == 28
 
     env.settings.currency, env.settings.usd_per_eur = "EUR", 1.117
     order, _ = await env.orch.create_order(client_name="Ann", client_email="ann@example.com", language="en",
