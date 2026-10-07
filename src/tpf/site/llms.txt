@@ -1,0 +1,29 @@
+# TPF Technology
+
+> A software studio that builds websites, web applications, online shops, Telegram bots and process automation with a team of AI agents overseen by engineers — from request to launch. The spec and estimate are free and come before any payment; payment is 50/50 (before start and after acceptance); the client owns the source code and all rights.
+
+Works in English, Russian and Chinese. Orders are taken through the form on the site or by e-mail: orders@tpf-technology.com. After a request the client receives the spec, estimate and timeline by e-mail, usually within an hour, and follows the order status on a personal order page.
+
+## Pages
+
+- [English](https://tpf-technology.com/en): services, prices, selected work, request form
+- [Русский](https://tpf-technology.com/ru): услуги, цены, проекты, форма заявки
+- [中文](https://tpf-technology.com/zh): 服务、价格、项目、需求表单
+- [Privacy policy](https://tpf-technology.com/privacy): what data is collected and how to have it removed
+
+## What the studio builds
+
+- Landing pages and multi-page websites with a request form delivered to the client's e-mail
+- Web applications with a database and an admin area: bookings, requests, catalogues, schedules, user accounts with roles
+- Online shops: catalogue, cart, checkout, card payments into the client's own Stripe, YooKassa or bePaid account
+- Telegram bots: button menus, answers to frequent questions, step-by-step booking or ordering, a web admin area
+- Process automation: requests, reminders, documents and data exchange between services run by themselves in an application built around the client's process
+- Mobile apps as installable web applications (own icon, full screen, no app stores)
+
+## Prices
+
+Current "from" prices in euros and US dollars are listed at https://tpf-technology.com/en#prices. The price depends on the scope; anything not on the list is sized and priced by estimate.
+
+## Technology
+
+React, Next.js, TypeScript, Node.js, PostgreSQL, Supabase, Vercel, PWA, Telegram, Stripe.

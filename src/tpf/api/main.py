@@ -11,7 +11,7 @@ from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 import asyncpg
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, StreamingResponse, Response
 from pydantic import BaseModel, EmailStr, Field
 
 from tpf.notifications import portal_url
@@ -345,6 +345,22 @@ def run() -> None:
 
 
 SITE_DIR = Path(__file__).resolve().parent.parent / "site"
+SITE_URL = "https://tpf-technology.com"
+
+
+def page(path: str):
+    """A public address of the studio site. It answers HEAD as well as GET: crawlers and link checkers ask
+    with HEAD first, and a 405 there reads as a broken page."""
+    return app.api_route(path, methods=["GET", "HEAD"], include_in_schema=False)
+
+
+@app.middleware("http")
+async def one_address_per_page(request: Request, call_next):
+    """/en/ is the same page as /en: send it there for good (308), so search engines keep one address."""
+    path = request.url.path
+    if len(path) > 1 and path.endswith("/") and path.rstrip("/") in ("/ru", "/en", "/zh", "/privacy"):
+        return RedirectResponse(SITE_URL + path.rstrip("/"), status_code=308)
+    return await call_next(request)
 
 
 def _page(name: str) -> FileResponse:
@@ -355,14 +371,13 @@ def _page(name: str) -> FileResponse:
                         headers={"Cache-Control": "public, max-age=300"})
 
 
-@app.get("/", include_in_schema=False)
+@page("/")
 async def site() -> FileResponse:
     """The public TPF Technology site; its contact form posts to /orders."""
     return _page("root")
 
 
 SITE_LANGS = {"ru": "ru", "en": "en", "zh": "zh-Hans"}
-SITE_URL = "https://tpf-technology.com"
 
 
 def _lang_page(lang: str):
@@ -372,10 +387,10 @@ def _lang_page(lang: str):
 
 
 for _lang in SITE_LANGS:
-    app.get(f"/{_lang}", include_in_schema=False)(_lang_page(_lang))
+    page(f"/{_lang}")(_lang_page(_lang))
 
 
-@app.get("/robots.txt", include_in_schema=False)
+@page("/robots.txt")
 async def robots() -> Response:
     # Order pages, the admin area and the endpoints forms and applications post to are nobody's search result.
     lines = ["User-agent: *", "Allow: /", *(f"Disallow: /{p}" for p in ("portal/", "admin", "orders", "forms/", "apps/", "uploads", "webhooks/", "pay/")),
@@ -386,7 +401,7 @@ async def robots() -> Response:
 INDEXNOW_KEY = (SITE_DIR / "indexnow-key.txt").read_text().strip() if (SITE_DIR / "indexnow-key.txt").is_file() else ""
 
 
-@app.get("/indexnow-{key}.txt", include_in_schema=False)
+@page("/indexnow-{key}.txt")
 async def indexnow_key(key: str) -> Response:
     """Proof for IndexNow (Yandex, Bing) that the pages we report as changed are ours. The key is public by design."""
     if not INDEXNOW_KEY or key != INDEXNOW_KEY:
@@ -406,25 +421,31 @@ def _site_changed() -> str:
     return datetime.now(tz=timezone.utc).date().isoformat()
 
 
-@app.get("/sitemap.xml", include_in_schema=False)
+@page("/sitemap.xml")
 async def sitemap() -> Response:
     changed = _site_changed()
     alternates = "".join(f'<xhtml:link rel="alternate" hreflang="{code}" href="{SITE_URL}/{lang}"/>' for lang, code in SITE_LANGS.items()) \
         + f'<xhtml:link rel="alternate" hreflang="x-default" href="{SITE_URL}/"/>'
     urls = "".join(f"<url><loc>{SITE_URL}/{path}</loc><lastmod>{changed}</lastmod>{alternates}</url>" for path in ("", *SITE_LANGS))
-    urls += f"<url><loc>{SITE_URL}/privacy</loc></url>"
+    urls += f"<url><loc>{SITE_URL}/privacy</loc><lastmod>{changed}</lastmod></url>"
     xml = ('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
            f'xmlns:xhtml="http://www.w3.org/1999/xhtml">{urls}</urlset>')
     return Response(xml, media_type="application/xml; charset=utf-8", headers={"Cache-Control": "public, max-age=3600"})
 
 
-@app.get("/privacy", include_in_schema=False)
+@page("/llms.txt")
+async def llms() -> FileResponse:
+    """A short plain-text description of the studio for AI assistants that answer questions about it."""
+    return FileResponse(SITE_DIR / "llms.txt", media_type="text/plain; charset=utf-8", headers={"Cache-Control": "public, max-age=3600"})
+
+
+@page("/privacy")
 async def privacy() -> FileResponse:
     return FileResponse(SITE_DIR / "privacy.html", media_type="text/html; charset=utf-8",
                         headers={"Cache-Control": "public, max-age=300"})
 
 
-@app.get("/case-zerno.jpg", include_in_schema=False)
+@page("/case-zerno.jpg")
 async def case_zerno() -> FileResponse:
     return FileResponse(SITE_DIR / "case-zerno.jpg", media_type="image/jpeg",
                         headers={"Cache-Control": "public, max-age=86400"})
@@ -445,20 +466,20 @@ def _asset(name: str):
 
 
 for _name in SITE_ASSETS:      # the icon a phone puts on its home screen, and what describes the site as an app
-    app.get(f"/{_name}", include_in_schema=False)(_asset(_name))
+    page(f"/{_name}")(_asset(_name))
 
 
-@app.get("/brand-mark.jpg", include_in_schema=False)
+@page("/brand-mark.jpg")
 async def brand_mark() -> FileResponse:
     return FileResponse(SITE_DIR / "brand-mark.jpg", media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
 
 
-@app.get("/brand-hero.jpg", include_in_schema=False)
+@page("/brand-hero.jpg")
 async def brand_hero() -> FileResponse:
     return FileResponse(SITE_DIR / "brand-hero.jpg", media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
 
 
-@app.get("/brand.jpg", include_in_schema=False)
+@page("/brand.jpg")
 async def brand() -> FileResponse:
     return FileResponse(SITE_DIR / "brand.jpg", media_type="image/jpeg",
                         headers={"Cache-Control": "public, max-age=86400"})

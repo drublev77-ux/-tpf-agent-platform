@@ -39,6 +39,10 @@ def test_each_language_page_is_filled_in_and_fresh(name, lang, address):
     assert ld["@graph"][0]["@type"] == "Organization" and ld["@graph"][0]["description"] == desc.replace("&amp;", "&")
     assert f'<meta property="og:url" content="https://tpf-technology.com{address}">' in html
     assert '<meta property="og:image" content="https://tpf-technology.com/brand.jpg">' in html
+    offers = ld["@graph"][0]["hasOfferCatalog"]["itemListElement"]      # the services and "from" prices the page shows
+    assert len(offers) == 8 and [o["priceSpecification"]["minPrice"] for o in offers[:2]] == [448, 560]
+    assert all(o["priceSpecification"]["priceCurrency"] == "EUR" and o["itemOffered"]["name"] for o in offers)
+    assert 'rel="preload" as="image" href="/brand-hero.jpg"' in html and 'fetchpriority="high"' in html
 
 
 def test_site_serves_language_pages_robots_and_sitemap(pool, settings, monkeypatch):
@@ -56,6 +60,13 @@ def test_site_serves_language_pages_robots_and_sitemap(pool, settings, monkeypat
         for address in ("/</loc>", "/ru</loc>", "/en</loc>", "/zh</loc>", "/privacy</loc>"):
             assert "https://tpf-technology.com" + address in sitemap.text
         assert "portal" not in sitemap.text
+        assert sitemap.text.count("<lastmod>") == 5                       # the privacy page is dated too
+        for address in ("/", "/en", "/privacy", "/robots.txt", "/sitemap.xml", "/brand.jpg", "/llms.txt"):
+            assert client.head(address).status_code == 200, address           # crawlers ask with HEAD first
+        for address in ("/ru/", "/en/", "/zh/", "/privacy/"):
+            moved = client.get(address, follow_redirects=False)
+            assert moved.status_code == 308 and moved.headers["location"] == "https://tpf-technology.com" + address.rstrip("/")
+        assert "orders@tpf-technology.com" in client.get("/llms.txt").text
         changed = set(re.findall(r"<lastmod>(.*?)</lastmod>", sitemap.text))
         assert changed == {(SITE / "lastmod.txt").read_text().strip()} and min(changed) >= "2026-10-06"
     get_settings.cache_clear()
