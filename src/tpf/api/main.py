@@ -358,7 +358,7 @@ def page(path: str):
 async def one_address_per_page(request: Request, call_next):
     """/en/ is the same page as /en: send it there for good (308), so search engines keep one address."""
     path = request.url.path
-    if len(path) > 1 and path.endswith("/") and path.rstrip("/") in ("/ru", "/en", "/zh", "/privacy"):
+    if len(path) > 1 and path.endswith("/") and path.rstrip("/") in ("/ru", "/en", "/nl", "/zh", "/privacy"):
         return RedirectResponse(SITE_URL + path.rstrip("/"), status_code=308)
     return await call_next(request)
 
@@ -377,7 +377,7 @@ async def site() -> FileResponse:
     return _page("root")
 
 
-SITE_LANGS = {"ru": "ru", "en": "en", "zh": "zh-Hans"}
+SITE_LANGS = {"ru": "ru", "en": "en", "nl": "nl", "zh": "zh-Hans"}
 
 
 def _lang_page(lang: str):

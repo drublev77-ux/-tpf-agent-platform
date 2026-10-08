@@ -46,6 +46,15 @@ en: { title: 'Privacy policy', date: 'Effective 7 October 2026', s: [
  ['Your rights', ['You can ask for a copy of your data, ask us to correct or delete it, and withdraw your consent. Write to ' + MAIL + ' — we reply within 24 hours.']],
  ['Changes', ['If this policy changes, the new version will appear on this page with a new date.']]
 ]},
+nl: { title: 'Privacybeleid', date: 'Geldig vanaf 7 oktober 2026', s: [
+ ['Wie wij zijn', ['De website tpf-technology.com en het opdrachtenplatform worden beheerd door TPF Technology. Voor elke vraag over uw gegevens kunt u mailen naar ' + MAIL + '.']],
+ ['Welke gegevens wij ontvangen', ['Alleen wat u ons geeft in het aanvraagformulier en in het gesprek over de opdracht:', ['uw naam en e‑mailadres;', 'de beschrijving van de opdracht, uw antwoorden en opmerkingen bij de opdracht;', 'uw GitHub‑gebruikersnaam, als u toegang tot de coderepository vraagt.'], 'Wij gebruiken geen advertentietrackers en plaatsen geen advertentiecookies. Bezoeken worden geteld door Vercel Web Analytics: dat gebruikt geen cookies en verzamelt niets waarmee een persoon te herkennen is, alleen anonieme statistieken: de geopende pagina, de verwijzende site, het land en het type apparaat en browser. De site bewaart alleen uw gekozen taal in uw browser.']],
+ ['Waarvoor wij ze gebruiken', [['om de specificatie en offerte op te stellen, de opdracht uit te voeren en het resultaat op te leveren;', 'om u per e‑mail op de hoogte te houden van de opdracht;', 'om betalingen te ontvangen.'], 'Wij verkopen uw gegevens niet en sturen geen marketing zonder uw toestemming.']],
+ ['Wie de gegevens nog meer verwerkt', ['Voor het platform gebruiken wij diensten die gegevens namens ons verwerken:', ['Anthropic — de AI‑agents die de specificatie en de code schrijven: zij ontvangen de tekst van de aanvraag en het gesprek over de opdracht;', 'Stripe — betalingen: kaartgegevens worden bij Stripe ingevoerd en komen nooit bij ons;', 'Brevo en ImprovMX — het verzenden en doorsturen van e‑mail;', 'Vercel, Supabase, Railway en GitHub — hosting van de site, database, servers en opslag van de broncode.'], 'Deze bedrijven kunnen buiten uw land gevestigd zijn.']],
+ ['Hoe lang wij ze bewaren', ['Gegevens van een opdracht bewaren wij zolang de opdracht loopt en zolang onze verplichtingen daarvoor gelden, inclusief boekhoudkundige eisen. Op verzoek verwijderen wij ze eerder, tenzij de wet ons verplicht ze te bewaren.']],
+ ['Uw rechten', ['U kunt een kopie van uw gegevens opvragen, ons vragen ze te corrigeren of te verwijderen, en uw toestemming intrekken. Mail naar ' + MAIL + ' — wij antwoorden binnen 24 uur.']],
+ ['Wijzigingen', ['Als dit beleid verandert, verschijnt de nieuwe versie op deze pagina met een nieuwe datum.']]
+]},
 zh: { title: '隐私政策', date: '自 2026 年 10 月 7 日起生效', s: [
  ['我们是谁', ['网站 tpf-technology.com 及订单平台由 TPF Technology 运营。有关您数据的任何问题，请发送邮件至 ' + MAIL + '。']],
  ['我们收集哪些数据', ['仅限您在需求表单和订单沟通中主动提供的内容：', ['姓名和电子邮箱；', '需求描述、您对订单的回复和意见；', 'GitHub 用户名——当您申请访问代码仓库时。'], '我们不使用广告跟踪器，也不设置广告 Cookie。网站访问量由 Vercel Web Analytics 统计：该服务不使用 Cookie，也不收集可识别个人身份的数据，仅收集匿名统计信息——访问的页面、来源网站、国家以及设备和浏览器类型。网站仅在您的浏览器中保存所选语言。']],
@@ -56,8 +65,8 @@ zh: { title: '隐私政策', date: '自 2026 年 10 月 7 日起生效', s: [
  ['变更', ['如本政策发生变更，新版本将连同新日期发布在本页面。']]
 ]}
 };
-var LANGS = [['ru','RU'],['en','EN'],['zh','中文']], lang = 'ru';
-try { var saved = localStorage.getItem('tpf_lang'); if (DOC[saved]) lang = saved; else if (/^zh/i.test(navigator.language)) lang = 'zh'; else if (!/^(ru|be|uk|kk)/i.test(navigator.language)) lang = 'en'; } catch (e) {}
+var LANGS = [['ru','RU'],['en','EN'],['nl','NL'],['zh','中文']], lang = 'ru';
+try { var saved = localStorage.getItem('tpf_lang'); if (DOC[saved]) lang = saved; else if (/^zh/i.test(navigator.language)) lang = 'zh'; else if (/^nl/i.test(navigator.language)) lang = 'nl'; else if (!/^(ru|be|uk|kk)/i.test(navigator.language)) lang = 'en'; } catch (e) {}
 function render() {
   var d = DOC[lang], html = '<h1>' + d.title + '</h1><p class="date">' + d.date + '</p>';
   d.s.forEach(function (sec) {

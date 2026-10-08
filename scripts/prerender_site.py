@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fill the studio site in for search engines. The page builds its text in the browser from one source
 (src/tpf/site/index.html); a crawler that does not run scripts would see an empty page, and no language would
-have an address of its own. This writes index.ru.html, index.en.html and index.zh.html next to it: the same page
+have an address of its own. This writes index.ru.html, index.en.html, index.nl.html and index.zh.html next to it: the same page
 with the text already in the HTML and the head tags of that language; and index.root.html, the Russian page
 for the bare address, where the visitor's own language is then chosen by the script. Run it after every change to index.html
 (tests/test_site_seo.py fails while the copies are stale):
@@ -21,7 +21,7 @@ from pathlib import Path
 
 SITE = Path(__file__).resolve().parent.parent / "src" / "tpf" / "site"
 BASE = "https://tpf-technology.com"
-LANGS = {"ru": ("ru", "ru_RU"), "en": ("en", "en_US"), "zh": ("zh-Hans", "zh_CN")}     # hreflang, og:locale
+LANGS = {"ru": ("ru", "ru_RU"), "en": ("en", "en_US"), "nl": ("nl", "nl_NL"), "zh": ("zh-Hans", "zh_CN")}     # hreflang, og:locale
 
 
 def source_hash() -> str:
@@ -30,7 +30,7 @@ def source_hash() -> str:
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def translate_path(self, path: str) -> str:
-        if path.split("?")[0].rstrip("/") in ("", "/ru", "/en", "/zh"):
+        if path.split("?")[0].rstrip("/") in ("", "/ru", "/en", "/nl", "/zh"):
             return str(SITE / "index.html")
         return super().translate_path(path)
 

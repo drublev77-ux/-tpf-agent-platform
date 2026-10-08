@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN"><head>
-<meta name="tpf-source" content="bfa6283888e48890">
+<meta name="tpf-source" content="6896486c01bdf02d">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>网站、网络应用与 Telegram 机器人开发 — TPF Technology</title>
@@ -8,6 +8,7 @@
 <link rel="canonical" href="https://tpf-technology.com/zh">
 <link rel="alternate" hreflang="ru" href="https://tpf-technology.com/ru">
 <link rel="alternate" hreflang="en" href="https://tpf-technology.com/en">
+<link rel="alternate" hreflang="nl" href="https://tpf-technology.com/nl">
 <link rel="alternate" hreflang="zh-Hans" href="https://tpf-technology.com/zh">
 <link rel="alternate" hreflang="x-default" href="https://tpf-technology.com/">
 <meta property="og:type" content="website">
@@ -128,6 +129,7 @@ input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{out
 footer{margin-top:var(--gap);padding:40px var(--pad);border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap;font-size:14px;color:#8D9AA5}
 footer img{width:240px;height:94px;object-fit:cover;object-position:center 55%;border-radius:14px;border:1px solid var(--line);display:block}
 footer div{display:flex;gap:24px}footer a{color:var(--muted)}
+@media(max-width:1360px){nav{gap:clamp(14px,1.6vw,26px)}.langs a{min-width:38px;padding:0 9px}}@media(max-width:1180px){.cta-top{display:none}}
 @media(max-width:900px){nav{display:none}.cta-top{display:none}.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.grid3{grid-template-columns:1fr}.card{min-height:0}}
 @media(max-width:420px){header{gap:10px}.logo{font-size:15px;gap:8px}.logo .mark{width:44px;height:44px}.langs a{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;min-width:36px;padding:0 7px}}
@@ -146,7 +148,7 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 <a href="#services" data-t="nav_services">服务</a><a href="#automation" data-t="nav_auto">自动化</a><a href="#prices" data-t="nav_prices">价格</a><a href="#stack" data-t="nav_stack">技术</a><a href="#cases" data-t="nav_cases">项目</a><a href="#contact" data-t="nav_contact">联系我们</a>
 </nav>
 <div class="right">
-<div class="langs" role="group" id="langs" aria-label="语言"><a href="/ru" hreflang="ru" aria-current="false">RU</a><a href="/en" hreflang="en" aria-current="false">EN</a><a href="/zh" hreflang="zh-Hans" aria-current="true">中文</a></div>
+<div class="langs" role="group" id="langs" aria-label="语言"><a href="/ru" hreflang="ru" aria-current="false">RU</a><a href="/en" hreflang="en" aria-current="false">EN</a><a href="/nl" hreflang="nl" aria-current="false">NL</a><a href="/zh" hreflang="zh-Hans" aria-current="true">中文</a></div>
 <a class="btn sm cta-top" href="#contact" data-t="cta_discuss">洽谈项目</a>
 </div>
 </header>
@@ -430,7 +432,7 @@ var EXTRA = {
         f_video: '视频（可选）', f_video_hint: '用语音讲述需求，或在屏幕上展示示例——我们将根据视频编写规格书和报价。最大 50 MB，仅查看前 5 分钟。', in_video: '需求说明见所附视频。', e_video: '视频超过 50 MB。请缩短视频或用文字描述需求。', e_upload: '视频上传失败。请不带视频提交，或稍后重试。', uploading: '正在上传视频… ', ok_video: '需求已收到。我们将查看视频，并把规格书和报价发送到您的邮箱。订单状态：', sending: '正在提交…', ok: '需求已收到，确认邮件已发送至您的邮箱。订单状态：', ok_link: '订单页面',
         e_fields: '请填写姓名、邮箱并描述需求（不少于 10 个字符）。', e_busy: '当前请求过多，请一小时后再试。', e_fail: '提交失败，请稍后再试。' }
 };
-var LANGS = [['ru','RU'],['en','EN'],['zh','中文']];
+var LANGS = [['ru','RU'],['en','EN'],['nl','NL'],['zh','中文']];
 var ICONS = [
  '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
  '<rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="9" x2="22" y2="9"/>',
@@ -614,6 +616,112 @@ var LOOK = {
     pr_note: '可使用银行卡以欧元或美元付款——请在需求中选择货币。价格不含可能需要的第三方付费服务（例如您自己的域名）。' }
 };
 var CASES = [{"img": "/case-brigada.jpg", "href": "", "ru": ["ПРИЛОЖЕНИЕ ДЛЯ КОМАНДЫ · ДЕМО", "«Ремонт‑Бригада»", "Бригадир и рабочие входят со своими ролями. Чат по каждому объекту, чеки с фото, смены с отметкой места по геолокации и табель часов. Ставится на телефон с сайта.", ["Роли и вход", "Чат и файлы", "Геолокация"]], "en": ["TEAM APP · DEMO", "Remont‑Brigada", "A foreman and workers sign in with their own roles. A chat per site, receipts with photos, shifts clocked with the phone's location, and a timesheet. Installs on a phone from the site.", ["Roles and sign‑in", "Chat and files", "Geolocation"]], "zh": ["团队应用 · 演示", "“Remont‑Brigada”", "工长和工人按各自角色登录。每个工地有聊天、带照片的票据、按手机定位打卡的班次和工时表。可从网站安装到手机。", ["角色与登录", "聊天与文件", "定位"]]}, {"img": "/case-gge.jpg", "href": "https://www.globalgainengine.online", "ru": ["ВЕБ‑ПЛАТФОРМА · СОБСТВЕННЫЙ ПРОДУКТ", "Global Gain Engine", "Сервис автоматизации торговли на криптобиржах: ИИ‑агенты, сигналы с планом сделки, демо‑режим, личный кабинет, тарифы и приём оплаты.", ["React и TypeScript", "Supabase", "6 бирж"]], "en": ["WEB PLATFORM · OUR OWN PRODUCT", "Global Gain Engine", "A service that automates trading on crypto exchanges: AI agents, signals with a trade plan, a demo mode, a personal account, plans and payments.", ["React and TypeScript", "Supabase", "6 exchanges"]], "zh": ["网络平台 · 自有产品", "Global Gain Engine", "加密货币交易所自动化交易服务：AI 智能体、带交易计划的信号、模拟模式、个人账户、套餐与收款。", ["React 与 TypeScript", "Supabase", "6 家交易所"]]}, {"img": "/case-glina-shop.jpg", "href": "https://tpf-order-5.vercel.app", "ru": ["ИНТЕРНЕТ‑МАГАЗИН · ДЕМО", "Магазин керамики «Глина»", "Каталог с категориями, корзина, оформление заказа с самовывозом или доставкой и оплата картой через Stripe (в демо — тестовый режим). Товары и заказы ведутся в админке.", ["Каталог и корзина", "Оплата картой", "Админка"]], "en": ["ONLINE SHOP · DEMO", "Glina ceramics shop", "A catalogue with categories, a cart, checkout with pickup or delivery, and card payments through Stripe (test mode in the demo). Products and orders are managed in an admin panel.", ["Catalogue and cart", "Card payments", "Admin panel"]], "zh": ["网店 · 演示", "“Glina”陶瓷店", "带分类的商品目录、购物车、自提或配送下单，以及通过 Stripe 刷卡支付（演示为测试模式）。商品和订单在后台管理。", ["目录与购物车", "刷卡支付", "后台"]]}, {"img": "/case-glina-app.jpg", "href": "https://tpf-order-3.vercel.app", "ru": ["ВЕБ‑ПРИЛОЖЕНИЕ · ДЕМО", "Запись на мастер‑классы «Глина»", "Расписание со свободными местами и запись в два шага. Владелец добавляет мастер‑классы и видит записи в админке; места считаются автоматически.", ["База данных", "Запись онлайн", "Админка"]], "en": ["WEB APP · DEMO", "Glina workshop booking", "A timetable with free places and booking in two steps. The owner adds workshops and sees bookings in an admin panel; places are counted automatically.", ["Database", "Online booking", "Admin panel"]], "zh": ["网络应用 · 演示", "“Glina”课程预约", "显示剩余名额的课程表，两步完成预约。店主在后台添加课程并查看预约，名额自动计算。", ["数据库", "在线预约", "后台"]]}, {"img": "/case-mastera.jpg", "href": "", "ru": ["ПРИЛОЖЕНИЕ ДЛЯ КОМАНДЫ · ДЕМО", "«Мастера»", "Учёт задач и объектов ремонтной бригады. Три роли: рабочий видит свои задачи, бригадир — задачи бригады, менеджер ведёт объекты и сроки.", ["3 роли", "Задачи и объекты", "Телефон и компьютер"]], "en": ["TEAM APP · DEMO", "Mastera", "Tasks and sites for a renovation crew. Three roles: a worker sees their own tasks, a foreman the crew's tasks, a manager runs sites and deadlines.", ["3 roles", "Tasks and sites", "Phone and desktop"]], "zh": ["团队应用 · 演示", "“Mastera”", "装修队的任务与工地管理。三种角色：工人看自己的任务，工长看全队任务，经理管理工地和期限。", ["3 种角色", "任务与工地", "手机与电脑"]]}, {"img": "/case-glina-bot.jpg", "href": "https://tpf-order-4.vercel.app", "ru": ["TELEGRAM‑БОТ · ДЕМО", "Бот студии «Глина»", "Бот показывает расписание, записывает на мастер‑класс по шагам и отвечает на частые вопросы. Записи и тексты владелец ведёт в веб‑админке.", ["Telegram", "Запись по шагам", "Веб‑админка"]], "en": ["TELEGRAM BOT · DEMO", "Glina studio bot", "The bot shows the timetable, books a workshop step by step and answers common questions. The owner manages bookings and texts in a web admin panel.", ["Telegram", "Step‑by‑step booking", "Web admin"]], "zh": ["TELEGRAM 机器人 · 演示", "“Glina”工作室机器人", "机器人显示课程表、分步预约课程并回答常见问题。店主在网页后台管理预约和文本。", ["Telegram", "分步预约", "网页后台"]]}, {"img": "/case-yoga.jpg", "href": "https://tpf-order-2.vercel.app", "ru": ["САЙТ ИЗ НЕСКОЛЬКИХ СТРАНИЦ · ДЕМО", "Студия йоги «Лотос»", "Три страницы: главная с преимуществами, расписание с ценами и контакты с формой заявки.", ["Next.js", "3 страницы", "Форма заявки"]], "en": ["MULTI‑PAGE SITE · DEMO", "Lotos yoga studio", "Three pages: a home page with the studio's strengths, a timetable with prices, and contacts with a request form.", ["Next.js", "3 pages", "Request form"]], "zh": ["多页网站 · 演示", "“Lotos”瑜伽馆", "三个页面：介绍优势的首页、带价格的课程表，以及带咨询表单的联系页。", ["Next.js", "3 个页面", "咨询表单"]]}, {"img": "/case-zerno.jpg", "href": "https://tpf-order-1.vercel.app", "ru": ["ЛЕНДИНГ · ДЕМО", "Кофейня «Зерно»", "Одностраничный сайт: первый экран, меню с ценами, адрес и часы работы, звонок в одно касание.", ["Next.js", "Адаптивная вёрстка", "Исходный код у клиента"]], "en": ["LANDING PAGE · DEMO", "Zerno coffee shop", "A one‑page site: hero, menu with prices, address and opening hours, one‑tap call.", ["Next.js", "Responsive layout", "Client owns the source"]], "zh": ["落地页 · 演示", "“Zerno”咖啡馆", "单页网站：首屏、带价格的菜单、地址与营业时间、一键拨号。", ["Next.js", "响应式布局", "源代码归客户所有"]]}];
+// Nederlands. The page is in Dutch; an order placed from it is handled in English (the agents, the e-mails and
+// the order page speak ru, en and zh), and the form says so.
+I18N.nl = Object.assign({}, I18N.en, {
+  lang_label: 'Taal', nav_services: 'Diensten', nav_prices: 'Prijzen', nav_agents: 'AI‑agents', nav_stack: 'Technologie', nav_cases: 'Projecten', nav_contact: 'Contact', cta_discuss: 'Project bespreken',
+  hero_kicker: 'STUDIO VOOR SOFTWAREONTWIKKELING', hero_kicker_s: 'SOFTWARESTUDIO', hero_title: 'Wij bouwen software die meedenkt', dot: '.',
+  hero_cta: 'Neem contact op', img_alt: 'Een gloeiend brein boven een neuraal netwerk — het embleem van TPF Technology', menu: 'Menu openen',
+  sv_kicker: '01 / DIENSTEN', sv_title: 'Wat wij bouwen',
+  pr_kicker: 'PRIJZEN', pr_title: 'Wat het kost', pr_lead: 'De prijs hangt af van de omvang. U krijgt de offerte gratis en vóór betaling; de helft betaalt u vóór de start, de andere helft vóór de livegang.',
+  prices: [
+    { title: 'Landingspagina', sum: 'vanaf €448', text: 'Eén pagina met een aanvraagformulier: ontwerp, teksten op basis van uw gegevens, mobiele weergave, publicatie.' },
+    { title: 'Website met meerdere pagina’s', sum: 'vanaf €560', text: 'Drie pagina’s of meer: diensten, prijzen, contact en een aanvraagformulier dat in uw mailbox binnenkomt.' },
+    { title: 'Webapplicatie', sum: 'vanaf €2.150', text: 'Een site met een database en een beheeromgeving: afspraken, aanvragen, een catalogus, een rooster — u beheert de gegevens zelf.' },
+    { title: 'App met gebruikersaccounts', sum: 'vanaf €3.150', text: 'Medewerkers of klanten loggen in met e‑mail en wachtwoord, elk met een eigen rol: een medewerker ziet zijn eigen taken, een manager ziet alles. U voegt de mensen zelf toe.' },
+    { title: 'Webshop', sum: 'vanaf €2.150', text: 'Catalogus, winkelwagen, afrekenen en kaartbetaling op uw eigen Stripe‑account — het geld gaat rechtstreeks naar u.' },
+    { title: 'Mobiele app', sum: 'vanaf €2.150', text: 'Een webapplicatie die zich als gewone app op het telefoonscherm installeert: eigen icoon, volledig scherm, zonder appstores.' },
+    { title: 'Eenvoudige Telegram‑bot', sum: 'vanaf €720', text: 'Een knoppenmenu, antwoorden op veelgestelde vragen, contactgegevens en het verzamelen van aanvragen.' },
+    { title: 'Telegram‑bot met reserveringen', sum: 'vanaf €1.800', text: 'Stap voor stap reserveren of bestellen, meldingen aan de eigenaar en een webbeheeromgeving voor de gegevens.' },
+    { title: 'Iets anders', sum: 'op offerte', text: 'Beschrijf de opdracht — wij schatten omvang en prijs binnen een uur.' }
+  ],
+  ag_kicker: '02 / AI‑AGENTS', ag_title: 'Volledig autonome AI‑agents leveren klantopdrachten op',
+  ag_lead: 'Agents nemen de opdracht aan, schrijven de specificatie, ontwerpen, bouwen, testen en leveren het resultaat op — 24/7, zonder handmatige stappen. Engineers van TPF bewaken de kwaliteit en grijpen alleen in als dat nodig is.',
+  hitl_title: 'Autonoom, 24/7',
+  hitl_text: 'Een opdracht gaat van aanvraag tot oplevering zonder handmatige stappen. U ziet de status live; engineers van TPF bewaken de kwaliteit.',
+  hitl_tags: ['Aanvraag → Specificatie', 'Code → Tests', 'Release → Oplevering'],
+  why_kicker: '04 / WAAROM WIJ', cs_kicker: '05 / PROJECTEN', cs_title: 'Geselecteerd werk', cs_all: 'Alle projecten →',
+  ct_kicker: '06 / CONTACT', ct_title: 'Vertel ons over uw idee',
+  f_name: 'Naam', f_name_ph: 'Hoe mogen we u aanspreken', f_contact: 'Telefoon of e‑mail', f_contact_ph: 'Zodat we contact kunnen opnemen', f_type: 'Soort project',
+  f_about: 'Over het project', f_about_ph: 'Beschrijf de opdracht in het kort', f_submit: 'Aanvraag versturen',
+  footer: '© 2026 TPF Technology. Alle rechten voorbehouden.'
+});
+EXTRA.nl = Object.assign({}, EXTRA.en, {
+  seo_title: 'Websites, webapps en Telegram‑bots laten maken — TPF Technology',
+  seo_desc: 'TPF Technology bouwt websites, webapps, webshops, Telegram‑bots en procesautomatisering met AI‑agents onder toezicht van engineers. Gratis offerte vóór betaling; de code is van u.',
+  privacy: 'Privacybeleid', f_email: 'E‑mail',
+  f_consent: 'Door op de knop te klikken gaat u ermee akkoord dat wij deze gegevens verwerken om uw aanvraag te beantwoorden.',
+  f_video: 'Video (optioneel)', f_video_hint: 'Vertel over de opdracht of laat een voorbeeld op het scherm zien — wij maken de specificatie en offerte op basis van de video. Maximaal 50 MB; wij bekijken de eerste 5 minuten.',
+  in_video: 'De beschrijving staat in de bijgevoegde video.', e_video: 'De video is groter dan 50 MB. Maak hem korter of beschrijf de opdracht in tekst.',
+  e_upload: 'De video kon niet worden geüpload. Verstuur de aanvraag zonder video of probeer het opnieuw.', uploading: 'Video uploaden… ',
+  ok_video: 'Aanvraag ontvangen. Wij bekijken de video en mailen u de specificatie en offerte (in het Engels). Status van uw opdracht: ',
+  sending: 'Versturen…', ok: 'Aanvraag ontvangen. U ontvangt een bevestiging per e‑mail (in het Engels). Status van uw opdracht: ', ok_link: 'uw opdrachtpagina',
+  e_fields: 'Vul uw naam en e‑mailadres in en beschrijf de opdracht (minimaal 10 tekens).',
+  e_busy: 'Er komen nu te veel aanvragen binnen. Probeer het over een uur opnieuw.', e_fail: 'Versturen is niet gelukt. Probeer het later nog eens.'
+});
+ACTUAL.nl = {
+  hero_lead: 'Wij bouwen websites, webapplicaties, webshops en Telegram‑bots met een team van AI‑agents onder toezicht van engineers — van aanvraag tot livegang.',
+  tags: ['Web', 'Telegram', 'Op de telefoon', 'AI‑agents'],
+  sv_lead: 'Van aanvraag en offerte tot livegang — op één platform. De broncode en alle rechten blijven bij u.',
+  services: [
+    { title: 'Landingspagina’s en websites', text: 'Eén pagina of meerdere: ontwerp, teksten op basis van uw gegevens, mobiele weergave en een aanvraagformulier dat in uw mailbox binnenkomt.' },
+    { title: 'Webapplicaties', text: 'Een site met een database en een beheeromgeving: afspraken, aanvragen, een catalogus, een rooster. U beheert de gegevens zelf, zonder ontwikkelaar. Medewerkers of klanten kunnen inloggen, elk met een eigen rol.' },
+    { title: 'Webshops', text: 'Catalogus, winkelwagen, afrekenen, voorraadbeheer en kaartbetaling. Producten en bestellingen staan in uw beheeromgeving.' },
+    { title: 'Telegram‑bots', text: 'Een knoppenmenu, antwoorden op veelgestelde vragen, stap voor stap reserveren of bestellen, meldingen aan de eigenaar en een webbeheeromgeving.' },
+    { title: 'Apps op de telefoon', text: 'Een applicatie of webshop installeert zich op het beginscherm met een eigen icoon en opent schermvullend — zonder appstores.' },
+    { title: 'Betalingen ontvangen', text: 'Wij koppelen Stripe aan uw eigen account: het geld van uw klanten gaat rechtstreeks naar u, niet via ons.' }
+  ],
+  agents: [
+    { title: 'Analist', text: 'Neemt de aanvraag aan, verduidelijkt de wensen, schrijft de specificatie en berekent offerte en planning.' },
+    { title: 'Architect', text: 'Ontwerpt de pagina’s, de gegevens en de uitstraling: kleuren, lettertypen, structuur.' },
+    { title: 'Ontwikkelaar', text: 'Schrijft de code van het product en past die aan na de controles en uw wijzigingsverzoeken.' },
+    { title: 'Tester', text: 'Bouwt het project, controleert afhankelijkheden op kwetsbaarheden, opent elke pagina en vergelijkt het resultaat met de specificatie.' },
+    { title: 'Reviewer', text: 'Controleert de specificatie, het ontwerp en de code onafhankelijk opnieuw vóór elke volgende stap.' },
+    { title: 'DevOps', text: 'Publiceert een versie ter beoordeling en, na uw akkoord, de live versie, en draagt de broncode aan u over.' }
+  ],
+  benefits: [
+    { title: 'Snel', text: 'Agents werken de klok rond: de offerte is meestal binnen een uur klaar, de eerste versie binnen uren of dagen.' },
+    { title: 'Zonder risico', text: 'De offerte is gratis en komt vóór elke betaling. De helft betaalt u vóór de start, de rest pas nadat u het werk hebt goedgekeurd.' },
+    { title: 'Transparant', text: 'Elke opdracht heeft een eigen pagina: status, specificatie, offerte, de testversie en een knop “wijzigingen aanvragen”.' }
+  ],
+  nav_stack: 'Technologie', st_kicker: '03 / TECHNOLOGIE', st_title: 'Waarop wij bouwen',
+  st_lead: 'Beproefde technologie: het product laadt snel, werkt op de telefoon en is niet aan ons gebonden — u kunt de code meenemen en overal verder ontwikkelen.',
+  integrations: ['Telegram', 'Stripe', 'E‑mailmeldingen', 'Installeert op de telefoon', 'GitHub'],
+  why_title: 'Transparant, en u betaalt nooit blind', why_lead: 'Op uw opdrachtpagina ziet u op elk moment de status. U keurt het werk goed vóór de laatste betaling, en de broncode en alle rechten zijn van u.',
+  stats: [ { num: '100%', label: 'eigendom van de code is van u' }, { num: '50/50', label: 'betaling: vóór de start en na goedkeuring' }, { num: '€0', label: 'voor specificatie en offerte' }, { num: 'EN', label: 'correspondentie over uw opdracht in het Engels' } ],
+  ct_lead: 'Beschrijf de opdracht — wij mailen de specificatie, offerte en planning, meestal binnen een uur. Gratis. U mag in het Nederlands schrijven; wij antwoorden in het Engels.',
+  types: ['Landingspagina of website', 'Webapplicatie', 'Webshop', 'Telegram‑bot', 'App op de telefoon', 'Procesautomatisering', 'Anders']
+};
+AUTOMATION.nl = {
+  nav_auto: 'Automatisering', au_kicker: '02 / AUTOMATISERING', au_title: 'Wij automatiseren routinewerk',
+  au_lead: 'Aanvragen, herinneringen, documenten en gegevensuitwisseling tussen diensten lopen vanzelf — in een applicatie die wij rond uw proces bouwen. U controleert alleen het resultaat.',
+  automation: [
+    { title: 'Geen aanvraag gaat verloren', text: 'Elke aanvraag, reservering of bestelling komt direct in de database, wordt naar u gemaild en gaat via een webhook naar uw n8n, Zapier, Make of CRM.' },
+    { title: 'Herinneringen en overzichten', text: 'Volgens een schema herinnert de applicatie mensen aan deadlines, stuurt een dagelijks of wekelijks overzicht en sluit af wat over tijd is.' },
+    { title: 'Mails zonder handwerk', text: 'Een reserveringsbevestiging, een statuswijziging, een klaar document — de mail aan een klant of collega gaat vanzelf de deur uit, en antwoorden komen bij u binnen.' },
+    { title: 'Documenten en Excel', text: 'Een offerte, factuur of rapport als pdf — met één klik uit uw eigen gegevens. Lijsten worden naar Excel geëxporteerd en eruit geïmporteerd.' },
+    { title: 'AI in het proces', text: 'Een model leest een foto van een bon of een pdf en vult het formulier in, schrijft een concepttekst, beantwoordt vragen over uw gegevens. Een mens bevestigt het resultaat.' },
+    { title: 'Gekoppeld aan uw diensten', text: 'Wij sturen gegevens naar een CRM, boekhouding, agenda of messenger en lezen ze terug — via de openbare API van de dienst en uw eigen account.' }
+  ],
+  au_how_title: 'Waar te beginnen', au_how: 'Beschrijf wat nu met de hand gebeurt en in welke diensten. Wij mailen de specificatie en offerte, meestal binnen een uur — gratis en vóór elke betaling.',
+  au_cta: 'Beschrijf het proces',
+  au_note: 'Wij koppelen geen banken, overheidssystemen, software die op uw eigen computers draait of diensten zonder openbare API. Elke koppeling controleert u op de testversie vóór de laatste betaling.'
+};
+LOOK.nl = { cs_lead: 'De demoprojecten zijn op ons platform gebouwd, van aanvraag tot livegang. Ook ons eigen product staat hier.', case_open: 'Site openen →', case_ask: 'Inloggen vereist — tonen wij op verzoek', sv_kicker: '01 / DIENSTEN', st_kicker: '03 / TECHNOLOGIE', why_kicker: '04 / WAAROM WIJ', cs_kicker: '05 / PROJECTEN', ct_kicker: '06 / CONTACT',
+  hero_facts: ['Gratis offerte vóór betaling', 'Betaling 50/50', 'De code en alle rechten zijn van u'],
+  usd: ['vanaf $496', 'vanaf $620', 'vanaf $2.400', 'vanaf $3.500', 'vanaf $2.400', 'vanaf $2.400', 'vanaf $800', 'vanaf $2.000', ''],
+  f_currency: 'Valuta',
+  pr_note: 'U betaalt per kaart in euro of Amerikaanse dollar — kies de valuta in de aanvraag. Prijzen zijn exclusief betaalde diensten van derden als die nodig zijn (bijvoorbeeld uw eigen domeinnaam).' };
+[
+  ['TEAM‑APP · DEMO', 'Remont‑Brigada', 'Een uitvoerder en vakmensen loggen in met hun eigen rol. Een chat per project, bonnen met foto’s, diensten geregistreerd met de locatie van de telefoon en een urenstaat. Installeert op de telefoon vanaf de site.', ['Rollen en inloggen', 'Chat en bestanden', 'Geolocatie']],
+  ['WEBPLATFORM · EIGEN PRODUCT', 'Global Gain Engine', 'Een dienst die handelen op cryptobeurzen automatiseert: AI‑agents, signalen met een handelsplan, een demomodus, een persoonlijk account, abonnementen en betalingen.', ['React en TypeScript', 'Supabase', '6 beurzen']],
+  ['WEBSHOP · DEMO', 'Keramiekwinkel Glina', 'Een catalogus met categorieën, een winkelwagen, afrekenen met afhalen of bezorgen en kaartbetaling via Stripe (testmodus in de demo). Producten en bestellingen staan in een beheeromgeving.', ['Catalogus en winkelwagen', 'Kaartbetaling', 'Beheeromgeving']],
+  ['WEBAPP · DEMO', 'Workshops boeken bij Glina', 'Een rooster met vrije plaatsen en boeken in twee stappen. De eigenaar voegt workshops toe en ziet de boekingen in een beheeromgeving; plaatsen worden automatisch geteld.', ['Database', 'Online boeken', 'Beheeromgeving']],
+  ['TEAM‑APP · DEMO', 'Mastera', 'Taken en projecten van een renovatieteam. Drie rollen: een vakman ziet zijn eigen taken, een uitvoerder die van het team, een manager beheert projecten en deadlines.', ['3 rollen', 'Taken en projecten', 'Telefoon en computer']],
+  ['TELEGRAM‑BOT · DEMO', 'Bot van studio Glina', 'De bot toont het rooster, boekt stap voor stap een workshop en beantwoordt veelgestelde vragen. De eigenaar beheert boekingen en teksten in een webbeheeromgeving.', ['Telegram', 'Stap voor stap boeken', 'Webbeheer']],
+  ['WEBSITE MET MEERDERE PAGINA’S · DEMO', 'Yogastudio Lotos', 'Drie pagina’s: een homepage met de sterke punten van de studio, een rooster met prijzen en een contactpagina met aanvraagformulier.', ['Next.js', '3 pagina’s', 'Aanvraagformulier']],
+  ['LANDINGSPAGINA · DEMO', 'Koffiebar Zerno', 'Een site van één pagina: openingsscherm, menu met prijzen, adres en openingstijden, bellen met één tik.', ['Next.js', 'Responsieve weergave', 'De klant bezit de broncode']]
+].forEach(function (x, i) { CASES[i].nl = x; });
 function T() { var t = Object.assign({}, I18N[lang], EXTRA[lang], ACTUAL[lang], AUTOMATION[lang], LOOK[lang]); return t; }
 function render() {
   var t = T();
@@ -662,10 +770,10 @@ function render() {
   var sel = document.getElementById('types'), keep = sel.selectedIndex;
   fill(sel, t.types, function (s) { return el('option', s); }); if (keep > 0) sel.selectedIndex = keep;
 }
-// Each language has its own address (/ru, /en, /zh) with the page already filled in for search engines;
+// Each language has its own address (/ru, /en, /nl, /zh) with the page already filled in for search engines;
 // on the bare address the visitor's own language is chosen here.
-var PAGE_LANG = (location.pathname.match(/^\/(ru|en|zh)\/?$/) || [])[1];
-try { var saved = localStorage.getItem('tpf_lang'); if (PAGE_LANG) lang = PAGE_LANG; else if (I18N[saved]) lang = saved; else if (/^zh/i.test(navigator.language)) lang = 'zh'; else if (!/^(ru|be|uk|kk)/i.test(navigator.language)) lang = 'en'; } catch (e) {}
+var PAGE_LANG = (location.pathname.match(/^\/(ru|en|nl|zh)\/?$/) || [])[1];
+try { var saved = localStorage.getItem('tpf_lang'); if (PAGE_LANG) lang = PAGE_LANG; else if (I18N[saved]) lang = saved; else if (/^zh/i.test(navigator.language)) lang = 'zh'; else if (/^nl/i.test(navigator.language)) lang = 'nl'; else if (!/^(ru|be|uk|kk)/i.test(navigator.language)) lang = 'en'; } catch (e) {}
 render();
 // 'Describe the process' leads to the form with that kind of project already chosen.
 var AUTO_TYPE = 5;
@@ -707,7 +815,7 @@ document.getElementById('form').addEventListener('submit', function (ev) {
   upload().then(function (video) {
     if (file) show(t.sending);
     return fetch('/orders', { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ client_name: name, client_email: email, language: lang, channel: 'site',
+      body: JSON.stringify({ client_name: name, client_email: email, language: lang === 'nl' ? 'en' : lang, channel: 'site',
         request_text: '[' + f.type.value + '] ' + about, video: video, currency: f.currency.value }) }).then(json);
   }).then(function (r) {
       if (r.ok) { f.reset(); show(file ? t.ok_video : t.ok, false, r.d.portal_url); }

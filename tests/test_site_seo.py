@@ -19,14 +19,14 @@ prerender = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(prerender)
 
 
-@pytest.mark.parametrize("name,lang,address", [("root", "ru", "/"), ("ru", "ru", "/ru"), ("en", "en", "/en"), ("zh", "zh-CN", "/zh")])
+@pytest.mark.parametrize("name,lang,address", [("root", "ru", "/"), ("ru", "ru", "/ru"), ("en", "en", "/en"), ("nl", "nl", "/nl"), ("zh", "zh-CN", "/zh")])
 def test_each_language_page_is_filled_in_and_fresh(name, lang, address):
     html = (SITE / f"index.{name}.html").read_text(encoding="utf-8")
     made_from = re.search(r'<meta name="tpf-source" content="([0-9a-f]+)"', html).group(1)
     assert made_from == prerender.source_hash(), "index.html changed: run `python scripts/prerender_site.py`"
     assert f'<html lang="{lang}"' in html
     assert f'<link rel="canonical" href="https://tpf-technology.com{address}">' in html
-    for code in ("ru", "en", "zh-Hans", "x-default"):
+    for code in ("ru", "en", "nl", "zh-Hans", "x-default"):
         assert f'hreflang="{code}"' in html
     title = re.search(r"<title>(.*?)</title>", html).group(1)
     desc = re.search(r'<meta name="description" content="([^"]*)"', html).group(1)
@@ -34,7 +34,7 @@ def test_each_language_page_is_filled_in_and_fresh(name, lang, address):
     assert len(re.findall(r"<h1[ >]", html)) == 1 and re.search(r"<h1>.*?\S.*?</h1>", html, re.S)
     text = re.sub(r"<script.*?</script>|<style.*?</style>|<[^>]+>", " ", html, flags=re.S)
     assert len(text.split()) > 150 if name != "zh" else len(text) > 1500         # the page's text is in the HTML itself
-    assert html.count('class="case"') == 8 and 'href="/en"' in html and 'href="/zh"' in html and 'href="/ru"' in html
+    assert html.count('class="case"') == 8 and 'href="/en"' in html and 'href="/zh"' in html and 'href="/ru"' in html and 'href="/nl"' in html
     ld = json.loads(re.search(r'<script type="application/ld\+json" id="ld">(.*?)</script>', html, re.S).group(1))
     assert ld["@graph"][0]["@type"] == "Organization" and ld["@graph"][0]["description"] == desc.replace("&amp;", "&")
     assert f'<meta property="og:url" content="https://tpf-technology.com{address}">' in html
@@ -50,20 +50,20 @@ def test_site_serves_language_pages_robots_and_sitemap(pool, settings, monkeypat
     get_settings.cache_clear()
     from tpf.api.main import app
     with TestClient(app) as client:
-        for address, lang in (("/", "ru"), ("/ru", "ru"), ("/en", "en"), ("/zh", "zh-CN")):
+        for address, lang in (("/", "ru"), ("/ru", "ru"), ("/en", "en"), ("/nl", "nl"), ("/zh", "zh-CN")):
             page = client.get(address)
             assert page.status_code == 200 and f'<html lang="{lang}"' in page.text
         robots = client.get("/robots.txt").text
         assert "Disallow: /portal/" in robots and "Disallow: /admin" in robots and "Sitemap: https://tpf-technology.com/sitemap.xml" in robots
         sitemap = client.get("/sitemap.xml")
         assert sitemap.headers["content-type"].startswith("application/xml")
-        for address in ("/</loc>", "/ru</loc>", "/en</loc>", "/zh</loc>", "/privacy</loc>"):
+        for address in ("/</loc>", "/ru</loc>", "/en</loc>", "/nl</loc>", "/zh</loc>", "/privacy</loc>"):
             assert "https://tpf-technology.com" + address in sitemap.text
         assert "portal" not in sitemap.text
-        assert sitemap.text.count("<lastmod>") == 5                       # the privacy page is dated too
+        assert sitemap.text.count("<lastmod>") == 6                       # the privacy page is dated too
         for address in ("/", "/en", "/privacy", "/robots.txt", "/sitemap.xml", "/brand.jpg", "/llms.txt"):
             assert client.head(address).status_code == 200, address           # crawlers ask with HEAD first
-        for address in ("/ru/", "/en/", "/zh/", "/privacy/"):
+        for address in ("/ru/", "/en/", "/nl/", "/zh/", "/privacy/"):
             moved = client.get(address, follow_redirects=False)
             assert moved.status_code == 308 and moved.headers["location"] == "https://tpf-technology.com" + address.rstrip("/")
         assert "orders@tpf-technology.com" in client.get("/llms.txt").text
@@ -92,7 +92,7 @@ def test_built_sites_ship_the_search_engine_plumbing_and_the_developer_is_held_t
     assert len(SEO_CRITERIA) == 2
 
 
-@pytest.mark.parametrize("name,choice", [("ru", "Автоматизация процессов"), ("en", "Process automation"), ("zh", "流程自动化")])
+@pytest.mark.parametrize("name,choice", [("ru", "Автоматизация процессов"), ("en", "Process automation"), ("nl", "Procesautomatisering"), ("zh", "流程自动化")])
 def test_the_site_offers_process_automation_and_the_form_can_ask_for_it(name, choice):
     from tpf.agents.analyst import system_prompt
 

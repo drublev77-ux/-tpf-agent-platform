@@ -20,7 +20,7 @@ log = logging.getLogger("tpf.indexnow")
 
 SITE_DIR = Path(__file__).resolve().parent.parent / "site"
 SITE_URL = "https://tpf-technology.com"
-PAGES = ("", "ru", "en", "zh", "privacy")       # the addresses in /sitemap.xml (tests keep the two in step)
+PAGES = ("", "ru", "en", "nl", "zh", "privacy")       # the addresses in /sitemap.xml (tests keep the two in step)
 ENDPOINTS = ("https://yandex.com/indexnow", "https://api.indexnow.org/indexnow")
 EVERY_SEC = 900
 
