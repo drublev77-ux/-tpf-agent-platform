@@ -115,7 +115,12 @@ class Settings(BaseSettings):
     operator_email: str = ""   # escalations and new orders; empty = log only
     # Days of the client's silence after which an order that waits for them gets a reminder; empty = no reminders
     client_reminder_days: str = "2,5"
-    indexnow: bool = True      # the worker reports the studio site's changed pages to Yandex and Bing
+    indexnow: bool = True
+    # Pictures for client sites (tools/imagegen.py): Seedream 5.0 Pro through BytePlus ModelArk; no key = grey placeholders
+    seedream_api_key: str = ""
+    seedream_base_url: str = "https://ark.ap-southeast.bytepluses.com/api/v3"
+    seedream_model: str = "dola-seedream-5-0-pro-260628"
+    image_gen_per_order: int = 30      # pictures drawn for one order, redraws after changed prompts included (~$0.045 each)      # the worker reports the studio site's changed pages to Yandex and Bing
 
     @property
     def reminder_days(self) -> list[float]:

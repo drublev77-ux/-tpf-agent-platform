@@ -7,6 +7,7 @@ from tpf.tools.deploy import Deployment, DeployError
 from tpf.tools.telegram import TelegramError, webhook_secret
 from tpf.tools.shop_pay import NAMES as PAY_NAMES, NOTIFY_PATH, effective_mode
 from tpf.tools.shop_stripe import StripeKeyError
+from tpf.tools.imagegen import with_images
 from tpf.tools.template import BOT_WEBHOOK_PATH, SHOP_WEBHOOK_PATH, all_files, has_database, kind_of
 from tpf.tools.tenantdb import TenantDBError
 
@@ -27,7 +28,9 @@ async def _kind(ctx: Ctx) -> str:
 
 async def _files(ctx: Ctx) -> list[dict[str, str]] | None:
     code = await ctx.orch.latest_artifact(ctx.order_id, "code")
-    return all_files(code["files"], ctx.form_endpoint, await _kind(ctx)) if code else None
+    if not code:
+        return None
+    return all_files(await with_images(ctx, code["files"]), ctx.form_endpoint, await _kind(ctx))
 
 
 async def _database(ctx: Ctx, files: list[dict[str, str]], env: str, project: str) -> str | None:

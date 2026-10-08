@@ -21,6 +21,7 @@ from tpf.orchestrator.states import Ev
 from tpf.tools.deploy import DeployError
 from tpf.tools.sandbox import RunResult
 from tpf.tools.template_caps import CAPS_CRITERIA, SEO_CRITERIA
+from tpf.tools.imagegen import with_images
 from tpf.tools.template import (ROLES_PATH, SCHEMA_PATH, access_of, all_files, capabilities_of, has_database, installable, kind_of, materialize,
                                 route_to_page, uses_accounts)
 from tpf.tools.tenantdb import TenantDBError
@@ -179,7 +180,7 @@ async def _build_on_vercel(ctx: Ctx, files: list[dict[str, str]], version: int, 
     if ctx.deployer is None:
         return RunResult(1, "SANDBOX=vercel needs VERCEL_TOKEN")
     try:
-        dep = await ctx.deployer.deploy(staging_project(ctx.order_id), all_files(files, ctx.form_endpoint, kind), production=False,
+        dep = await ctx.deployer.deploy(staging_project(ctx.order_id), all_files(await with_images(ctx, files), ctx.form_endpoint, kind), production=False,
                                         build_command=VERCEL_BUILD_CMD)
     except DeployError as e:
         if getattr(e, "deployment_id", None) is None:
@@ -304,7 +305,7 @@ async def run(ctx: Ctx) -> Outcome:
     elif ctx.settings.sandbox == "vercel":
         run_result = await _build_on_vercel(ctx, files, version, report, kind, [r["path"] for r in arch["routes"]], cookie, arch)
     else:
-        workdir = materialize(Path(ctx.settings.workspace_root) / f"order-{ctx.order_id}" / f"v{version}", files, ctx.form_endpoint, kind)
+        workdir = materialize(Path(ctx.settings.workspace_root) / f"order-{ctx.order_id}" / f"v{version}", await with_images(ctx, files), ctx.form_endpoint, kind)
         run_result = await ctx.sandbox.run(workdir, BUILD_CMD)
     stage = {0: "ok", 10: "install", 20: "build", 30: "audit", 40: "health", 50: "schema"}.get(run_result.exit_code, "sandbox")
     report["build"] = {

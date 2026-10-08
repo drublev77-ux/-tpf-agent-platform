@@ -2,10 +2,12 @@
 the build configuration below is owned by the platform so a model cannot break it."""
 from __future__ import annotations
 
+import base64
 import json
 import re
 from pathlib import Path
 
+from tpf.tools.imagegen import IMAGES_RULES, PUBLIC_DIR as GEN_DIR
 from tpf.tools.template_extras import (APP_AUTO_REFRESH, APP_FILE_INPUT, APP_FILES, APP_GEO, APP_GEO_FORM, CHAT_RULES, FILES_PATH,
                                        GEO_RULES, UPLOADS_RULES)
 from tpf.tools.template_caps import (APP_AI, APP_MAIL, APP_PDF, APP_PDF_FONT, APP_PLATFORM, APP_SERVICES, APP_SHEETS, APP_TICK,
@@ -869,8 +871,9 @@ def rules_for(kind: str) -> str:
     if kind == "bot":
         return APP_RULES + NOTIFY_RULES + BOT_RULES + SEO_RULES
     if kind == "shop":
-        return APP_RULES + NOTIFY_RULES + SHOP_RULES + PWA_RULES + CONTACT_FORM_RULES + SEO_RULES
-    return ((APP_RULES + NOTIFY_RULES + PWA_RULES + CONTACT_FORM_RULES) if kind == "app" else TEMPLATE_RULES) + " " + SEO_RULES
+        return APP_RULES + NOTIFY_RULES + SHOP_RULES + PWA_RULES + CONTACT_FORM_RULES + SEO_RULES + " " + IMAGES_RULES
+    return (((APP_RULES + NOTIFY_RULES + PWA_RULES + CONTACT_FORM_RULES) if kind == "app" else TEMPLATE_RULES) + " " + SEO_RULES
+            + " " + IMAGES_RULES)
 
 
 def route_to_page(route: str) -> str:
@@ -937,14 +940,18 @@ def materialize(root: Path, files: list[dict[str, str]], form_endpoint: str = ""
         (root / path).parent.mkdir(parents=True, exist_ok=True)
         (root / path).write_text(content, encoding="utf-8")
     for f in files:
-        err = validate_path(f["path"], kind)
+        picture = f.get("encoding") == "base64" and f["path"].startswith(GEN_DIR)   # drawn by the platform
+        err = None if picture else validate_path(f["path"], kind)
         if err:
             raise ValueError(err)
         target = (root / f["path"]).resolve()
         if root.resolve() not in target.parents:
             raise ValueError(f"path escapes workspace: {f['path']}")
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(f["content"], encoding="utf-8")
+        if picture:
+            target.write_bytes(base64.b64decode(f["content"]))
+        else:
+            target.write_text(f["content"], encoding="utf-8")
     return root
 
 

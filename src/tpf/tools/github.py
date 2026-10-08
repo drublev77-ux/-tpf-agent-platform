@@ -1,6 +1,7 @@
 """Optional: publish each delivered order's code to its own private GitHub repository."""
 from __future__ import annotations
 
+import base64
 import tempfile
 from pathlib import Path
 
@@ -32,7 +33,10 @@ class GitHubPublisher:
             for f in files:
                 p = root / f["path"]
                 p.parent.mkdir(parents=True, exist_ok=True)
-                p.write_text(f["content"], encoding="utf-8")
+                if f.get("encoding") == "base64":       # a picture drawn by the platform
+                    p.write_bytes(base64.b64decode(f["content"]))
+                else:
+                    p.write_text(f["content"], encoding="utf-8")
             remote = f"https://x-access-token:{self.token}@github.com/{self.owner}/{repo}.git"
             for cmd in (
                 ["git", "init", "-b", "main"],

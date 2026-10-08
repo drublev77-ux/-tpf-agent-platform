@@ -58,7 +58,8 @@ class VercelDeployer:
             settings |= {"buildCommand": build_command, "installCommand": "npm install --no-audit --no-fund"}
         body = {
             "name": project,
-            "files": [{"file": f["path"], "data": f["content"]} for f in files],
+            "files": [{"file": f["path"], "data": f["content"]} | ({"encoding": "base64"} if f.get("encoding") == "base64" else {})
+                      for f in files],
             "projectSettings": settings,
         }
         if production:

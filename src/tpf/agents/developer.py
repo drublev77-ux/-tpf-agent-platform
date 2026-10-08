@@ -11,6 +11,7 @@ from tpf.llm.gateway import LLMError
 from tpf.orchestrator.states import Ev
 from tpf.tools.shop_payments_ts import PAYMENT_HOSTS
 from tpf.tools.tenantdb import check_schema_sql
+from tpf.tools.imagegen import check_manifest
 from tpf.tools.template_caps import SEO_CONFIG_PATH
 from tpf.tools.template import ACCOUNTS_RULES, ROLES_PATH, access_of, capability_rules, uses_accounts, PWA_CONFIG_PATH, SHOP_HANDLER_PATH, installable, BOT_HANDLER_PATH, MAX_FILE_BYTES, SCHEMA_PATH, has_database, kind_of, route_to_page, rules_for, validate_path
 
@@ -291,7 +292,8 @@ async def run(ctx: Ctx) -> Outcome:
                 "files": [{"path": p, "content": c} for p, c in files.items()]}, "developer")
             continue
         result = [{"path": p, "content": c} for p, c in files.items()]
-        problems = check_files(result, routes, kind) + (check_accounts(result, arch) if uses_accounts(arch) else [])
+        problems = (check_files(result, routes, kind) + (check_accounts(result, arch) if uses_accounts(arch) else [])
+                    + (check_manifest(result) if kind != "bot" else []))
         if not problems:
             await ctx.orch.save_artifact(ctx.order_id, "code", {"files": result}, "developer")
             await ctx.orch.log(ctx.order_id, "code_written", "developer",

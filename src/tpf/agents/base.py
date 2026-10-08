@@ -39,6 +39,7 @@ class Ctx:
     telegram: Any = None   # tpf.tools.telegram.TelegramAPI
     shop_stripe: Any = None  # tpf.tools.shop_stripe.ShopStripe
     screens: Any = None    # tpf.tools.screens.Screenshooter, or None when the worker has no browser
+    images: Any = None     # tpf.tools.imagegen.ImageModel, or None: pictures are grey placeholders
 
     @property
     def order_id(self) -> int:
