@@ -65,6 +65,35 @@ async def test_a_waiting_order_is_reminded_on_its_days_and_no_more(env):
     assert not [e for e in await env.orch.events(fresh) if e["name"] == "client_reminder"]
 
 
+class Refusing(Recorder):
+    """A mail service that refuses every letter, as Brevo does to an address it was not told about."""
+
+    async def to_client(self, order, text):
+        raise RuntimeError("brevo 401: unrecognised IP address")
+
+
+async def test_a_reminder_the_mail_service_refused_is_not_counted_and_is_tried_again(env):
+    oid = await _waiting_order(env, 2.1)
+    env.orch.notifier = Refusing()
+    shown = len(await env.orch.messages(oid))
+
+    assert await reminders.remind_due(env.orch) == []                        # nobody was reminded…
+    assert len(await env.orch.messages(oid)) == shown                        # …and the order page does not claim otherwise
+    failed = [e["data"] for e in await env.orch.events(oid) if e["name"] == "client_reminder_failed"]
+    assert len(failed) == 1 and failed[0]["number"] == 1 and "401" in failed[0]["error"]
+
+    env.orch.notifier = sent = Recorder()
+    assert await reminders.remind_due(env.orch) == []                        # not every half hour: the next try is a day later
+    await env.pool.execute("ALTER TABLE events DISABLE TRIGGER events_no_update")
+    await env.pool.execute("UPDATE events SET created_at = now() - interval '25 hours' WHERE name LIKE 'client_reminder%'")
+    await env.pool.execute("ALTER TABLE events ENABLE TRIGGER events_no_update")
+    assert await reminders.remind_due(env.orch) == [oid]
+    assert "last reminder" not in sent.client[0][1] and "Это последнее" not in sent.client[0][1]   # still the first of two
+    assert (await env.orch.messages(oid))[-1]["text"] == sent.client[0][1]
+    journal = [e["data"]["number"] for e in await env.orch.events(oid) if e["name"] == "client_reminder"]
+    assert journal == [1, 1]
+
+
 async def test_reminders_leave_alone_what_does_not_wait_for_the_client(env):
     env.orch.notifier = sent = Recorder()
     answered = await _waiting_order(env, 3)
