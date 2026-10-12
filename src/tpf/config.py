@@ -111,6 +111,10 @@ class Settings(BaseSettings):
     email_api_key: str = ""
     email_from: str = ""       # "TPF Technology <orders@your-domain>" — the domain must be verified
     email_reply_to: str = ""
+    # A second provider tried when the first refuses a letter (a lapsed key, an IP allowlist, an outage): off | resend | brevo
+    email_fallback_provider: str = "off"
+    email_fallback_api_key: str = ""
+    email_fallback_from: str = ""   # empty = EMAIL_FROM; the domain must be verified with this provider too
     intake_hourly_limit: int = 20  # new orders per hour across all channels
     operator_email: str = ""   # escalations and new orders; empty = log only
     # Days of the client's silence after which an order that waits for them gets a reminder; empty = no reminders

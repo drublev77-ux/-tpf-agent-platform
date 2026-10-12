@@ -117,6 +117,45 @@ async def test_provider_errors_surface():
         await EmailNotifier(_settings(), http).to_client(ORDER, "hi")
 
 
+async def test_fallback_provider_sends_what_the_main_one_refuses():
+    sent: list[httpx.Request] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        sent.append(req)
+        if "brevo" in str(req.url):
+            return httpx.Response(401, json={"message": "unrecognised IP address 208.77.244.169"})
+        return httpx.Response(200, json={"id": "msg_1"})
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    s = _settings(email_provider="brevo", email_api_key="xkeysib",
+                  email_fallback_provider="resend", email_fallback_api_key="re_backup")
+    await EmailNotifier(s, http).to_client(ORDER, "Напоминание")
+    assert [str(r.url) for r in sent] == ["https://api.brevo.com/v3/smtp/email", "https://api.resend.com/emails"]
+    body = json.loads(sent[1].content)
+    assert sent[1].headers["authorization"] == "Bearer re_backup"
+    assert body["from"] == "TPF Technology <orders@tpf.tech>" and body["to"] == ["anna@example.com"]
+    assert body["reply_to"] == "hello@tpf.tech"
+
+
+async def test_every_refusal_is_reported_when_all_providers_fail():
+    http = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(401, json={"message": "nope"})))
+    s = _settings(email_provider="brevo", email_api_key="xkeysib",
+                  email_fallback_provider="resend", email_fallback_api_key="re_backup")
+    with pytest.raises(RuntimeError, match=r"brevo 401.*\| resend 401"):
+        await EmailNotifier(s, http).to_client(ORDER, "hi")
+
+
+async def test_no_fallback_without_its_key():
+    sent: list[httpx.Request] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        sent.append(req)
+        return httpx.Response(401, json={"message": "nope"})
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    with pytest.raises(RuntimeError, match="brevo 401"):
+        await EmailNotifier(_settings(email_provider="brevo", email_fallback_provider="resend"), http).to_client(ORDER, "hi")
+    assert len(sent) == 1
+
+
 def test_notifier_selection_and_links():
     assert isinstance(make_notifier(_settings()), EmailNotifier)
     assert not isinstance(make_notifier(_settings(email_api_key="")), EmailNotifier)

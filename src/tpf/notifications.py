@@ -173,32 +173,56 @@ class EmailNotifier:
         self.s = settings
         self._client = client
 
+    def _providers(self) -> list[tuple[str, str, str]]:
+        """(provider, API key, sender) in the order they are tried: the main one, then the fallback if it is set."""
+        s = self.s
+        out = [(s.email_provider, s.email_api_key, s.email_from)]
+        if s.email_fallback_provider in ("resend", "brevo") and s.email_fallback_api_key:
+            out.append((s.email_fallback_provider, s.email_fallback_api_key, s.email_fallback_from or s.email_from))
+        return out
+
     async def send(self, to: str, subject: str, text: str, html: str, *, sender_name: str = "", reply_to: str = "") -> None:
         """`sender_name` and `reply_to` are for mail sent on behalf of a client's application: the address stays
-        ours (the only one the provider has verified), the name and the reply address are theirs."""
-        s = self.s
-        name, addr = parseaddr(s.email_from)
-        name = sender_name or name
-        reply = reply_to or s.email_reply_to
-        if s.email_provider == "resend":
-            url, headers = "https://api.resend.com/emails", {"Authorization": f"Bearer {s.email_api_key}"}
-            body: dict[str, Any] = {"from": formataddr((name, addr)) if sender_name else s.email_from, "to": [to], "subject": subject, "text": text, "html": html}
-            if reply:
-                body["reply_to"] = reply
-        else:  # brevo
-            url, headers = "https://api.brevo.com/v3/smtp/email", {"api-key": s.email_api_key}
-            body = {"sender": {"email": addr, "name": name or "TPF Technology"}, "to": [{"email": to}],
-                    "subject": subject, "textContent": text, "htmlContent": html}
-            if reply:
-                body["replyTo"] = {"email": reply}
+        ours (the only one the provider has verified), the name and the reply address are theirs.
+        A letter the main provider refuses (a lapsed key, an IP allowlist, an outage) goes through the fallback
+        provider when one is set; the error is raised only when every provider has refused, and names them all."""
+        errors: list[str] = []
         client = self._client or httpx.AsyncClient(timeout=20)
         try:
-            r = await client.post(url, json=body, headers=headers)
-            if r.status_code >= 400:
-                raise RuntimeError(f"{s.email_provider} {r.status_code}: {r.text[:300]}")
+            for provider, key, sender in self._providers():
+                try:
+                    await self._post(client, provider, key, sender, to, subject, text, html,
+                                     sender_name=sender_name, reply_to=reply_to or self.s.email_reply_to)
+                except (RuntimeError, httpx.HTTPError) as e:
+                    errors.append(str(e) or f"{provider} {type(e).__name__}")
+                    continue
+                if errors:
+                    log.warning("mail to %s went through %s after: %s", to, provider, " | ".join(errors))
+                return
         finally:
             if self._client is None:
                 await client.aclose()
+        raise RuntimeError(" | ".join(errors))
+
+    @staticmethod
+    async def _post(client: httpx.AsyncClient, provider: str, key: str, sender: str, to: str, subject: str,
+                    text: str, html: str, *, sender_name: str, reply_to: str) -> None:
+        name, addr = parseaddr(sender)
+        name = sender_name or name
+        if provider == "resend":
+            url, headers = "https://api.resend.com/emails", {"Authorization": f"Bearer {key}"}
+            body: dict[str, Any] = {"from": formataddr((name, addr)) if sender_name else sender, "to": [to], "subject": subject, "text": text, "html": html}
+            if reply_to:
+                body["reply_to"] = reply_to
+        else:  # brevo
+            url, headers = "https://api.brevo.com/v3/smtp/email", {"api-key": key}
+            body = {"sender": {"email": addr, "name": name or "TPF Technology"}, "to": [{"email": to}],
+                    "subject": subject, "textContent": text, "htmlContent": html}
+            if reply_to:
+                body["replyTo"] = {"email": reply_to}
+        r = await client.post(url, json=body, headers=headers)
+        if r.status_code >= 400:
+            raise RuntimeError(f"{provider} {r.status_code}: {r.text[:300]}")
 
     async def to_client(self, order: dict[str, Any], text: str) -> None:
         lang = order.get("language") or "en"
