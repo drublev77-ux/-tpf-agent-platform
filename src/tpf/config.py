@@ -49,14 +49,17 @@ class Settings(BaseSettings):
     # bot with booking ~$2,500) and converted at 1 EUR = 1.117 USD when the studio began charging in euros.
     # Sites: lowered on 7 October 2026 by the owner's decision. Published Polish prices put a landing at
     # 800-3,000 PLN; 16 hours at 28 is 448 EUR (~1,960 PLN), 20% under the middle of that range.
-    hourly_rate_site: float = 28.0
+    # Raised on 13 October 2026 by the owner's decision, for the international market: freelancers there ask
+    # EUR 800-3,000 for a business site, agencies EUR 2,000-8,000. 16 hours at 44 is 704 EUR, a multi-page site
+    # of 20 hours is 880 EUR; the site shows them as "from 700" and "from 880".
+    hourly_rate_site: float = 44.0
     hourly_rate_app: float = 63.0
     hourly_rate_bot: float = 45.0
     hourly_rate_shop: float = 33.0     # small shop ~$3,000 on the market; a shop takes about 65 hours
 
     # Orders in Russian are priced against the Russian-speaking market, which is cheaper: landing ~60 000 RUB,
     # simple bot ~65 000 RUB, bot with booking ~140 000 RUB, small application ~200 000 RUB (EUR at ~93 RUB).
-    hourly_rate_ru_site: float = 28.0  # the same as everywhere: the owner set one site rate for all languages
+    hourly_rate_ru_site: float = 44.0  # the same as everywhere: the owner set one site rate for all languages
     hourly_rate_ru_app: float = 50.0
     hourly_rate_ru_bot: float = 30.0
     hourly_rate_ru_shop: float = 26.0  # small shop ~200 000 RUB

@@ -40,7 +40,7 @@ def test_each_language_page_is_filled_in_and_fresh(name, lang, address):
     assert f'<meta property="og:url" content="https://tpf-technology.com{address}">' in html
     assert '<meta property="og:image" content="https://tpf-technology.com/brand.jpg">' in html
     offers = ld["@graph"][0]["hasOfferCatalog"]["itemListElement"]      # the services and "from" prices the page shows
-    assert len(offers) == 8 and [o["priceSpecification"]["minPrice"] for o in offers[:2]] == [448, 560]
+    assert len(offers) == 8 and [o["priceSpecification"]["minPrice"] for o in offers[:2]] == [700, 880]
     assert all(o["priceSpecification"]["priceCurrency"] == "EUR" and o["itemOffered"]["name"] for o in offers)
     assert 'rel="preload" as="image" href="/brand-hero.jpg"' in html and 'fetchpriority="high"' in html
 
