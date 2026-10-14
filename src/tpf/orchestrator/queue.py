@@ -48,9 +48,11 @@ async def extend(pool: asyncpg.Pool, task_id: int, lease_sec: int) -> bool:
 
 
 async def release(pool: asyncpg.Pool, task_ids: list[int]) -> None:
-    """Hand running tasks back to the queue now, without waiting for their leases to run out."""
+    """Hand running tasks back to the queue now, without waiting for their leases to run out. The run was
+    interrupted on purpose (a redeploy), so it does not count as an attempt."""
     await pool.execute(
-        "UPDATE tasks SET locked_until = now() WHERE id = ANY($1::bigint[]) AND status = 'running'", task_ids)
+        "UPDATE tasks SET locked_until = now(), attempts = greatest(attempts - 1, 0) "
+        "WHERE id = ANY($1::bigint[]) AND status = 'running'", task_ids)
 
 
 async def mark_done(conn: asyncpg.Connection, task_id: int, result: dict[str, Any] | None) -> None:

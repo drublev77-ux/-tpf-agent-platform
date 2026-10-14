@@ -72,3 +72,29 @@ async def test_a_stopping_worker_hands_its_task_back_at_once(env, monkeypatch):
     await queue.release(env.pool, [task_id])
     await env.drain()
     assert State((await env.orch.get_order(oid))["state"]) is State.AWAITING_ESTIMATE
+
+
+async def test_a_task_that_keeps_killing_its_worker_is_escalated_instead_of_run_again(env, monkeypatch):
+    runs = []
+
+    async def deadly_analyst(ctx):
+        runs.append(ctx.order_id)
+        return Outcome(Ev.CLARIFICATION_NEEDED, details="- ?")
+
+    monkeypatch.setitem(HANDLERS, "analyst", deadly_analyst)
+    oid = await _order(env)
+    # three workers took the task and were killed under it (out of memory): no error, no result, only the lease ran out
+    await env.pool.execute("UPDATE tasks SET status = 'running', attempts = $2, locked_until = now() - interval '1 second' "
+                           "WHERE order_id = $1", oid, env.settings.task_max_retries)
+    assert await env.worker.run_once() is True
+    assert runs == []                                      # the fourth worker does not run it again
+    assert State((await env.orch.get_order(oid))["state"]) is State.PAUSED
+    assert await env.pool.fetchval("SELECT status FROM tasks WHERE order_id = $1 AND kind = 'analyst'", oid) == "failed"
+
+
+async def test_a_task_handed_back_on_shutdown_does_not_use_up_an_attempt(env):
+    oid = await _order(env)
+    claimed = await queue.claim(env.pool, 60)
+    await queue.release(env.pool, [claimed["id"]])         # a redeploy, not a failure
+    again = await queue.claim(env.pool, 60)
+    assert again["id"] == claimed["id"] and again["attempts"] == 1

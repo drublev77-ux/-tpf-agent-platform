@@ -64,6 +64,14 @@ class Worker:
                 await queue.mark_failed(conn, task["id"], f"stale task: order is {order['state']}")
             return True
 
+        if task["attempts"] > self.settings.task_max_retries:
+            # Every earlier run ended without a result or an error: the worker process itself died under it (out
+            # of memory, a crash in native code). Running it again would only kill the next worker too.
+            await self.orch.escalate(
+                order["id"], f"Задача {task['kind']} роняет рабочий процесс: {task['attempts'] - 1} запуска(ов) "
+                f"оборвались без ответа (вероятно, нехватка памяти)", actor=task["kind"], failed_task=task["id"])
+            return True
+
         handler = HANDLERS[task["kind"]]
         ctx = Ctx(self.orch, self.llm, self.settings, self.sandbox, self.deployer, self.github, order,
                   payments=self.payments, payload=task["payload"] or {}, tenant_db=self.tenant_db, telegram=self.telegram,

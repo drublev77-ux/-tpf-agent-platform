@@ -1,19 +1,22 @@
 """What a worker can get out of a client's video without watching it: still frames across its length and
-the words spoken in it. ffmpeg cuts the frames; the speech is recognised on the worker itself."""
+the words spoken in it. ffmpeg cuts the frames; the speech is recognised in a child process."""
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
 import shutil
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from tpf.tools import speech
 
 log = logging.getLogger("tpf.video")
 
 MAX_SECONDS = 300          # only the first five minutes are looked at
 MAX_FRAMES = 16
-SPEECH_MODEL = "small"
+SPEECH_CMD = [sys.executable, "-m", "tpf.tools.speech"]
 
 
 class VideoError(RuntimeError):
@@ -38,20 +41,25 @@ async def _run(*cmd: str, timeout: int = 180) -> tuple[int, bytes, bytes]:
     return proc.returncode or 0, out, err
 
 
-def _transcribe(wav: str, language: str | None = None) -> str:
-    import wave
-
-    import numpy as np
-    from faster_whisper import WhisperModel      # heavy: loaded only when a video actually arrives
-
-    # ffmpeg has already written 16 kHz mono 16-bit sound; handing the samples over directly keeps the
-    # recogniser's own audio decoder (and its version quirks) out of the way.
-    with wave.open(wav, "rb") as w:
-        audio = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768.0
-    model = WhisperModel(SPEECH_MODEL, device="cpu", compute_type="int8")
-    # The language of the order form is a strong hint; without one a short or noisy clip is easily misheard.
-    segments, _ = model.transcribe(audio, vad_filter=True, beam_size=5, language=language)
-    return " ".join(s.text.strip() for s in segments).strip()
+async def _transcribe(wav: str, language: str | None = None, timeout: int = 900) -> tuple[str, str]:
+    """(words, why there are none). The recogniser runs as a separate process (see tpf.tools.speech): if it
+    runs out of memory, only it dies, not the worker."""
+    cmd = [*SPEECH_CMD, wav] + ([language] if language else [])
+    proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    try:
+        out, err = await asyncio.wait_for(proc.communicate(), timeout)
+    except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
+        return "", "speech recognition took too long"
+    if proc.returncode == speech.NOT_INSTALLED:
+        return "", "speech recognition is not installed on this worker"
+    if proc.returncode != 0:
+        log.warning("speech recognition exited with %s: %s", proc.returncode, err.decode("utf-8", "replace")[-500:])
+        if proc.returncode < 0:
+            return "", f"speech recognition was stopped by signal {-proc.returncode} (likely out of memory)"
+        return "", f"speech recognition failed (exit {proc.returncode})"
+    return out.decode("utf-8", "replace").strip(), ""
 
 
 async def watch(path: Path, workdir: Path, language: str | None = None) -> Watched:
@@ -89,13 +97,7 @@ async def watch(path: Path, workdir: Path, language: str | None = None) -> Watch
     if code != 0 or not wav.exists():
         watched.speech_note = "the sound could not be read"
         return watched
-    try:
-        watched.speech = (await asyncio.wait_for(asyncio.to_thread(_transcribe, str(wav), language), 900))[:12000]
-        if not watched.speech:
-            watched.speech_note = "nobody speaks in the video"
-    except ImportError:
-        watched.speech_note = "speech recognition is not installed on this worker"
-    except Exception as e:  # noqa: BLE001 — frames alone still tell a lot
-        log.exception("speech recognition failed")
-        watched.speech_note = f"speech recognition failed ({type(e).__name__})"
+    text, note = await _transcribe(str(wav), language)     # frames alone still tell a lot when this fails
+    watched.speech = text[:12000]
+    watched.speech_note = note or ("" if watched.speech else "nobody speaks in the video")
     return watched
