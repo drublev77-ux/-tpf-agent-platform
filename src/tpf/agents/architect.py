@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from tpf.agents.base import SAFETY_NOTE, Ctx, Outcome
+from tpf.agents.base import SAFETY_NOTE, Ctx, Outcome, reference_note
 from tpf.agents.reviewer import review
 from tpf.orchestrator.states import Ev
 from tpf.tools.template_caps import CAPS_DESIGN as _CAPS_DESIGN
@@ -217,7 +217,8 @@ async def run(ctx: Ctx) -> Outcome:
                 + ([f"The design covers the spec's capabilities ({', '.join(extras)}) with the tables, routes and screens the platform "
                     "rules for them describe: " + "; ".join(CAPS_DESIGN[c] for c in extras)] if extras else [])
                 + (BOT_CRITERIA if kind == "bot" else []) + (SHOP_CRITERIA if kind == "shop" else []))
-    base = f"Approved spec:\n{json.dumps(spec, ensure_ascii=False, indent=2)}\n\nDesign the site for this spec."
+    reference = reference_note(await ctx.orch.latest_artifact(ctx.order_id, "reference"))
+    base = f"Approved spec:\n{json.dumps(spec, ensure_ascii=False, indent=2)}\n\n{reference}Design the site for this spec."
     issues: list[str] = []
     for _ in range(ctx.settings.max_review_rounds + 1):
         prompt = base + ("\n\nFix these reviewer issues:\n" + "\n".join(f"- {i}" for i in issues) if issues else "")

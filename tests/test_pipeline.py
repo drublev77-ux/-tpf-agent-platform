@@ -156,3 +156,25 @@ async def test_order_with_video_starts_the_analyst_only_after_the_video_task(env
     assert await state(env, order["id"]) is State.AWAITING_ESTIMATE
     history = await env.orch.messages(order["id"])
     assert any("Нужен лендинг кофейни" in m["text"] for m in history)
+
+
+async def test_a_reference_product_reaches_the_architect_and_the_developer(env):
+    # order 19: the owner had a working app of the same kind and wanted the order built on its model
+    oid, _ = await new_order(env)
+    await env.drain()
+    await env.orch.save_artifact(oid, "reference", {
+        "name": "Brigada", "url": "https://brigada.example", "summary": "Tables: projects(code, title, address)"}, "operator")
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    prompts = {agent: p for agent, p in env.llm.prompts if agent in ("architect", "developer")}
+    for agent in ("architect", "developer"):
+        assert "Reference product" in prompts[agent] and "projects(code, title, address)" in prompts[agent]
+        assert "https://brigada.example" in prompts[agent]
+
+
+async def test_without_a_reference_the_prompts_do_not_mention_one(env):
+    oid, _ = await new_order(env)
+    await env.drain()
+    await env.orch.fire(oid, Ev.ESTIMATE_APPROVED, actor="client")
+    await env.drain()
+    assert not any("Reference product" in p for _, p in env.llm.prompts)

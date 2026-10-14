@@ -6,7 +6,7 @@ import json
 import re
 from typing import Any
 
-from tpf.agents.base import SAFETY_NOTE, Ctx, Outcome
+from tpf.agents.base import SAFETY_NOTE, Ctx, Outcome, reference_note
 from tpf.llm.gateway import LLMError
 from tpf.orchestrator.states import Ev
 from tpf.tools.shop_payments_ts import PAYMENT_HOSTS
@@ -222,6 +222,7 @@ async def run(ctx: Ctx) -> Outcome:
     base = (
         f"Spec:\n{json.dumps(spec, ensure_ascii=False, indent=2)}\n\n"
         f"Architecture:\n{json.dumps(arch, ensure_ascii=False, indent=2)}\n\n"
+        + reference_note(await ctx.orch.latest_artifact(ctx.order_id, "reference"))
     )
     files: dict[str, str] = {f["path"]: f["content"] for f in (previous or {}).get("files", [])}
     changing = bool(files)                    # a fix or a client change request, not a first version
