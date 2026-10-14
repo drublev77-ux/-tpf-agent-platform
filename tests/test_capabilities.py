@@ -218,3 +218,11 @@ def test_without_the_providers_key_the_web_side_asks_through_a_worker(client, mo
     monkeypatch.setattr(apps, "WORKER_WAIT_SEC", 0.8)
     assert client.post(f"/apps/{oid}/ai", json={"prompt": "Вопрос"}, headers={"x-tpf-app": app_key(SECRET)}).json() == {"ok": False, "error": "failed"}
     assert client.portal.call(orch.pool.fetchval, "SELECT count(*) FROM app_ai_requests") == 0
+
+
+def test_the_reviewer_knows_the_order_page_webhook_is_free_as_the_analyst_does():
+    # order 19: the analyst mentioned the built-in webhook, the reviewer took it for an undeclared outside service
+    from tpf.agents import analyst
+    assert "n8n" in analyst.SCOPE_AUTOMATION and "no work in the estimate" in analyst.SCOPE_AUTOMATION
+    webhook = [c for c in analyst.REVIEW_CRITERIA if "n8n" in c]
+    assert webhook and "without 'integrations'" in webhook[0] and "without estimate hours" in webhook[0]

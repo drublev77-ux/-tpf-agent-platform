@@ -262,12 +262,22 @@ def system_prompt(apps_enabled: bool) -> str:
     )
 
 
+# Every delivered product can send its new records to a webhook the client sets on the order page (tpf.tools.hooks).
+# The analyst is told it costs nothing; the reviewer has to know it too, or it reads a mention of it as an outside
+# service missing from capabilities and the estimate, and rejects the spec until the order pauses (order 19).
+ORDER_PAGE_WEBHOOK = (
+    "The webhook the client sets on the order page, which sends each new request, booking or order to the client's "
+    "own n8n, Zapier, Make or CRM, is built into every delivered product: a spec may mention it in features or "
+    "assumptions without 'integrations' in capabilities and without estimate hours, and it is not an outside service "
+    "for out_of_scope either; do not raise it as an issue")
+
 REVIEW_CRITERIA = [
     "Every page has a purpose and concrete sections; nothing essential from the client's request is missing",
     "The spec fits what the studio builds: a static website (product_type 'site', its only dynamic feature a contact form), a web application (product_type 'app') with a database and an owner-only admin area, a rule-based Telegram bot (product_type 'bot') with a database and a web admin area, or an online shop (product_type 'shop') with card payments through the owner's own payment provider account; no self-registration of visitors, and no payments outside a shop; file uploads, chat and clocking in by location appear only in an 'app' with user_roles and are listed in capabilities; documents and Excel, e-mail from the application, scheduled work, AI features and outside services appear only in an 'app' and only when listed in capabilities, each within the limits the studio states (for 'integrations' every service is named with what is sent or read, and the assumptions say the client checks it on the review version; for 'ai' the assumptions say a person confirms the model's answers); people sign in only in an 'app' whose user_roles lists every role with what it sees and may do",
     "product_type is 'app' only if the client needs data stored or managed and 'bot' only if the client asked for a Telegram bot and 'shop' only if the client sells online; for an app or a bot, every kind of record has its fields and the owner's actions on it described; for a bot, every command and dialog is described step by step",
     "Acceptance criteria are specific and checkable by looking at the site or by talking to the bot",
     "Assumptions are stated where the client did not decide",
+    ORDER_PAGE_WEBHOOK,
     "client_content contains only facts found in the client conversation; every other fact the site needs is in missing_content",
     "The estimate covers every page and feature and its hours are plausible for the scope",
 ]
