@@ -147,6 +147,22 @@ async def test_changed_pages_are_reported_once_the_site_serves_them(pool):
         assert len(await indexnow.submit(pool, http)) == 2
 
 
+async def test_a_refused_report_says_why(pool, caplog):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(200, text=f'<meta name="tpf-source" content="{indexnow.source_hash()}">')
+        if request.url.host == "yandex.com":
+            raise httpx.RemoteProtocolError("Server disconnected without sending a response.")
+        return httpx.Response(302, headers={"location": "https://example.org/showcaptcha"})
+    caplog.set_level("WARNING", logger="tpf.indexnow")
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler), follow_redirects=True) as http:
+        assert await indexnow.submit(pool, http) == []
+    lines = [r.getMessage() for r in caplog.records]
+    assert any("yandex.com/indexnow answered 0 (RemoteProtocolError: Server disconnected" in line for line in lines)
+    assert any("api.indexnow.org/indexnow answered 302 -> https://example.org/showcaptcha" in line for line in lines)
+    assert await pool.fetchval("SELECT count(*) FROM app_settings WHERE key LIKE 'indexnow:%'") == 0
+
+
 def test_the_reported_pages_are_the_sitemap_and_the_key_is_served(pool, settings, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", settings.database_url)
     get_settings.cache_clear()

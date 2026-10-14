@@ -74,11 +74,13 @@ async def submit(pool: asyncpg.Pool, client: httpx.AsyncClient | None = None) ->
             return []
         body = {"host": SITE_URL.split("//")[1], "key": k, "keyLocation": f"{SITE_URL}/indexnow-{k}.txt", "urlList": urls()}
         for endpoint in pending:
-            try:
-                reply = await client.post(endpoint, json=body, headers={"content-type": "application/json; charset=utf-8"})
+            failure = ""
+            try:                            # a redirect is the engine's answer (a captcha, a moved address), not a page to follow
+                reply = await client.post(endpoint, json=body, headers={"content-type": "application/json; charset=utf-8"},
+                                          follow_redirects=False)
                 status = reply.status_code
-            except httpx.HTTPError:
-                status = 0
+            except httpx.HTTPError as exc:  # say what broke: "answered 0" alone does not tell a timeout from a reset
+                status, failure = 0, f" ({type(exc).__name__}: {exc})"[:300]
             if status in (200, 202):        # 202: accepted, the key file is still being checked
                 await pool.execute(
                     "INSERT INTO app_settings (key, value) VALUES ($1, $2) "
@@ -86,7 +88,8 @@ async def submit(pool: asyncpg.Pool, client: httpx.AsyncClient | None = None) ->
                 accepted.append(endpoint)
                 log.info("indexnow: %s accepted %s pages (site version %s)", endpoint, len(body["urlList"]), v)
             else:
-                log.warning("indexnow: %s answered %s", endpoint, status)
+                where = reply.headers.get("location", "") if status and 300 <= status < 400 else ""
+                log.warning("indexnow: %s answered %s%s%s", endpoint, status, failure, f" -> {where}" if where else "")
     finally:
         if own:
             await client.aclose()
