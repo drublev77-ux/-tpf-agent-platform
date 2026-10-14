@@ -130,8 +130,9 @@ async def test_changed_pages_are_reported_once_the_site_serves_them(pool):
     seen: list = []
     async with _engines("0" * 16, {}, seen) as http:                    # the site still serves the previous version
         assert await indexnow.submit(pool, http) == [] and seen == []
-    async with _engines(indexnow.source_hash(), {"yandex.com": 202, "api.indexnow.org": 429}, seen) as http:
-        assert await indexnow.submit(pool, http) == ["https://yandex.com/indexnow"]
+    assert indexnow.ENDPOINTS == ("https://api.indexnow.org/indexnow",)     # it shares every report with Yandex and Bing
+    async with _engines(indexnow.source_hash(), {"api.indexnow.org": 429}, seen) as http:
+        assert await indexnow.submit(pool, http) == []                    # refused: asked again on the next round
     assert [url for url, _ in seen] == list(indexnow.ENDPOINTS)
     body = seen[0][1]
     assert body["host"] == "tpf-technology.com" and body["key"] == indexnow.key()
@@ -139,26 +140,29 @@ async def test_changed_pages_are_reported_once_the_site_serves_them(pool):
     assert body["urlList"][0] == "https://tpf-technology.com/" and "https://tpf-technology.com/en" in body["urlList"]
     seen.clear()
     async with _engines(indexnow.source_hash(), {}, seen) as http:
-        assert await indexnow.submit(pool, http) == ["https://api.indexnow.org/indexnow"]   # only the one that refused
-        assert await indexnow.submit(pool, http) == []                                      # and then nobody, until the site changes
+        assert await indexnow.submit(pool, http) == ["https://api.indexnow.org/indexnow"]
+        assert await indexnow.submit(pool, http) == []                    # and then nobody, until the site changes
     assert len(seen) == 1
     await pool.execute("UPDATE app_settings SET value = 'an-earlier-version' WHERE key LIKE 'indexnow:%'")
     async with _engines(indexnow.source_hash(), {}, seen) as http:
-        assert len(await indexnow.submit(pool, http)) == 2
+        assert len(await indexnow.submit(pool, http)) == 1
 
 
 async def test_a_refused_report_says_why(pool, caplog):
     def handler(request: httpx.Request) -> httpx.Response:
         if request.method == "GET":
             return httpx.Response(200, text=f'<meta name="tpf-source" content="{indexnow.source_hash()}">')
-        if request.url.host == "yandex.com":
+        if not answers:
             raise httpx.RemoteProtocolError("Server disconnected without sending a response.")
         return httpx.Response(302, headers={"location": "https://example.org/showcaptcha"})
     caplog.set_level("WARNING", logger="tpf.indexnow")
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler), follow_redirects=True) as http:
+        answers: list = []
+        assert await indexnow.submit(pool, http) == []
+        answers.append("redirect")
         assert await indexnow.submit(pool, http) == []
     lines = [r.getMessage() for r in caplog.records]
-    assert any("yandex.com/indexnow answered 0 (RemoteProtocolError: Server disconnected" in line for line in lines)
+    assert any("api.indexnow.org/indexnow answered 0 (RemoteProtocolError: Server disconnected" in line for line in lines)
     assert any("api.indexnow.org/indexnow answered 302 -> https://example.org/showcaptcha" in line for line in lines)
     assert await pool.fetchval("SELECT count(*) FROM app_settings WHERE key LIKE 'indexnow:%'") == 0
 

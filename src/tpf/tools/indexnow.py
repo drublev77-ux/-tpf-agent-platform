@@ -21,7 +21,9 @@ log = logging.getLogger("tpf.indexnow")
 SITE_DIR = Path(__file__).resolve().parent.parent / "site"
 SITE_URL = "https://tpf-technology.com"
 PAGES = ("", "ru", "en", "nl", "zh", "privacy")       # the addresses in /sitemap.xml (tests keep the two in step)
-ENDPOINTS = ("https://yandex.com/indexnow", "https://api.indexnow.org/indexnow")
+# The shared endpoint passes every report on to all IndexNow engines, Yandex included. Yandex's own endpoint was
+# dropped on 2026-10-14: since 2026-10-13 it closes the connection from the worker without answering.
+ENDPOINTS = ("https://api.indexnow.org/indexnow",)
 EVERY_SEC = 900
 
 
