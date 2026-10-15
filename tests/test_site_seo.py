@@ -39,6 +39,10 @@ def test_each_language_page_is_filled_in_and_fresh(name, lang, address):
     assert ld["@graph"][0]["@type"] == "Organization" and ld["@graph"][0]["description"] == desc.replace("&amp;", "&")
     assert f'<meta property="og:url" content="https://tpf-technology.com{address}">' in html
     assert '<meta property="og:image" content="https://tpf-technology.com/brand.jpg">' in html
+    faq = next(g for g in ld["@graph"] if g["@type"] == "FAQPage")        # the questions block, readable by search engines
+    assert len(faq["mainEntity"]) == 7 and html.count("<details>") == 7 and 'id="faq"' in html
+    assert all(q["acceptedAnswer"]["text"] and "{" not in q["acceptedAnswer"]["text"] for q in faq["mainEntity"])
+    assert re.sub(r"\D", "", ld["@graph"][0]["hasOfferCatalog"]["itemListElement"][0]["priceSpecification"]["minPrice"].__str__()) in re.sub(r"\D", "", faq["mainEntity"][0]["acceptedAnswer"]["text"])
     offers = ld["@graph"][0]["hasOfferCatalog"]["itemListElement"]      # the services and "from" prices the page shows
     assert len(offers) == 8 and [o["priceSpecification"]["minPrice"] for o in offers[:2]] == [700, 880]
     assert all(o["priceSpecification"]["priceCurrency"] == "EUR" and o["itemOffered"]["name"] for o in offers)
