@@ -80,6 +80,11 @@ def main() -> None:
         browser.close()
     server.shutdown()
     (SITE / "lastmod.txt").write_text(date.today().isoformat() + "\n")       # the sitemap's <lastmod>
+    import importlib.util                     # the service pages read their prices from the pages just written
+    spec = importlib.util.spec_from_file_location("build_service_pages", Path(__file__).with_name("build_service_pages.py"))
+    services = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(services)
+    services.main()
 
 
 if __name__ == "__main__":

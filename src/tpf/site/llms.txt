@@ -9,6 +9,10 @@ Works in English, Russian and Chinese. Orders are taken through the form on the 
 - [English](https://tpf-technology.com/en): services, prices, selected work, request form
 - [Русский](https://tpf-technology.com/ru): услуги, цены, проекты, форма заявки
 - [中文](https://tpf-technology.com/zh): 服务、价格、项目、需求表单
+- [Websites and landing pages](https://tpf-technology.com/en/websites)
+- [Web applications](https://tpf-technology.com/en/web-apps)
+- [Online shops](https://tpf-technology.com/en/online-shops)
+- [Telegram bots](https://tpf-technology.com/en/telegram-bots)
 - [Privacy policy](https://tpf-technology.com/privacy): what data is collected and how to have it removed
 
 ## What the studio builds

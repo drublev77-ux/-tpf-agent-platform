@@ -64,7 +64,7 @@ def test_site_serves_language_pages_robots_and_sitemap(pool, settings, monkeypat
         for address in ("/</loc>", "/ru</loc>", "/en</loc>", "/nl</loc>", "/zh</loc>", "/privacy</loc>"):
             assert "https://tpf-technology.com" + address in sitemap.text
         assert "portal" not in sitemap.text
-        assert sitemap.text.count("<lastmod>") == 6                       # the privacy page is dated too
+        assert sitemap.text.count("<lastmod>") == 22                       # the privacy page is dated too
         for address in ("/", "/en", "/privacy", "/robots.txt", "/sitemap.xml", "/brand.jpg", "/llms.txt"):
             assert client.head(address).status_code == 200, address           # crawlers ask with HEAD first
         for address in ("/ru/", "/en/", "/nl/", "/zh/", "/privacy/"):
@@ -107,3 +107,42 @@ def test_the_site_offers_process_automation_and_the_form_can_ask_for_it(name, ch
     source = (SITE / "index.html").read_text(encoding="utf-8")
     assert options.index(choice) == int(re.search(r"var AUTO_TYPE = (\d+);", source).group(1))   # the button picks this one
     assert "PROCESS AUTOMATION" in system_prompt(True) and "PROCESS AUTOMATION" not in system_prompt(False)
+
+
+SERVICE_SLUGS = ("websites", "web-apps", "online-shops", "telegram-bots")
+
+
+@pytest.mark.parametrize("lang", ["ru", "en", "nl", "zh"])
+def test_each_service_has_a_page_in_each_language_with_the_home_page_prices(lang):
+    home = (SITE / f"index.{lang}.html").read_text(encoding="utf-8")
+    sums = re.findall(r'<div class="sum">(.*?)</div>', home)
+    for slug in SERVICE_SLUGS:
+        assert f'href="/{lang}/{slug}"' in home, slug                         # the home page links to it
+        page = (SITE / "services" / lang / f"{slug}.html").read_text(encoding="utf-8")
+        assert f'<link rel="canonical" href="https://tpf-technology.com/{lang}/{slug}">' in page
+        for code in ("ru", "en", "nl", "zh-Hans", "x-default"):
+            assert f'hreflang="{code}"' in page
+        assert len(re.findall(r"<h1>", page)) == 1 and 'href="/' + lang + '#contact"' in page
+        title = re.search(r"<title>(.*?)</title>", page).group(1)
+        desc = re.search(r'<meta name="description" content="([^"]*)"', page).group(1)
+        assert 15 <= len(title) <= 70 and (40 if lang == "zh" else 80) <= len(desc) <= 200, (slug, len(title), len(desc))  # Chinese says it in fewer characters
+        shown = re.findall(r'<div class="sum">(.*?)</div>', page)
+        assert shown and set(shown) <= set(sums), (slug, shown)                # the same prices as the home page
+        ld = json.loads(re.search(r'<script type="application/ld\+json">(.*?)</script>', page, re.S).group(1))
+        assert ld["@graph"][0]["@type"] == "Service" and ld["@graph"][0]["offers"]["priceSpecification"]["minPrice"] > 0
+
+
+def test_service_pages_are_served_and_in_the_sitemap(pool, settings, monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", settings.database_url)
+    get_settings.cache_clear()
+    from tpf.api.main import app
+    with TestClient(app) as client:
+        sitemap = client.get("/sitemap.xml").text
+        for lang in ("ru", "en", "nl", "zh"):
+            for slug in SERVICE_SLUGS:
+                page = client.get(f"/{lang}/{slug}")
+                assert page.status_code == 200 and "<h1>" in page.text
+                assert f"<loc>https://tpf-technology.com/{lang}/{slug}</loc>" in sitemap
+        moved = client.get("/en/websites/", follow_redirects=False)
+        assert moved.status_code == 308 and moved.headers["location"] == "https://tpf-technology.com/en/websites"
+    get_settings.cache_clear()

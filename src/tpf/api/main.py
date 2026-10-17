@@ -358,7 +358,7 @@ def page(path: str):
 async def one_address_per_page(request: Request, call_next):
     """/en/ is the same page as /en: send it there for good (308), so search engines keep one address."""
     path = request.url.path
-    if len(path) > 1 and path.endswith("/") and path.rstrip("/") in ("/ru", "/en", "/nl", "/zh", "/privacy"):
+    if len(path) > 1 and path.endswith("/") and path.rstrip("/") in SITE_PAGES:
         return RedirectResponse(SITE_URL + path.rstrip("/"), status_code=308)
     return await call_next(request)
 
@@ -386,6 +386,21 @@ def _lang_page(lang: str):
     return serve
 
 
+# A page of its own for each kind of work, in every language (scripts/build_service_pages.py writes them).
+SERVICE_SLUGS = ("websites", "web-apps", "online-shops", "telegram-bots")
+SITE_PAGES = {"/privacy", *(f"/{lang}" for lang in SITE_LANGS), *(f"/{lang}/{slug}" for lang in SITE_LANGS for slug in SERVICE_SLUGS)}
+
+
+def _service_page(lang: str, slug: str):
+    async def serve() -> FileResponse:
+        return FileResponse(SITE_DIR / "services" / lang / f"{slug}.html", media_type="text/html; charset=utf-8",
+                            headers={"Cache-Control": "public, max-age=300"})
+    return serve
+
+
+for _lang in SITE_LANGS:
+    for _slug in SERVICE_SLUGS:
+        page(f"/{_lang}/{_slug}")(_service_page(_lang, _slug))
 for _lang in SITE_LANGS:
     page(f"/{_lang}")(_lang_page(_lang))
 
@@ -427,6 +442,10 @@ async def sitemap() -> Response:
     alternates = "".join(f'<xhtml:link rel="alternate" hreflang="{code}" href="{SITE_URL}/{lang}"/>' for lang, code in SITE_LANGS.items()) \
         + f'<xhtml:link rel="alternate" hreflang="x-default" href="{SITE_URL}/"/>'
     urls = "".join(f"<url><loc>{SITE_URL}/{path}</loc><lastmod>{changed}</lastmod>{alternates}</url>" for path in ("", *SITE_LANGS))
+    for slug in SERVICE_SLUGS:
+        also = "".join(f'<xhtml:link rel="alternate" hreflang="{code}" href="{SITE_URL}/{lang}/{slug}"/>' for lang, code in SITE_LANGS.items()) \
+            + f'<xhtml:link rel="alternate" hreflang="x-default" href="{SITE_URL}/en/{slug}"/>'
+        urls += "".join(f"<url><loc>{SITE_URL}/{lang}/{slug}</loc><lastmod>{changed}</lastmod>{also}</url>" for lang in SITE_LANGS)
     urls += f"<url><loc>{SITE_URL}/privacy</loc><lastmod>{changed}</lastmod></url>"
     xml = ('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
            f'xmlns:xhtml="http://www.w3.org/1999/xhtml">{urls}</urlset>')

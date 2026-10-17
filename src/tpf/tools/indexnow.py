@@ -20,7 +20,9 @@ log = logging.getLogger("tpf.indexnow")
 
 SITE_DIR = Path(__file__).resolve().parent.parent / "site"
 SITE_URL = "https://tpf-technology.com"
-PAGES = ("", "ru", "en", "nl", "zh", "privacy")       # the addresses in /sitemap.xml (tests keep the two in step)
+SERVICE_SLUGS = ("websites", "web-apps", "online-shops", "telegram-bots")   # a page per kind of work in each language
+PAGES = ("", "ru", "en", "nl", "zh", "privacy",     # the addresses in /sitemap.xml (tests keep the two in step)
+         *(f"{lang}/{slug}" for lang in ("ru", "en", "nl", "zh") for slug in SERVICE_SLUGS))
 # The shared endpoint passes every report on to all IndexNow engines, Yandex included. Yandex's own endpoint was
 # dropped on 2026-10-14: since 2026-10-13 it closes the connection from the worker without answering.
 ENDPOINTS = ("https://api.indexnow.org/indexnow",)
