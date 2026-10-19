@@ -37,8 +37,10 @@
    записано в журнале заказа как `client_reminder_failed` и повторяется через сутки. Если задан запасной почтовый
    провайдер (`EMAIL_FALLBACK_*` на Railway и Vercel), строка `mail to … went through <провайдер> after: …` значит,
    что письмо ушло через запасной, а основной отказал — его надо чинить. Отправка страниц в
-   поиск: `SELECT key, value, updated_at FROM app_settings WHERE key LIKE 'indexnow:%'` — после изменения сайта
-   обе строки должны обновиться в течение часа.
+   поиск: `SELECT key, value, updated_at FROM app_settings WHERE key = 'indexnow:https://api.indexnow.org/indexnow'` —
+   после изменения сайта строка должна обновиться в течение часа. Отчёты идут только на общий адрес
+   `api.indexnow.org`, он передаёт их всем поисковикам, включая Яндекс. Строка `indexnow:https://yandex.com/indexnow`
+   осталась от прежней схемы и больше не обновляется — это не сбой.
 9. Запросы о данных (обещан ответ за 24 часа): в Gmail метка «TPF/Данные», треды за 3 дня без ответа.
 
 ## Как чинить
