@@ -2,7 +2,7 @@
    Google and no cookie is set; the choice is kept in this browser (localStorage "tpf_consent") and can be
    changed from the privacy page (tpfConsent.open()). Vercel Web Analytics, which sets no cookies, runs as before. */
 (function () {
-  var ID = 'G-P32QFSFR4D', KEY = 'tpf_consent';
+  var ID = 'G-7JRVHTTDHW', KEY = 'tpf_consent';
   var T = {
     ru: { text: 'Мы хотим подключить Google Analytics, чтобы понимать, как посетители пользуются сайтом. Он ставит cookie — только если вы согласны.', ok: 'Принять', no: 'Отклонить', more: 'Подробнее' },
     en: { text: 'We would like to use Google Analytics to understand how visitors use the site. It sets cookies — only if you agree.', ok: 'Accept', no: 'Reject', more: 'Learn more' },
