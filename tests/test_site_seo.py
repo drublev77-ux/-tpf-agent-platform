@@ -146,3 +146,23 @@ def test_service_pages_are_served_and_in_the_sitemap(pool, settings, monkeypatch
         moved = client.get("/en/websites/", follow_redirects=False)
         assert moved.status_code == 308 and moved.headers["location"] == "https://tpf-technology.com/en/websites"
     get_settings.cache_clear()
+
+
+def test_google_analytics_waits_for_consent(pool, settings, monkeypatch):
+    """GA sets cookies, so it is loaded only after "Accept" (GDPR); every page carries the notice script, the
+    saved pages carry no banner, and the privacy policy describes it in every language."""
+    script = (SITE / "consent.js").read_text(encoding="utf-8")
+    assert "G-P32QFSFR4D" in script and "navigator.webdriver" in script and "googletagmanager" not in (SITE / "index.html").read_text(encoding="utf-8")
+    pages = [SITE / f"index.{n}.html" for n in ("root", "ru", "en", "nl", "zh")] + list((SITE / "services").glob("*/*.html")) + [SITE / "privacy.html"]
+    for page in pages:
+        html = page.read_text(encoding="utf-8")
+        assert 'src="/consent.js?v=1"' in html and 'id="tpf-consent"' not in html, page.name
+    privacy = (SITE / "privacy.html").read_text(encoding="utf-8")
+    assert privacy.count("Google Analytics") >= 8 and privacy.count("tpfConsent.open()") == 4
+    monkeypatch.setenv("DATABASE_URL", settings.database_url)
+    get_settings.cache_clear()
+    from tpf.api.main import app
+    with TestClient(app) as client:
+        served = client.get("/consent.js")
+        assert served.status_code == 200 and served.headers["content-type"].startswith("text/javascript")
+    get_settings.cache_clear()

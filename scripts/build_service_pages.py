@@ -280,6 +280,7 @@ def build(lang: str, slug: str, prices: list[dict], cases: list[dict]) -> str:
 </style>
 <script>window.va=window.va||function(){{(window.vaq=window.vaq||[]).push(arguments)}};</script>
 <script defer src="/_vercel/insights/script.js"></script>
+<script defer src="/consent.js?v=1"></script>
 </head>
 <body>
 <header><a class="logo" href="/{lang}">TPF<span>technology</span></a><nav class="langs" aria-label="Language">{langs}</nav></header>
