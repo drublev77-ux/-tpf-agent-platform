@@ -19,11 +19,11 @@ SITE = Path(__file__).resolve().parent.parent / "src" / "tpf" / "site"
 OUT = SITE / "services"
 BASE = "https://tpf-technology.com"
 LANGS = {"ru": ("ru", "ru_RU"), "en": ("en", "en_US"), "nl": ("nl", "nl_NL"), "zh": ("zh-Hans", "zh_CN")}
-SLUGS = ("websites", "web-apps", "online-shops", "telegram-bots")
+SLUGS = ("websites", "web-apps", "online-shops", "telegram-bots", "crm-integration")
 
 # Positions in the home page's price list and project list (index.html: prices[] and CASES[]).
-PRICES = {"websites": (0, 1), "web-apps": (2, 3, 5), "online-shops": (4,), "telegram-bots": (6, 7)}
-CASES = {"websites": (7, 6), "web-apps": (3, 0, 4), "online-shops": (2,), "telegram-bots": (5,)}
+PRICES = {"websites": (0, 1), "web-apps": (2, 3, 5), "online-shops": (4,), "telegram-bots": (6, 7), "crm-integration": (4,)}
+CASES = {"websites": (7, 6), "web-apps": (3, 0, 4), "online-shops": (2,), "telegram-bots": (5,), "crm-integration": (1, 2)}
 
 UI = {
     "ru": dict(home="Главная", price_h="Цены", price_note="Точная цена — в смете: бесплатно и до оплаты.",
@@ -182,6 +182,48 @@ PAGES = {
                    includes=["按钮菜单与常见问题解答", "联系方式与收集咨询", "分步预约或下单",
                              "通知店主", "管理机器人数据和文本的网页后台"]),
     },
+    "crm-integration": {
+        "ru": dict(name="Интеграция с CRM", title="Интеграция магазина с CRM и учётом — TPF Technology",
+                   desc="Связываем магазин с CRM, учётом и n8n через открытые API: заказы попадают в CRM сами, статусы и остатки синхронны, письма уходят без ручной работы. Смета бесплатно.",
+                   h1="Интеграция магазина с CRM и учётом",
+                   lead="Заказы, клиенты и оплаты передаются между вашим магазином, CRM и учётом автоматически — через открытые API. Вам остаётся проверять результат.",
+                   includes=["Заказы попадают в CRM сами: amoCRM, Bitrix24, HubSpot и другие сервисы с открытым API",
+                             "Статусы синхронизируются: отправили заказ — статус обновился, клиенту ушло письмо",
+                             "Остатки актуальны: товар закончился — кнопка покупки спрятана автоматически",
+                             "Сценарии автоматизации n8n, Zapier, Make: заявки уходят по вебхуку",
+                             "Выгрузки в Excel и загрузки из него, документы в PDF в одно нажатие",
+                             "Без прямых банков, государственных систем и сервисов без открытого API"]),
+        "en": dict(name="CRM integration", title="Online shop CRM integration — TPF Technology",
+                   desc="We connect your shop to a CRM, accounting and n8n through open APIs: orders reach the CRM on their own, statuses and stock stay in sync, e-mails go out without manual work.",
+                   h1="Shop and CRM integration",
+                   lead="Orders, customers and payments flow between your shop, CRM and accounting automatically — through open APIs. All you do is check the result.",
+                   includes=["Orders reach the CRM on their own: amoCRM, Bitrix24, HubSpot and other services with an open API",
+                             "Statuses stay in sync: an order ships — the status updates and the customer gets an e-mail",
+                             "Stock is accurate: an item runs out and the buy button hides itself",
+                             "n8n, Zapier and Make scenarios: requests flow in by webhook",
+                             "Excel exports and imports, PDF documents in one click",
+                             "No direct bank connections, government systems or services without an open API"]),
+        "nl": dict(name="CRM-integratie", title="Webshop en CRM-integratie — TPF Technology",
+                   desc="Wij koppelen uw webshop aan een CRM, boekhouding en n8n via open API’s: bestellingen komen vanzelf in de CRM, statussen en voorraad blijven synchroon, e‑mails gaan automatisch.",
+                   h1="Webshop en CRM-integratie",
+                   lead="Bestellingen, klanten en betalingen lopen automatisch tussen uw webshop, CRM en boekhouding — via open API’s. U hoeft alleen het resultaat te controleren.",
+                   includes=["Bestellingen komen vanzelf in de CRM: amoCRM, Bitrix24, HubSpot en andere diensten met een open API",
+                             "Statussen blijven synchroon: een bestelling is verzonden — de status klopt en de klant krijgt een e‑mail",
+                             "Voorraad is actueel: een product is op en de bestelknop verbergt zichzelf",
+                             "n8n-, Zapier- en Make-scenario’s: aanvragen binnenkomen via een webhook",
+                             "Excel-export en -import, pdf-documenten in één klik",
+                             "Geen directe bankkoppelingen, overheidsystemen of diensten zonder open API"]),
+        "zh": dict(name="CRM 集成", title="商店与 CRM 集成 — TPF Technology",
+                   desc="通过开放 API 将您的商店与 CRM、记账系统和 n8n 打通：订单自动进入 CRM，状态与库存保持同步，邮件自动发送。报价免费。",
+                   h1="商店与 CRM 集成",
+                   lead="订单、客户与付款数据通过开放 API 在您的商店、CRM 与记账系统之间自动流转。您只需检查结果。",
+                   includes=["订单自动进入 CRM：amoCRM、Bitrix24、HubSpot 等支持开放 API 的服务",
+                             "状态同步：订单发货后状态更新，客户自动收到邮件",
+                             "库存实时准确：商品售罄后购买按钮自动隐藏",
+                             "n8n、Zapier、Make 自动化场景：咨询通过 webhook 进入流程",
+                             "Excel 导入导出，一键生成 PDF 文档",
+                             "不直连银行、政府系统或无开放 API 的服务"]),
+    },
 }
 
 STYLE = """:root{--bg:#07090C;--line:#16202A;--line2:#2A3844;--ink:#E6EDF2;--soft:#B7C3CC;--muted:#8D9AA5;--accent:#5CE1F0;--pad:clamp(20px,5.5vw,80px)}
@@ -206,10 +248,8 @@ ul.inc{padding-left:22px}ul.inc li{margin:6px 0}ol.steps{padding-left:24px}ol.st
 footer{padding:28px var(--pad);border-top:1px solid var(--line);color:var(--muted);font-size:14px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}footer a{color:var(--muted)}
 @media(max-width:640px){.price{grid-template-columns:1fr}}"""
 
-
 def esc(s: str) -> str:
     return html.escape(s, quote=True)
-
 
 def home_facts(lang: str) -> tuple[list[dict], list[dict]]:
     """The price list and the demo projects as the filled-in home page of this language shows them."""
@@ -223,10 +263,8 @@ def home_facts(lang: str) -> tuple[list[dict], list[dict]]:
     assert len(prices) >= 8 and len(cases) == 8, (lang, len(prices), len(cases))
     return prices, cases
 
-
 def url(lang: str, slug: str) -> str:
     return f"{BASE}/{lang}/{slug}"
-
 
 def build(lang: str, slug: str, prices: list[dict], cases: list[dict]) -> str:
     ui, c = UI[lang], PAGES[slug][lang]
@@ -308,7 +346,6 @@ def build(lang: str, slug: str, prices: list[dict], cases: list[dict]) -> str:
 </html>
 """
 
-
 def main() -> None:
     for lang in LANGS:
         prices, cases = home_facts(lang)
@@ -316,7 +353,6 @@ def main() -> None:
         for slug in SLUGS:
             (OUT / lang / f"{slug}.html").write_text(build(lang, slug, prices, cases), encoding="utf-8")
     print(f"service pages: {len(LANGS) * len(SLUGS)}")
-
 
 if __name__ == "__main__":
     main()

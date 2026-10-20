@@ -13,6 +13,7 @@ Works in English, Russian and Chinese. Orders are taken through the form on the 
 - [Web applications](https://tpf-technology.com/en/web-apps)
 - [Online shops](https://tpf-technology.com/en/online-shops)
 - [Telegram bots](https://tpf-technology.com/en/telegram-bots)
+- [Shop and CRM integration](https://tpf-technology.com/en/crm-integration)
 - [Privacy policy](https://tpf-technology.com/privacy): what data is collected and how to have it removed
 
 ## What the studio builds
@@ -21,6 +22,7 @@ Works in English, Russian and Chinese. Orders are taken through the form on the 
 - Web applications with a database and an admin area: bookings, requests, catalogues, schedules, user accounts with roles
 - Online shops: catalogue, cart, checkout, card payments into the client's own Stripe, YooKassa or bePaid account
 - Telegram bots: button menus, answers to frequent questions, step-by-step booking or ordering, a web admin area
+- Shop and CRM integration: orders reach the client's CRM, accounting or n8n automatically through open APIs, statuses and stock stay in sync
 - Process automation: requests, reminders, documents and data exchange between services run by themselves in an application built around the client's process
 - Mobile apps as installable web applications (own icon, full screen, no app stores)
 

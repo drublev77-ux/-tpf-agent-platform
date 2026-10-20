@@ -387,7 +387,7 @@ def _lang_page(lang: str):
 
 
 # A page of its own for each kind of work, in every language (scripts/build_service_pages.py writes them).
-SERVICE_SLUGS = ("websites", "web-apps", "online-shops", "telegram-bots")
+SERVICE_SLUGS = ("websites", "web-apps", "online-shops", "telegram-bots", "crm-integration")
 SITE_PAGES = {"/privacy", *(f"/{lang}" for lang in SITE_LANGS), *(f"/{lang}/{slug}" for lang in SITE_LANGS for slug in SERVICE_SLUGS)}
 
 

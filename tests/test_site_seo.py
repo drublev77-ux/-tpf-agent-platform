@@ -109,7 +109,7 @@ def test_the_site_offers_process_automation_and_the_form_can_ask_for_it(name, ch
     assert "PROCESS AUTOMATION" in system_prompt(True) and "PROCESS AUTOMATION" not in system_prompt(False)
 
 
-SERVICE_SLUGS = ("websites", "web-apps", "online-shops", "telegram-bots")
+SERVICE_SLUGS = ("websites", "web-apps", "online-shops", "telegram-bots", "crm-integration")
 
 
 @pytest.mark.parametrize("lang", ["ru", "en", "nl", "zh"])
