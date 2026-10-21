@@ -64,7 +64,7 @@ def test_site_serves_language_pages_robots_and_sitemap(pool, settings, monkeypat
         for address in ("/</loc>", "/ru</loc>", "/en</loc>", "/nl</loc>", "/zh</loc>", "/privacy</loc>"):
             assert "https://tpf-technology.com" + address in sitemap.text
         assert "portal" not in sitemap.text
-        assert sitemap.text.count("<lastmod>") == 22                       # the privacy page is dated too
+        assert sitemap.text.count("<lastmod>") == 26                       # the privacy page is dated too
         for address in ("/", "/en", "/privacy", "/robots.txt", "/sitemap.xml", "/brand.jpg", "/llms.txt"):
             assert client.head(address).status_code == 200, address           # crawlers ask with HEAD first
         for address in ("/ru/", "/en/", "/nl/", "/zh/", "/privacy/"):
