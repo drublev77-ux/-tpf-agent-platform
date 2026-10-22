@@ -7,7 +7,7 @@ on:
 jobs:
   claude-review:
     name: Claude review
-    if: ${{ !github.event.pull_request.draft }}
+    if: ${{ github.event.pull_request.head.repo.fork == false && !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
 
     permissions:
@@ -21,6 +21,12 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
+      - name: Skip fork PRs
+        if: ${{ github.event.pull_request.head.repo.fork == true }}
+        shell: bash
+        run: |
+          echo "Skipping review for fork PRs to avoid running secret-bearing code on untrusted changes."
+
       - name: Check out repository
         uses: actions/checkout@v4
         with:
