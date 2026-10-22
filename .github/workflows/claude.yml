@@ -1,4 +1,4 @@
-name: Claude Assistant
+name: Claude PR Review
 
 on:
   pull_request:
@@ -8,16 +8,21 @@ on:
   workflow_dispatch:
     inputs:
       prompt:
-        description: 'Custom prompt for Claude'
+        description: 'Custom review prompt for Claude'
         required: false
-        default: 'Review the current repository state and summarize key risks.'
+        default: 'Review the code for logic defects, security issues, and maintainability improvements.'
+      pr_number:
+        description: 'Optional PR number for manual run'
+        required: false
+        default: ''
 
 jobs:
   claude-review:
+    name: Claude review
     runs-on: ubuntu-latest
     if: >-
       github.event_name == 'pull_request' ||
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/claude')) ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request != null && contains(github.event.comment.body, '/claude')) ||
       github.event_name == 'workflow_dispatch'
 
     permissions:
@@ -31,13 +36,64 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - name: Checkout repository
+      - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Determine target PR/issue
+      - name: Validate API key
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "Missing ANTHROPIC_API_KEY secret. Add it in Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+      - name: Resolve target PR number and prompt
         id: target
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          MANUAL_PROMPT: ${{ github.event.inputs.prompt }}
+          MANUAL_PR: ${{ github.event.inputs.pr_number }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "pr_number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            echo "prompt=Review the pull request for logic bugs, security issues, and maintainability improvements. Focus on the diff and mention concrete risks." >> "$GITHUB_OUTPUT"
+            echo "mode=pr" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT_NAME" = "issue_comment" ]; then
+            echo "pr_number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+            custom_prompt="${COMMENT_BODY:-}"
+            custom_prompt="${custom_prompt#/claude }"
+            custom_prompt="${custom_prompt#'/claude'}"
+            custom_prompt="${custom_prompt#"/claude"}"
+            custom_prompt="${custom_prompt#"/claude "}"
+            if [ -n "$custom_prompt" ] && [ "$custom_prompt" != "${COMMENT_BODY:-}" ]; then
+              echo "prompt=${custom_prompt}" >> "$GITHUB_OUTPUT"
+            else
+              echo "prompt=Review the current patch and point out possible bugs, security risks, and code-quality issues." >> "$GITHUB_OUTPUT"
+            fi
+            echo "mode=comment" >> "$GITHUB_OUTPUT"
+          else
+            if [ -n "$MANUAL_PR" ]; then
+              echo "pr_number=$MANUAL_PR" >> "$GITHUB_OUTPUT"
+            else
+              echo "pr_number=0" >> "$GITHUB_OUTPUT"
+            fi
+            if [ -n "$MANUAL_PROMPT" ]; then
+              echo "prompt=$MANUAL_PROMPT" >> "$GITHUB_OUTPUT"
+            else
+              echo "prompt=Review the repository state and summarize the main risks and improvements." >> "$GITHUB_OUTPUT"
+            fi
+            echo "mode=manual" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build diff
+        id: diff
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -45,68 +101,28 @@ jobs:
           set -euo pipefail
 
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
-            echo "context=PR" >> "$GITHUB_OUTPUT"
-            echo "base_sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
-            echo "head_sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
-            echo "comment_target=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
-          elif [ "$EVENT_NAME" = "issue_comment" ]; then
-            echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
-            echo "context=COMMENT" >> "$GITHUB_OUTPUT"
-            echo "base_sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
-            echo "head_sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
-            echo "comment_target=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+            git diff --unified=3 "$base"..."$head" > /tmp/claude.diff || true
           else
-            echo "number=0" >> "$GITHUB_OUTPUT"
-            echo "context=MANUAL" >> "$GITHUB_OUTPUT"
-            echo "comment_target=0" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Validate secrets
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-            echo "Missing ANTHROPIC_API_KEY secret. Add it in repository settings -> Secrets and variables -> Actions."
-            exit 1
-          fi
-
-      - name: Build diff context
-        id: diff
-        shell: bash
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ steps.target.outputs.base_sha }}
-          HEAD_SHA: ${{ steps.target.outputs.head_sha }}
-        run: |
-          set -euo pipefail
-
-          if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "issue_comment" ]; then
-            if git rev-parse --verify "$BASE_SHA" >/dev/null 2>&1; then
-              git diff --unified=3 "$BASE_SHA"..."$HEAD_SHA" > /tmp/claude.diff || true
-            else
-              git diff --unified=3 HEAD~1 HEAD > /tmp/claude.diff || true
-            fi
-          else
-            git status --short > /tmp/claude.diff || true
+            git diff --unified=3 HEAD~1 HEAD > /tmp/claude.diff || true
           fi
 
           if [ ! -s /tmp/claude.diff ]; then
-            echo "diff_empty=true" >> "$GITHUB_OUTPUT"
+            echo "empty=true" >> "$GITHUB_OUTPUT"
             echo "No diff available for review." > /tmp/claude.diff
           else
-            echo "diff_empty=false" >> "$GITHUB_OUTPUT"
+            echo "empty=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Ask Claude for review
-        id: ask
+        id: claude
         shell: bash
         env:
+          REVIEW_PROMPT: ${{ steps.target.outputs.prompt }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.target.outputs.pr_number }}
           EVENT_NAME: ${{ github.event_name }}
-          COMMENT_BODY: ${{ github.event.comment.body }}
-          MANUAL_PROMPT: ${{ github.event.inputs.prompt }}
-          REPO_NAME: ${{ github.repository }}
-          PR_NUMBER: ${{ steps.target.outputs.number }}
         run: |
           set -euo pipefail
 
@@ -116,10 +132,9 @@ import os
 import subprocess
 import sys
 
-repo = os.environ['REPO_NAME']
+repo = os.environ['REPO']
 pr_number = os.environ.get('PR_NUMBER', '0')
-manual_prompt = os.environ.get('MANUAL_PROMPT', '').strip()
-comment_body = os.environ.get('COMMENT_BODY', '').strip()
+review_prompt = os.environ.get('REVIEW_PROMPT', '').strip()
 
 def read_file(path):
     try:
@@ -128,119 +143,105 @@ def read_file(path):
     except Exception:
         return ''
 
-# Build prompt
-prompt_lines = []
-prompt_lines.append('Ты — senior software engineer и code reviewer.')
-prompt_lines.append('Проанализируй изменения в проекте и дай конструктивный review.')
-prompt_lines.append(f'Репозиторий: {repo}')
-if pr_number and pr_number != '0':
-    prompt_lines.append(f'PR/issue: #{pr_number}')
+system_prompt = (
+    'You are a senior software engineer and code reviewer. '
+    'Review the patch for correctness, security, maintainability, and testability. '
+    'Be precise, concrete, and actionable. Do not invent facts. '
+    'If there are no issues, say so clearly. '
+    'Prioritize real risk over stylistic preferences.'
+)
 
-if os.environ.get('EVENT_NAME') == 'issue_comment' and comment_body:
-    prompt_lines.append('Пользователь попросил:')
-    prompt_lines.append(comment_body)
-
-if os.environ.get('EVENT_NAME') == 'workflow_dispatch' and manual_prompt:
-    prompt_lines.append('Дополнительный custom prompt:')
-    prompt_lines.append(manual_prompt)
-
-prompt_lines.append('')
-prompt_lines.append('Контекст diff:')
-prompt_lines.append('```diff')
-prompt_lines.append(read_file('/tmp/claude.diff'))
-prompt_lines.append('```')
-
-prompt = '\n'.join(prompt_lines)
+user_message = (
+    f"Repository: {repo}\n"
+    f"PR/issue number: {pr_number if pr_number and pr_number != '0' else 'manual run'}\n\n"
+    f"Instruction: {review_prompt}\n\n"
+    "Review the following diff and answer in Russian unless the user explicitly asks otherwise.\n\n"
+    "Provide: 1) Key findings, 2) Risks, 3) Suggested fixes.\n\n"
+    "Diff:\n```diff\n"
+    f"{read_file('/tmp/claude.diff')}\n"
+    "```"
+)
 
 payload = {
-    'model': os.environ['ANTHROPIC_MODEL'],
-    'max_tokens': 2000,
-    'messages': [
-        {'role': 'user', 'content': prompt}
+    "model": os.environ['ANTHROPIC_MODEL'],
+    "max_tokens": 1800,
+    "system": system_prompt,
+    "messages": [
+        {"role": "user", "content": user_message}
     ],
 }
 
 proc = subprocess.run(
-    ['curl', '-sS', 'https://api.anthropic.com/v1/messages',
-     '-H', 'x-api-key: ' + os.environ['ANTHROPIC_API_KEY'],
-     '-H', 'anthropic-version: 2023-06-01',
-     '-H', 'content-type: application/json',
-     '--data-binary', json.dumps(payload)],
+    [
+        'curl', '-sS',
+        'https://api.anthropic.com/v1/messages',
+        '-H', 'x-api-key: ' + os.environ['ANTHROPIC_API_KEY'],
+        '-H', 'anthropic-version: 2023-06-01',
+        '-H', 'content-type: application/json',
+        '--data-binary', json.dumps(payload),
+    ],
     capture_output=True,
     text=True,
 )
 
 if proc.returncode != 0:
-    print(proc.stderr)
+    print(proc.stderr, file=sys.stderr)
     raise SystemExit(proc.returncode)
 
-resp_text = proc.stdout.strip()
-print(resp_text)
+raw = proc.stdout.strip()
+print(raw)
 
 try:
-    data = json.loads(resp_text)
-    text = data['content'][0]['text']
-except Exception as e:
-    print(f'Failed to parse Anthropic response: {e}', file=sys.stderr)
-    print(resp_text, file=sys.stderr)
+    data = json.loads(raw)
+    result = data['content'][0]['text']
+except Exception as exc:
+    print(f'Failed to parse response from Anthropic: {exc}', file=sys.stderr)
+    print(raw, file=sys.stderr)
     raise
 
-# Save response to output file for posting later
 with open('/tmp/claude_response.txt', 'w', encoding='utf-8') as f:
-    f.write(text)
+    f.write(result)
 
-# Save as GITHUB_OUTPUT
 with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
-    out.write(f"response<<EOF\n{text}\nEOF\n")
+    out.write(f"response<<EOF\n{result}\nEOF\n")
 PY
 
-      - name: Post Claude review comment
-        if: always()
+      - name: Post review comment to PR
+        if: steps.target.outputs.pr_number != '0'
         shell: bash
         env:
+          PR_NUMBER: ${{ steps.target.outputs.pr_number }}
           EVENT_NAME: ${{ github.event_name }}
-          PR_NUMBER: ${{ steps.target.outputs.number }}
         run: |
           set -euo pipefail
 
           if [ ! -s /tmp/claude_response.txt ]; then
-            echo 'Claude did not return a response.'
+            echo "No Claude response generated."
             exit 0
           fi
 
-          response=$(cat /tmp/claude_response.txt)
-          body=$(cat <<EOF
-          Claude review:
+          body=$(cat /tmp/claude_response.txt)
 
-          $response
-          EOF
-          )
-
-          if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "issue_comment" ]; then
-            if [ "$PR_NUMBER" = "0" ] || [ -z "$PR_NUMBER" ]; then
-              echo "No PR number to comment on."
-              exit 0
-            fi
-
-            curl -sS -X POST \
-              -H "Authorization: Bearer $GITHUB_TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              https://api.github.com/repos/${{ github.repository }}/issues/${PR_NUMBER}/comments \
-              -d "$(python3 - <<'PY'
-import json, os
-body = open('/tmp/claude_response.txt', 'r', encoding='utf-8').read().strip()
-print(json.dumps({"body": "Claude review:\n\n" + body}))
+          payload=$(python3 - <<'PY'
+import json
+with open('/tmp/claude_response.txt', 'r', encoding='utf-8') as f:
+    text = f.read().strip()
+print(json.dumps({"body": "### Claude review\n\n" + text}))
 PY
-)"
-          else
-            echo "Manual run: no PR comment was posted."
-          fi
+)
 
-      - name: Summary
+          curl -sS -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/${{ github.repository }}/issues/${PR_NUMBER}/comments \
+            -d "$payload"
+
+      - name: Final summary
         if: always()
         shell: bash
         run: |
-          echo "Claude workflow completed."
+          echo "Claude review workflow finished."
           if [ -s /tmp/claude_response.txt ]; then
             echo "Preview:"
             head -n 20 /tmp/claude_response.txt
