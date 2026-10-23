@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import gzip
 import hmac
 from datetime import date, datetime, timezone
 import json
@@ -486,6 +487,27 @@ def _asset(name: str):
 
 for _name in SITE_ASSETS:      # the icon a phone puts on its home screen, and what describes the site as an app
     page(f"/{_name}")(_asset(_name))
+
+
+GZIPPED = {"brain3d.js": "text/javascript; charset=utf-8", "brain-mesh.bin": "application/octet-stream"}
+
+
+def _gzipped(name: str):
+    """The 3D brain of the first screen (scripts/brain3d/build.py): stored gzipped and sent as such, which halves
+    the mesh; a client that does not take gzip gets it unpacked."""
+    async def serve(request: Request) -> Response:
+        data = (SITE_DIR / f"{name}.gz").read_bytes()
+        headers = {"Cache-Control": "public, max-age=604800", "Vary": "Accept-Encoding"}
+        if "gzip" in request.headers.get("accept-encoding", ""):
+            headers["Content-Encoding"] = "gzip"
+        else:
+            data = gzip.decompress(data)
+        return Response(data, media_type=GZIPPED[name], headers=headers)
+    return serve
+
+
+for _name in GZIPPED:
+    page(f"/{_name}")(_gzipped(_name))
 
 
 @page("/brand-mark.jpg")

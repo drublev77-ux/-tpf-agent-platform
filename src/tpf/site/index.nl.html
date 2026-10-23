@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="nl"><head>
-<meta name="tpf-source" content="5fd26fc27628dffc">
+<meta name="tpf-source" content="0426ad59c229ffc2">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Websites, webapps en Telegram‑bots laten maken — TPF Technology</title>
@@ -30,7 +30,7 @@
 <meta name="apple-mobile-web-app-title" content="TPF">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
-<link rel="preload" as="image" href="/brand-hero.jpg" fetchpriority="high">
+<link rel="preload" as="image" href="/brand-hero.jpg?v=2" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;700&amp;family=Manrope:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Noto+Sans+SC:wght@400;500;700&amp;display=swap" rel="stylesheet">
 <style>
 :root{--bg:#07090C;--panel:#0B0F14;--line:#16202A;--line2:#2A3844;--ink:#E6EDF2;--soft:#B7C3CC;--muted:#8D9AA5;--accent:#5CE1F0;--warm:#FFB35C;--pad:clamp(20px,5.5vw,80px);--gap:clamp(72px,10vw,140px)}
@@ -58,7 +58,8 @@ nav{display:flex;gap:clamp(16px,2.4vw,36px);font-size:15px;font-weight:500}nav a
 section{padding:var(--gap) var(--pad) 0}
 .hero{position:relative;padding:0;min-height:clamp(520px,78vh,720px);display:flex;align-items:center;overflow:hidden;border-bottom:1px solid var(--line);background:#000;isolation:isolate}
 .hero-img{position:absolute;z-index:-2;top:0;left:69%;height:100%;width:auto;max-width:none;transform:translateX(-49%)}
-.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#07090C 0,#07090C 26%,rgba(7,9,12,.86) 42%,rgba(7,9,12,.25) 62%,rgba(7,9,12,0) 78%),linear-gradient(0deg,#07090C 0,rgba(7,9,12,0) 9%)}
+.hero-3d{position:absolute;inset:0;z-index:-2;opacity:0;transition:opacity 1.2s ease}.hero-3d.on{opacity:1}.hero-3d canvas{display:block;width:100%;height:100%}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(90deg,#07090C 0,#07090C 26%,rgba(7,9,12,.86) 42%,rgba(7,9,12,.25) 62%,rgba(7,9,12,0) 78%),linear-gradient(0deg,#07090C 0,rgba(7,9,12,0) 9%)}
 .hero-text{display:flex;flex-direction:column;gap:26px;width:min(100%,calc(var(--pad) + 600px));padding:56px 0 56px var(--pad)}
 h1{font-size:clamp(32px,4.2vw,58px);line-height:1.1;letter-spacing:-.02em;max-width:11.5em}
 .lead{font-size:clamp(16px,1.4vw,19px);color:var(--soft);max-width:54ch}
@@ -68,6 +69,7 @@ h1{font-size:clamp(32px,4.2vw,58px);line-height:1.1;letter-spacing:-.02em;max-wi
 .hero-facts span::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--warm);box-shadow:0 0 10px var(--warm)}
 @media(max-width:860px){.hero{display:block;min-height:0}.hero::before{display:none}
 .hero-img{position:static;transform:none;width:100%;height:clamp(200px,52vw,320px);object-fit:cover;object-position:center;display:block;border-bottom:1px solid var(--line)}
+.hero-3d{bottom:auto;height:clamp(200px,52vw,320px);z-index:0}
 .hero-text{width:100%;padding:32px var(--pad) 40px}}
 .head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px 64px;flex-wrap:wrap;margin-bottom:clamp(32px,4vw,56px)}
 .head>div{display:flex;flex-direction:column;gap:16px;flex:1 1 420px}
@@ -152,6 +154,19 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 <script defer="" src="/_vercel/insights/script.js"></script>
 <!-- Google Analytics only after the visitor accepts cookies (consent.js; described in /privacy). -->
 <script defer="" src="/consent.js?v=2"></script>
+<script>
+/* The first screen's picture comes to life as a 3D scene (/brain3d.js), loaded only once the page has loaded, so it never slows the first paint. */
+(function(){
+  function ok(){
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches)return false;
+    var c=navigator.connection;if(c&&(c.saveData||/2g/.test(c.effectiveType||'')))return false;
+    try{var t=document.createElement('canvas');return !!(t.getContext('webgl')||t.getContext('experimental-webgl'));}catch(e){return false;}
+  }
+  function go(){if(!document.getElementById('hero3d')||!ok())return;var s=document.createElement('script');s.src='/brain3d.js?v=1';s.async=true;document.body.appendChild(s);}
+  function later(){(window.requestIdleCallback||function(f){setTimeout(f,600);})(go,{timeout:2500});}
+  if(document.readyState==='complete')later();else addEventListener('load',later);
+})();
+</script>
 </head>
 <body>
 <header>
@@ -169,7 +184,8 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 
 <main>
 <section class="hero" id="top">
-<img class="hero-img" src="/brand-hero.jpg" id="heroimg" alt="Een gloeiend brein boven een neuraal netwerk — het embleem van TPF Technology" width="1280" height="470" fetchpriority="high">
+<img class="hero-img" src="/brand-hero.jpg?v=2" id="heroimg" alt="Een gloeiend brein boven een neuraal netwerk — het embleem van TPF Technology" width="1280" height="720" fetchpriority="high">
+<div class="hero-3d" id="hero3d"></div>
 <div class="hero-text">
 <div class="kicker"><span class="k-long" data-t="hero_kicker">STUDIO VOOR SOFTWAREONTWIKKELING</span><span class="k-short" data-t="hero_kicker_s">SOFTWARESTUDIO</span></div>
 <h1><span style="color:inherit" data-t="hero_title">Websites, webapps en Telegram‑bots</span><span data-t="dot">.</span></h1>

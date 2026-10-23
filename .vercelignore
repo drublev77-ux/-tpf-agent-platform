@@ -4,3 +4,4 @@ Dockerfile.worker
 docker-compose.yml
 railway.json
 .env*
+scripts/brain3d/
