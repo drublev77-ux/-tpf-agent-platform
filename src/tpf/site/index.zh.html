@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN"><head>
-<meta name="tpf-source" content="eda3f34aacb8a6f0">
+<meta name="tpf-source" content="5fd26fc27628dffc">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>网站、网络应用与 Telegram 机器人开发 — TPF Technology</title>
@@ -77,6 +77,8 @@ h2{font-size:clamp(30px,4.2vw,52px);line-height:1.12;letter-spacing:-.01em}
 .card{padding:clamp(24px,3vw,40px);min-height:230px;background:var(--panel);display:flex;flex-direction:column;gap:18px;transition:background .2s}
 .card:hover{background:#0E141B}
 .card h3{font-size:22px}.card p{color:var(--muted)}
+.sv-cta{grid-column:span 2;justify-content:center}.sv-cta .btn{align-self:flex-start}
+@media(max-width:900px){.sv-cta{grid-column:span 1}}
 .plist{border-top:1px solid var(--line2)}
 .card a.more{margin-top:auto;font-weight:600}
 .faq{border-top:1px solid var(--line2)}
@@ -170,18 +172,18 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 <img class="hero-img" src="/brand-hero.jpg" id="heroimg" alt="神经网络背景中发光的大脑——TPF Technology 标志" width="1280" height="470" fetchpriority="high">
 <div class="hero-text">
 <div class="kicker"><span class="k-long" data-t="hero_kicker">软件开发工作室</span><span class="k-short" data-t="hero_kicker_s">软件开发工作室</span></div>
-<h1><span style="color:inherit" data-t="hero_title">我们打造会思考的软件</span><span data-t="dot">。</span></h1>
-<p class="lead" data-t="hero_lead">我们由 AI 智能体团队在工程师监督下开发网站、Web 应用、网上商店和 Telegram 机器人——从需求到上线。</p>
-<div class="row"><a class="btn fill" href="#contact"><span data-t="hero_cta">提交需求</span>
+<h1><span style="color:inherit" data-t="hero_title">网站、Web 应用和 Telegram 机器人</span><span data-t="dot">。</span></h1>
+<p class="lead" data-t="hero_lead">由工程师监督的 AI 智能体团队负责项目从需求到上线。在任何付款之前，您即可看到需求说明和价格。</p>
+<div class="row"><a class="btn fill" href="#contact"><span data-t="hero_cta">免费获取报价</span>
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#04161A" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="13,6 19,12 13,18"></polyline></svg></a>
 <a class="btn line" href="#prices" data-t="nav_prices">价格</a></div>
-<ul class="hero-facts" data-list="hero_facts"><span>付款前免费报价</span><span>付款 50/50</span><span>代码及全部权利归您</span></ul>
+<ul class="hero-facts" data-list="hero_facts"><span>免费报价，通常一小时内</span><span>700 欧元起 · 付款 50/50</span><span>代码及全部权利归您</span></ul>
 </div>
 </section>
 
 <section id="services">
 <div class="head"><div><div class="kicker" data-t="sv_kicker">01 / 服务</div><h2 data-t="sv_title">我们开发什么</h2></div><p data-t="sv_lead">从需求、报价到上线，全部在一个平台上完成。源代码和全部权利归您所有。</p></div>
-<div class="grid3" id="services-grid"><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5CE1F0" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg><h3>落地页与网站</h3><p>单页或多页：设计、根据您提供的信息撰写文案、移动端适配，咨询表单的留言发送到您的邮箱。</p><a class="more" href="/zh/websites">了解更多 →</a></div><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5CE1F0" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="2" y1="9" x2="22" y2="9"></line></svg><h3>Web 应用</h3><p>带数据库和管理后台的网站：预约、申请、目录、日程。数据由您自行管理，无需开发人员。员工或客户可登录，各有各的角色。</p><a class="more" href="/zh/web-apps">了解更多 →</a></div><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5CE1F0" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2.5"></rect><line x1="10.5" y1="18.5" x2="13.5" y2="18.5"></line></svg><h3>网上商店</h3><p>商品目录、购物车、下单、库存管理和刷卡付款。商品与订单都在您的管理后台中。</p><a class="more" href="/zh/online-shops">了解更多 →</a></div><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#FFB35C" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><circle cx="4" cy="5" r="1.6"></circle><circle cx="20" cy="5" r="1.6"></circle><circle cx="4" cy="19" r="1.6"></circle><circle cx="20" cy="19" r="1.6"></circle><line x1="5.3" y1="6.2" x2="9.8" y2="10"></line><line x1="18.7" y1="6.2" x2="14.2" y2="10"></line><line x1="5.3" y1="17.8" x2="9.8" y2="14"></line><line x1="18.7" y1="17.8" x2="14.2" y2="14"></line></svg><h3>Telegram 机器人</h3><p>按钮菜单、常见问题解答、分步预约或下单、向店主发送通知，并配有网页管理后台。</p><a class="more" href="/zh/telegram-bots">了解更多 →</a></div><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5CE1F0" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18h10.5a4.5 4.5 0 0 0 .6-8.96A6 6 0 0 0 6.4 10.1 4 4 0 0 0 7 18z"></path></svg><h3>手机端应用</h3><p>应用或商店可安装到手机主屏幕，拥有独立图标并全屏打开——无需应用商店。</p><a class="more" href="/zh/crm-integration">了解更多 →</a></div><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5CE1F0" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l8 4v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6z"></path><polyline points="8.5,12 11,14.5 15.5,9.5"></polyline></svg><h3>在线收款</h3><p>我们将 Stripe、YooKassa 或 bePaid 接入您自己的账户：顾客的款项直接进入您的账户，不经过我们。</p></div><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5CE1F0" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 7H3"></path><path d="M3 17h18"></path><polyline points="7,3 3,7 7,11"></polyline><polyline points="17,13 21,17 17,21"></polyline></svg><h3>CRM 集成</h3><p>通过开放 API 将商店或网站与 CRM、记账系统和 n8n 打通：订单自动进入 CRM，状态与库存保持同步。</p></div></div>
+<div class="grid3" id="services-grid"><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5CE1F0" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg><h3>落地页与网站</h3><p>单页或多页：设计、根据您提供的信息撰写文案、移动端适配，咨询表单的留言发送到您的邮箱。</p><a class="more" href="/zh/websites">了解更多 →</a></div><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5CE1F0" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="2" y1="9" x2="22" y2="9"></line></svg><h3>Web 应用</h3><p>带数据库和管理后台的网站：预约、申请、目录、日程。数据由您自行管理，无需开发人员。员工或客户可登录，各有各的角色。</p><a class="more" href="/zh/web-apps">了解更多 →</a></div><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5CE1F0" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2.5"></rect><line x1="10.5" y1="18.5" x2="13.5" y2="18.5"></line></svg><h3>网上商店</h3><p>商品目录、购物车、下单、库存管理和刷卡付款。商品与订单都在您的管理后台中。</p><a class="more" href="/zh/online-shops">了解更多 →</a></div><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#FFB35C" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><circle cx="4" cy="5" r="1.6"></circle><circle cx="20" cy="5" r="1.6"></circle><circle cx="4" cy="19" r="1.6"></circle><circle cx="20" cy="19" r="1.6"></circle><line x1="5.3" y1="6.2" x2="9.8" y2="10"></line><line x1="18.7" y1="6.2" x2="14.2" y2="10"></line><line x1="5.3" y1="17.8" x2="9.8" y2="14"></line><line x1="18.7" y1="17.8" x2="14.2" y2="14"></line></svg><h3>Telegram 机器人</h3><p>按钮菜单、常见问题解答、分步预约或下单、向店主发送通知，并配有网页管理后台。</p><a class="more" href="/zh/telegram-bots">了解更多 →</a></div><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5CE1F0" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18h10.5a4.5 4.5 0 0 0 .6-8.96A6 6 0 0 0 6.4 10.1 4 4 0 0 0 7 18z"></path></svg><h3>手机端应用</h3><p>应用或商店可安装到手机主屏幕，拥有独立图标并全屏打开——无需应用商店。</p><a class="more" href="/zh/crm-integration">了解更多 →</a></div><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5CE1F0" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l8 4v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6z"></path><polyline points="8.5,12 11,14.5 15.5,9.5"></polyline></svg><h3>在线收款</h3><p>我们将 Stripe、YooKassa 或 bePaid 接入您自己的账户：顾客的款项直接进入您的账户，不经过我们。</p></div><div class="card"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5CE1F0" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 7H3"></path><path d="M3 17h18"></path><polyline points="7,3 3,7 7,11"></polyline><polyline points="17,13 21,17 17,21"></polyline></svg><h3>CRM 集成</h3><p>通过开放 API 将商店或网站与 CRM、记账系统和 n8n 打通：订单自动进入 CRM，状态与库存保持同步。</p></div><div class="card sv-cta"><h3>不确定需要什么？</h3><p>用您自己的话描述任务——我们通常会在一小时内通过电子邮件发送报价和工期。免费。</p><a class="btn fill" href="#contact">描述任务</a></div></div>
 </section>
 
 <section id="automation">
@@ -786,7 +788,22 @@ var FAQ = {
 };
 // The service cards that have a page of their own (scripts/build_service_pages.py), in the order of t.services.
 var SERVICE_PAGES = ['websites', 'web-apps', 'online-shops', 'telegram-bots', 'crm-integration'];
-function T() { var t = Object.assign({}, I18N[lang], EXTRA[lang], ACTUAL[lang], AUTOMATION[lang], LOOK[lang], FAQ[lang]); return t; }
+// Hero and services call to action: say what we build in the headline, lead to the free estimate.
+var HERO = {
+  ru: { hero_title: 'Сайты, веб‑приложения и Telegram‑боты', hero_lead: 'Команда ИИ‑агентов под контролем инженеров ведёт проект от заявки до запуска. Смету и цену вы видите до любой оплаты.', hero_cta: 'Получить смету бесплатно',
+    hero_facts: ['Смета бесплатно, обычно за час', 'От 700 € · оплата 50/50', 'Код и все права — ваши'],
+    sv_cta_title: 'Не знаете, что выбрать?', sv_cta_text: 'Опишите задачу своими словами — пришлём смету и сроки, обычно в течение часа. Бесплатно.', sv_cta_btn: 'Описать задачу' },
+  en: { hero_title: 'Websites, web apps and Telegram bots', hero_lead: 'A team of AI agents overseen by engineers takes your project from request to launch. You see the spec and the price before you pay anything.', hero_cta: 'Get a free estimate',
+    hero_facts: ['Free estimate, usually within an hour', 'From €700 · payment 50/50', 'The code and all rights are yours'],
+    sv_cta_title: 'Not sure what you need?', sv_cta_text: 'Describe the task in your own words — we e-mail the estimate and timeline, usually within an hour. Free.', sv_cta_btn: 'Describe the task' },
+  zh: { hero_title: '网站、Web 应用和 Telegram 机器人', hero_lead: '由工程师监督的 AI 智能体团队负责项目从需求到上线。在任何付款之前，您即可看到需求说明和价格。', hero_cta: '免费获取报价',
+    hero_facts: ['免费报价，通常一小时内', '700 欧元起 · 付款 50/50', '代码及全部权利归您'],
+    sv_cta_title: '不确定需要什么？', sv_cta_text: '用您自己的话描述任务——我们通常会在一小时内通过电子邮件发送报价和工期。免费。', sv_cta_btn: '描述任务' },
+  nl: { hero_title: 'Websites, webapps en Telegram‑bots', hero_lead: 'Een team van AI‑agents onder toezicht van engineers brengt uw project van aanvraag tot livegang. U ziet de specificatie en de prijs vóór elke betaling.', hero_cta: 'Gratis offerte aanvragen',
+    hero_facts: ['Gratis offerte, meestal binnen een uur', 'Vanaf €700 · betaling 50/50', 'De code en alle rechten zijn van u'],
+    sv_cta_title: 'Weet u niet wat u nodig heeft?', sv_cta_text: 'Beschrijf de taak in uw eigen woorden — wij mailen de offerte en planning, meestal binnen een uur. Gratis.', sv_cta_btn: 'Taak beschrijven' }
+};
+function T() { var t = Object.assign({}, I18N[lang], EXTRA[lang], ACTUAL[lang], AUTOMATION[lang], LOOK[lang], FAQ[lang], HERO[lang]); return t; }
 function render() {
   var t = T();
   document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang;
@@ -830,6 +847,9 @@ function render() {
     c.append(svg, el('h3', s.title), el('p', s.text));
     if (SERVICE_PAGES[i]) { var more = el('a', t.more, 'more'); more.href = '/' + lang + '/' + SERVICE_PAGES[i]; c.append(more); }
     return c; });
+  (function () {                // the free estimate fills the empty cells of the services grid
+    var g = document.getElementById('services-grid'), c = el('div', null, 'card sv-cta'), b = el('a', t.sv_cta_btn, 'btn fill');
+    b.href = '#contact'; c.append(el('h3', t.sv_cta_title), el('p', t.sv_cta_text), b); g.appendChild(c); })();
   fill(document.getElementById('auto-grid'), t.automation, function (a, i) {
     var c = el('div', null, 'agent'), top = el('div', null, 'top');
     top.append(el('span', '0' + (i + 1)), el('i'));
