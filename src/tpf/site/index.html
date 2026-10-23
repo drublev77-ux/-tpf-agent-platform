@@ -77,6 +77,8 @@ h2{font-size:clamp(30px,4.2vw,52px);line-height:1.12;letter-spacing:-.01em}
 .card{padding:clamp(24px,3vw,40px);min-height:230px;background:var(--panel);display:flex;flex-direction:column;gap:18px;transition:background .2s}
 .card:hover{background:#0E141B}
 .card h3{font-size:22px}.card p{color:var(--muted)}
+.sv-cta{grid-column:span 2;justify-content:center}.sv-cta .btn{align-self:flex-start}
+@media(max-width:900px){.sv-cta{grid-column:span 1}}
 .plist{border-top:1px solid var(--line2)}
 .card a.more{margin-top:auto;font-weight:600}
 .faq{border-top:1px solid var(--line2)}
@@ -786,7 +788,22 @@ var FAQ = {
 };
 // The service cards that have a page of their own (scripts/build_service_pages.py), in the order of t.services.
 var SERVICE_PAGES = ['websites', 'web-apps', 'online-shops', 'telegram-bots', 'crm-integration'];
-function T() { var t = Object.assign({}, I18N[lang], EXTRA[lang], ACTUAL[lang], AUTOMATION[lang], LOOK[lang], FAQ[lang]); return t; }
+// Hero and services call to action: say what we build in the headline, lead to the free estimate.
+var HERO = {
+  ru: { hero_title: 'Сайты, веб‑приложения и Telegram‑боты', hero_lead: 'Команда ИИ‑агентов под контролем инженеров ведёт проект от заявки до запуска. Смету и цену вы видите до любой оплаты.', hero_cta: 'Получить смету бесплатно',
+    hero_facts: ['Смета бесплатно, обычно за час', 'От 700 € · оплата 50/50', 'Код и все права — ваши'],
+    sv_cta_title: 'Не знаете, что выбрать?', sv_cta_text: 'Опишите задачу своими словами — пришлём смету и сроки, обычно в течение часа. Бесплатно.', sv_cta_btn: 'Описать задачу' },
+  en: { hero_title: 'Websites, web apps and Telegram bots', hero_lead: 'A team of AI agents overseen by engineers takes your project from request to launch. You see the spec and the price before you pay anything.', hero_cta: 'Get a free estimate',
+    hero_facts: ['Free estimate, usually within an hour', 'From €700 · payment 50/50', 'The code and all rights are yours'],
+    sv_cta_title: 'Not sure what you need?', sv_cta_text: 'Describe the task in your own words — we e-mail the estimate and timeline, usually within an hour. Free.', sv_cta_btn: 'Describe the task' },
+  zh: { hero_title: '网站、Web 应用和 Telegram 机器人', hero_lead: '由工程师监督的 AI 智能体团队负责项目从需求到上线。在任何付款之前，您即可看到需求说明和价格。', hero_cta: '免费获取报价',
+    hero_facts: ['免费报价，通常一小时内', '700 欧元起 · 付款 50/50', '代码及全部权利归您'],
+    sv_cta_title: '不确定需要什么？', sv_cta_text: '用您自己的话描述任务——我们通常会在一小时内通过电子邮件发送报价和工期。免费。', sv_cta_btn: '描述任务' },
+  nl: { hero_title: 'Websites, webapps en Telegram‑bots', hero_lead: 'Een team van AI‑agents onder toezicht van engineers brengt uw project van aanvraag tot livegang. U ziet de specificatie en de prijs vóór elke betaling.', hero_cta: 'Gratis offerte aanvragen',
+    hero_facts: ['Gratis offerte, meestal binnen een uur', 'Vanaf €700 · betaling 50/50', 'De code en alle rechten zijn van u'],
+    sv_cta_title: 'Weet u niet wat u nodig heeft?', sv_cta_text: 'Beschrijf de taak in uw eigen woorden — wij mailen de offerte en planning, meestal binnen een uur. Gratis.', sv_cta_btn: 'Taak beschrijven' }
+};
+function T() { var t = Object.assign({}, I18N[lang], EXTRA[lang], ACTUAL[lang], AUTOMATION[lang], LOOK[lang], FAQ[lang], HERO[lang]); return t; }
 function render() {
   var t = T();
   document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang;
@@ -830,6 +847,9 @@ function render() {
     c.append(svg, el('h3', s.title), el('p', s.text));
     if (SERVICE_PAGES[i]) { var more = el('a', t.more, 'more'); more.href = '/' + lang + '/' + SERVICE_PAGES[i]; c.append(more); }
     return c; });
+  (function () {                // the free estimate fills the empty cells of the services grid
+    var g = document.getElementById('services-grid'), c = el('div', null, 'card sv-cta'), b = el('a', t.sv_cta_btn, 'btn fill');
+    b.href = '#contact'; c.append(el('h3', t.sv_cta_title), el('p', t.sv_cta_text), b); g.appendChild(c); })();
   fill(document.getElementById('auto-grid'), t.automation, function (a, i) {
     var c = el('div', null, 'agent'), top = el('div', null, 'top');
     top.append(el('span', '0' + (i + 1)), el('i'));
