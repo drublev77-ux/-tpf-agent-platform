@@ -1,6 +1,6 @@
 /* TPF hero: the graphite brain from the Figma image as a live 3D scene (cortex mesh from the MNI ICBM152 MRI template).
    Loaded by index.html only after the page has loaded, on screens that can run WebGL; until then, and wherever it cannot run,
-   the same picture stays as /brand-hero.jpg. Settings chosen by the owner: rotation 2.4x, glow 1.6x, circuits 1.6x, network 80%. */
+   the same picture stays as /brand-hero.jpg. Settings chosen by the owner: rotation 1.3x, glow 0.5x in the site's warm colour (#FFB35C), circuits 2.0x, network 100%. */
 (function () {
   var stage = document.getElementById('hero3d');
   if (!stage || !window.THREE) return;
@@ -60,7 +60,7 @@
       ' float up=R.y;',
       ' vec3 env=mix(vec3(0.01,0.015,0.02),vec3(0.62,0.64,0.66),smoothstep(-0.05,0.9,up));',
       ' env+=vec3(0.15,0.75,0.95)*0.55*smoothstep(0.35,1.0,abs(R.x))*(1.0-smoothstep(0.4,0.95,up));',
-      ' env+=vec3(1.0,0.5,0.15)*0.22*smoothstep(-0.1,-0.9,up);',
+      ' env+=vec3(1.0,0.70,0.36)*0.22*smoothstep(-0.1,-0.9,up);',
       ' float ndv=max(dot(N,V),0.0); float fres=0.28+0.72*pow(1.0-ndv,3.0);',
       ' vec3 L=normalize(vec3(-0.35,0.75,0.6)); float diff=max(dot(N,L),0.0);',
       ' vec3 H=normalize(L+V); float sp=pow(max(dot(N,H),0.0),90.0)*0.9+pow(max(dot(N,H),0.0),16.0)*0.12;',
@@ -77,12 +77,12 @@
       ' float lineC=1.0-smoothstep(0.0,fw*1.1,abs(vFold-0.42));',
       ' float lineW=1.0-smoothstep(0.0,fw*3.5+0.03,abs(vFold-0.45));',
       ' float g=smoothstep(0.7,1.0,vFold);',
-      ' vec3 amber=vec3(1.0,0.42,0.06);',
-      ' col+=amber*(lineW*0.5+g*0.32+smoothstep(0.5,1.0,vCav)*0.25)*wave*uGlow+vec3(1.0,0.66,0.28)*lineC*0.75*wave*uGlow;',
-      ' col+=vec3(1.0,0.45,0.08)*crack*0.25*smoothstep(0.2,0.6,vFold+0.3)*uGlow;',     // some cracks catch the fire
+      ' vec3 amber=vec3(1.0,0.70,0.36);',
+      ' col+=amber*(lineW*0.5+g*0.32+smoothstep(0.5,1.0,vCav)*0.25)*wave*uGlow+vec3(1.0,0.82,0.6)*lineC*0.75*wave*uGlow;',
+      ' col+=vec3(1.0,0.70,0.36)*crack*0.25*smoothstep(0.2,0.6,vFold+0.3)*uGlow;',     // some cracks catch the fire
       // tiny amber sparks inside the grooves
       ' float spk=step(0.985,h1(floor(vP*22.0)))*g*smoothstep(0.35,0.1,length(fract(vP*22.0)-0.5));',
-      ' col+=vec3(1.0,0.75,0.35)*spk*(0.6+0.6*sin(uTime*4.0+h1(floor(vP*22.0))*30.0))*2.0*uGlow;',
+      ' col+=vec3(1.0,0.82,0.6)*spk*(0.6+0.6*sin(uTime*4.0+h1(floor(vP*22.0))*30.0))*2.0*uGlow;',
       // cyan circuit traces along cell borders, round nodes with dark centres
       ' float tf1, te; vec3 tid; voro(vP*3.6, tf1, te, tid);',
       ' float on=step(0.62,h1(tid));',
@@ -222,7 +222,7 @@
   scene.add(new THREE.Points(new THREE.BufferGeometry().setFromPoints(dustPts), dustMat));
 
   // ---------- the owner's settings ----------
-  var S = { speed: 2.4, glow: 1.6, trace: 1.6, net: 0.8 };
+  var S = { speed: 1.3, glow: 0.5, trace: 2.0, net: 1.0 };
   brainMat.uniforms.uGlow.value = S.glow; brainMat.uniforms.uTrace.value = S.trace;
   if (bloom) bloom.strength = Math.min(0.9, 0.55 + 0.35 * Math.max(S.glow, S.net));   // capped: at glow 1.6 a stronger halo washes the metal out
   lineMat.opacity = 0.5 * S.net; nodeMat.opacity = S.net; haloMat.opacity = 0.28 * S.net; pulseMat.opacity = S.net;
