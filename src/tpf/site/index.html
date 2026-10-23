@@ -127,6 +127,7 @@ a.case:hover{border-color:var(--line2);color:var(--ink)}.case img{width:100%;hei
 .facts{margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:8px;font:13px 'JetBrains Mono','Noto Sans SC',monospace}.facts span{padding:7px 12px;border:1px solid var(--line2);border-radius:999px}
 .case .open{color:var(--accent);font-weight:600;margin-top:auto}.case .open.off{color:var(--soft);font-weight:500}
 @media(max-width:820px){.cases{grid-template-columns:1fr}}
+.cases:not(.all) .case[data-later]{display:none}.cases-more{margin-top:24px;display:flex;justify-content:center}.cases-more .btn{background:transparent}.cases-more .btn:hover{border-color:var(--accent)}
 .contact{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:clamp(32px,6vw,80px)}
 .contact>div{display:flex;flex-direction:column;gap:26px}.contact h2{font-size:clamp(32px,4.4vw,56px);line-height:1.08}
 form{display:flex;flex-direction:column;gap:20px;padding:clamp(24px,3.5vw,48px);background:var(--panel);border:1px solid var(--line);border-radius:28px}
@@ -219,6 +220,7 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 <section id="cases">
 <div class="head"><div><div class="kicker" data-t="cs_kicker"></div><h2 data-t="cs_title"></h2></div><p data-t="cs_lead"></p></div>
 <div class="cases" id="caselist"></div>
+<div class="cases-more"><button type="button" class="btn line" id="casemore" aria-controls="caselist" aria-expanded="false"></button></div>
 </section>
 
 <section id="faq">
@@ -826,8 +828,15 @@ function render() {
   fill(document.getElementById('faqlist'), answers, function (f) {
     var d = document.createElement('details'), s = document.createElement('summary');
     s.append(el('h3', f[0])); d.append(s, el('p', f[1])); return d; });
-  fill(document.getElementById('caselist'), CASES, function (c) {
+  // the strongest four first (our own product leads); the rest open on request, so the list does not read as a wall of demos
+  var CASE_ORDER = [1, 2, 0, 5, 3, 4, 6, 7], CASES_SHOWN = 4;
+  var MORE = { ru: 'Показать все работы', en: 'Show all work', zh: '显示全部案例', nl: 'Alle projecten tonen' };
+  var caseList = document.getElementById('caselist'), caseMore = document.getElementById('casemore');
+  caseMore.textContent = (MORE[lang] || MORE.en) + ' (' + CASES.length + ')';
+  caseMore.onclick = function () { caseList.classList.add('all'); caseMore.setAttribute('aria-expanded', 'true'); caseMore.parentNode.style.display = 'none'; };
+  fill(caseList, CASE_ORDER.map(function (i) { return CASES[i]; }), function (c, n) {
     var x = c[lang], card = el(c.href ? 'a' : 'div', null, 'case'), img = document.createElement('img'), body = el('div'), facts = el('ul', null, 'facts');
+    if (n >= CASES_SHOWN) card.setAttribute('data-later', '');
     if (c.href) { card.href = c.href; card.target = '_blank'; card.rel = 'noopener'; }
     img.src = c.img; img.alt = x[1]; img.width = 960; img.height = 600; img.loading = 'lazy';
     x[3].forEach(function (f) { facts.append(el('span', f)); });
