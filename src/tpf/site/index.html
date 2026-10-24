@@ -166,7 +166,7 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 <img class="mark" src="/brand-mark.jpg" alt="" width="52" height="52">
 <div>TPF<span>technology</span></div></a>
 <nav>
-<a href="#services" data-t="nav_services"></a><a href="#automation" data-t="nav_auto"></a><a href="#prices" data-t="nav_prices"></a><a href="#stack" data-t="nav_stack"></a><a href="#cases" data-t="nav_cases"></a><a href="#contact" data-t="nav_contact"></a>
+<a href="#services" data-t="nav_services"></a><a href="#automation" data-t="nav_auto"></a><a href="#prices" data-t="nav_prices"></a><a href="#stack" data-t="nav_stack"></a><a href="#contact" data-t="nav_contact"></a>
 </nav>
 <div class="right">
 <div class="langs" role="group" id="langs"></div>
@@ -221,11 +221,6 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 <div><div class="kicker" data-t="why_kicker"></div><h2 data-t="why_title"></h2><p data-t="why_lead"></p></div>
 <div class="stats" id="stats"></div>
 </div>
-</section>
-
-<section id="cases">
-<div class="head"><div><div class="kicker" data-t="cs_kicker"></div><h2 data-t="cs_title"></h2></div><p data-t="cs_lead"></p></div>
-<div class="cases" id="caselist"></div>
 </section>
 
 <section id="faq">
@@ -321,7 +316,7 @@ var I18N = {
     stats: [ { num: '[N]+', label: 'реализованных проектов' }, { num: '[N] лет', label: 'опыта команды' }, { num: '100%', label: 'прав на код — у вас' }, { num: '24/7', label: 'мониторинг после запуска' } ],
     cs_kicker: '05 / ПРОЕКТЫ', cs_title: 'Избранные работы', cs_all: 'Все проекты →', shot: '[СКРИНШОТ ПРОЕКТА]',
     case_tags: ['МОБИЛЬНОЕ ПРИЛОЖЕНИЕ', 'ВЕБ‑ПЛАТФОРМА', 'AI‑РЕШЕНИЕ'], case_title: '[Название проекта]', case_text: '[Короткое описание задачи и результата]',
-    ct_kicker: '06 / КОНТАКТЫ', ct_title: 'Расскажите о вашей идее', ct_lead: 'Ответим в течение рабочего дня, предложим решение и оценим сроки — бесплатно.',
+    ct_kicker: '05 / КОНТАКТЫ', ct_title: 'Расскажите о вашей идее', ct_lead: 'Ответим в течение рабочего дня, предложим решение и оценим сроки — бесплатно.',
     email: '[EMAIL]', phone: '[ТЕЛЕФОН]', addr: '[Город, адрес]',
     f_name: 'Имя', f_name_ph: 'Как к вам обращаться', f_contact: 'Телефон или e‑mail', f_contact_ph: 'Для обратной связи', f_type: 'Тип проекта',
     types: ['Разработка ПО', 'Веб‑разработка', 'Мобильное приложение', 'AI & ML решение', 'Облако / DevOps', 'Кибербезопасность'],
@@ -381,7 +376,7 @@ var I18N = {
     stats: [ { num: '[N]+', label: 'projects delivered' }, { num: '[N] yrs', label: 'of team experience' }, { num: '100%', label: 'code ownership is yours' }, { num: '24/7', label: 'post‑launch monitoring' } ],
     cs_kicker: '05 / PROJECTS', cs_title: 'Selected work', cs_all: 'All projects →', shot: '[PROJECT SCREENSHOT]',
     case_tags: ['MOBILE APP', 'WEB PLATFORM', 'AI SOLUTION'], case_title: '[Project name]', case_text: '[Short description of the task and result]',
-    ct_kicker: '06 / CONTACT', ct_title: 'Tell us about your idea', ct_lead: 'We reply within one business day, propose a solution and estimate the timeline — free of charge.',
+    ct_kicker: '05 / CONTACT', ct_title: 'Tell us about your idea', ct_lead: 'We reply within one business day, propose a solution and estimate the timeline — free of charge.',
     email: '[EMAIL]', phone: '[PHONE]', addr: '[City, address]',
     f_name: 'Name', f_name_ph: 'How should we address you', f_contact: 'Phone or email', f_contact_ph: 'So we can get back to you', f_type: 'Project type',
     types: ['Software development', 'Web development', 'Mobile app', 'AI & ML solution', 'Cloud / DevOps', 'Cybersecurity'],
@@ -441,7 +436,7 @@ var I18N = {
     stats: [ { num: '[N]+', label: '已完成项目' }, { num: '[N] 年', label: '团队经验' }, { num: '100%', label: '代码归您所有' }, { num: '24/7', label: '上线后监控' } ],
     cs_kicker: '05 / 项目', cs_title: '精选案例', cs_all: '全部项目 →', shot: '[项目截图]',
     case_tags: ['移动应用', 'WEB 平台', 'AI 解决方案'], case_title: '[项目名称]', case_text: '[任务与成果简介]',
-    ct_kicker: '06 / 联系我们', ct_title: '告诉我们您的想法', ct_lead: '我们将在一个工作日内回复，免费提供解决方案与工期评估。',
+    ct_kicker: '05 / 联系我们', ct_title: '告诉我们您的想法', ct_lead: '我们将在一个工作日内回复，免费提供解决方案与工期评估。',
     email: '[邮箱]', phone: '[电话]', addr: '[城市，地址]',
     f_name: '姓名', f_name_ph: '如何称呼您', f_contact: '电话或邮箱', f_contact_ph: '便于我们联系您', f_type: '项目类型',
     types: ['软件开发', '网站开发', '移动应用', 'AI 与机器学习', '云 / DevOps', '网络安全'],
@@ -632,17 +627,17 @@ var AUTOMATION = {
 
 // Texts and prices of the current look of the page; merged last.
 var LOOK = {
-  ru: { cs_lead: 'Демонстрационные проекты собраны на нашей платформе от заявки до запуска. Здесь же — собственный продукт команды.', case_open: 'Открыть сайт →', case_ask: 'Вход по паролю — покажем по запросу', sv_kicker: '01 / УСЛУГИ', st_kicker: '03 / ТЕХНОЛОГИИ', why_kicker: '04 / ПОЧЕМУ МЫ', cs_kicker: '05 / ПРОЕКТЫ', ct_kicker: '06 / КОНТАКТЫ',
+  ru: { cs_lead: 'Демонстрационные проекты собраны на нашей платформе от заявки до запуска. Здесь же — собственный продукт команды.', case_open: 'Открыть сайт →', case_ask: 'Вход по паролю — покажем по запросу', sv_kicker: '01 / УСЛУГИ', st_kicker: '03 / ТЕХНОЛОГИИ', why_kicker: '04 / ПОЧЕМУ МЫ', cs_kicker: '05 / ПРОЕКТЫ', ct_kicker: '05 / КОНТАКТЫ',
     hero_facts: ['Смета бесплатно и до оплаты', 'Оплата 50/50', 'Код и все права — ваши'],
     usd: ['от $780', 'от $980', 'от $1 900', 'от $2 800', 'от $1 900', 'от $1 900', 'от $544', 'от $1 360', ''],
     f_currency: 'Валюта оплаты',
     pr_note: 'Оплата банковской картой в евро или долларах США — валюту вы выбираете в заявке. Суммы в рублях — ориентир по курсу на октябрь 2026 года. В цену не входят платные сторонние сервисы, если они понадобятся (например, собственный домен).' },
-  en: { cs_lead: 'The demo projects were built on our platform from request to launch. Our own product is shown here too.', case_open: 'Open the site →', case_ask: 'Sign‑in required — shown on request', sv_kicker: '01 / SERVICES', st_kicker: '03 / TECHNOLOGY', why_kicker: '04 / WHY US', cs_kicker: '05 / PROJECTS', ct_kicker: '06 / CONTACT',
+  en: { cs_lead: 'The demo projects were built on our platform from request to launch. Our own product is shown here too.', case_open: 'Open the site →', case_ask: 'Sign‑in required — shown on request', sv_kicker: '01 / SERVICES', st_kicker: '03 / TECHNOLOGY', why_kicker: '04 / WHY US', cs_kicker: '05 / PROJECTS', ct_kicker: '05 / CONTACT',
     hero_facts: ['Free estimate before you pay', 'Payment 50/50', 'The code and all rights are yours'],
     usd: ['from $780', 'from $980', 'from $2,400', 'from $3,500', 'from $2,400', 'from $2,400', 'from $800', 'from $2,000', ''],
     f_currency: 'Payment currency',
     pr_note: 'You pay by card in euros or US dollars — choose the currency in the request. Prices do not include paid third‑party services if any are needed (for example, your own domain).' },
-  zh: { cs_lead: '演示项目均在我们的平台上从需求到上线全流程完成；这里也展示团队自己的产品。', case_open: '打开网站 →', case_ask: '需登录 — 可应要求演示', sv_kicker: '01 / 服务', st_kicker: '03 / 技术', why_kicker: '04 / 为什么选择我们', cs_kicker: '05 / 项目', ct_kicker: '06 / 联系我们',
+  zh: { cs_lead: '演示项目均在我们的平台上从需求到上线全流程完成；这里也展示团队自己的产品。', case_open: '打开网站 →', case_ask: '需登录 — 可应要求演示', sv_kicker: '01 / 服务', st_kicker: '03 / 技术', why_kicker: '04 / 为什么选择我们', cs_kicker: '05 / 项目', ct_kicker: '05 / 联系我们',
     hero_facts: ['付款前免费报价', '付款 50/50', '代码及全部权利归您'],
     usd: ['$780 起', '$980 起', '$2,400 起', '$3,500 起', '$2,400 起', '$2,400 起', '$800 起', '$2,000 起', ''],
     f_currency: '付款货币',
@@ -674,7 +669,7 @@ I18N.nl = Object.assign({}, I18N.en, {
   hitl_text: 'Een opdracht gaat van aanvraag tot oplevering zonder handmatige stappen. U ziet de status live; engineers van TPF bewaken de kwaliteit.',
   hitl_tags: ['Aanvraag → Specificatie', 'Code → Tests', 'Release → Oplevering'],
   why_kicker: '04 / WAAROM WIJ', cs_kicker: '05 / PROJECTEN', cs_title: 'Geselecteerd werk', cs_all: 'Alle projecten →',
-  ct_kicker: '06 / CONTACT', ct_title: 'Vertel ons over uw idee',
+  ct_kicker: '05 / CONTACT', ct_title: 'Vertel ons over uw idee',
   f_name: 'Naam', f_name_ph: 'Hoe mogen we u aanspreken', f_contact: 'Telefoon of e‑mail', f_contact_ph: 'Zodat we contact kunnen opnemen', f_type: 'Soort project',
   f_about: 'Over het project', f_about_ph: 'Beschrijf de opdracht in het kort', f_submit: 'Aanvraag versturen',
   footer: '© 2026 TPF Technology. Alle rechten voorbehouden.'
@@ -741,7 +736,7 @@ AUTOMATION.nl = {
   au_cta: 'Beschrijf het proces',
   au_note: 'Wij koppelen geen banken, overheidssystemen, software die op uw eigen computers draait of diensten zonder openbare API. Elke koppeling controleert u op de testversie vóór de laatste betaling.'
 };
-LOOK.nl = { cs_lead: 'De demoprojecten zijn op ons platform gebouwd, van aanvraag tot livegang. Ook ons eigen product staat hier.', case_open: 'Site openen →', case_ask: 'Inloggen vereist — tonen wij op verzoek', sv_kicker: '01 / DIENSTEN', st_kicker: '03 / TECHNOLOGIE', why_kicker: '04 / WAAROM WIJ', cs_kicker: '05 / PROJECTEN', ct_kicker: '06 / CONTACT',
+LOOK.nl = { cs_lead: 'De demoprojecten zijn op ons platform gebouwd, van aanvraag tot livegang. Ook ons eigen product staat hier.', case_open: 'Site openen →', case_ask: 'Inloggen vereist — tonen wij op verzoek', sv_kicker: '01 / DIENSTEN', st_kicker: '03 / TECHNOLOGIE', why_kicker: '04 / WAAROM WIJ', cs_kicker: '05 / PROJECTEN', ct_kicker: '05 / CONTACT',
   hero_facts: ['Gratis offerte vóór betaling', 'Betaling 50/50', 'De code en alle rechten zijn van u'],
   usd: ['vanaf $780', 'vanaf $980', 'vanaf $2.400', 'vanaf $3.500', 'vanaf $2.400', 'vanaf $2.400', 'vanaf $800', 'vanaf $2.000', ''],
   f_currency: 'Valuta',
@@ -837,15 +832,6 @@ function render() {
   fill(document.getElementById('faqlist'), answers, function (f) {
     var d = document.createElement('details'), s = document.createElement('summary');
     s.append(el('h3', f[0])); d.append(s, el('p', f[1])); return d; });
-  // only the four strongest works are shown: our own product first, then three demos built on the platform
-  var CASE_ORDER = [1, 2, 0, 5];
-  fill(document.getElementById('caselist'), CASE_ORDER.map(function (i) { return CASES[i]; }), function (c) {
-    var x = c[lang], card = el(c.href ? 'a' : 'div', null, 'case'), img = document.createElement('img'), body = el('div'), facts = el('ul', null, 'facts');
-    if (c.href) { card.href = c.href; card.target = '_blank'; card.rel = 'noopener'; }
-    img.src = c.img; img.alt = x[1]; img.width = 960; img.height = 600; img.loading = 'lazy';
-    x[3].forEach(function (f) { facts.append(el('span', f)); });
-    body.append(el('div', x[0], 'mono casetag'), el('h3', x[1]), el('p', x[2]), facts, el('span', c.href ? t.case_open : t.case_ask, c.href ? 'open' : 'open off'));
-    card.append(img, body); return card; });
   document.getElementById('langs').setAttribute('aria-label', t.lang_label);
   fill(document.getElementById('langs'), LANGS, function (l) {
     var b = el('a', l[1]); b.href = '/' + l[0]; b.hreflang = l[0] === 'zh' ? 'zh-Hans' : l[0]; b.setAttribute('aria-current', String(l[0] === lang));

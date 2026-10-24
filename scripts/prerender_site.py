@@ -72,7 +72,7 @@ def main() -> None:
             page = browser.new_page(viewport={"width": 1280, "height": 900}, locale="ru-RU")
             page.route("**/*", lambda route: route.continue_() if "127.0.0.1" in route.request.url else route.abort())  # no web fonts needed
             page.goto(f"http://127.0.0.1:{port}/" + ("" if name == "root" else lang), wait_until="domcontentloaded")
-            page.wait_for_function("document.querySelectorAll('.case').length > 0 && document.title.length > 0")
+            page.wait_for_function("document.querySelectorAll('.prow').length > 0 && document.title.length > 0")
             html = "<!doctype html>\n" + page.evaluate("document.documentElement.outerHTML") + "\n"
             (SITE / f"index.{name}.html").write_text(finish(html, lang, name == "root"), encoding="utf-8")
             print(name, len(html))

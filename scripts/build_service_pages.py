@@ -21,10 +21,8 @@ BASE = "https://tpf-technology.com"
 LANGS = {"ru": ("ru", "ru_RU"), "en": ("en", "en_US"), "nl": ("nl", "nl_NL"), "zh": ("zh-Hans", "zh_CN")}
 SLUGS = ("websites", "web-apps", "online-shops", "telegram-bots", "crm-integration")
 
-# Positions in the home page's price list and project list (index.html: prices[] and CASES[]).
+# Positions in the home page's price list (index.html: prices[]).
 PRICES = {"websites": (0, 1), "web-apps": (2, 3, 5), "online-shops": (4,), "telegram-bots": (6, 7), "crm-integration": (4,)}
-# positions in the home page's works: 0 Global Gain Engine, 1 Glina shop, 2 Remont-Brigada, 3 Glina bot
-CASES = {"websites": (1, 0), "web-apps": (0, 2), "online-shops": (1,), "telegram-bots": (3,), "crm-integration": (0, 1)}
 
 UI = {
     "ru": dict(home="Главная", price_h="Цены", price_note="Точная цена — в смете: бесплатно и до оплаты.",
@@ -261,7 +259,7 @@ def home_facts(lang: str) -> tuple[list[dict], list[dict]]:
     cases = [dict(href=href or "", img=img, title=html.unescape(t), text=html.unescape(p))
              for href, img, t, p in re.findall(r'<(?:a|div) class="case"(?: href="([^"]*)")?[^>]*><img src="([^"]+)"[^>]*>'
                                                r'<div><div class="mono casetag">.*?</div><h3>(.*?)</h3><p>(.*?)</p>', page)]
-    assert len(prices) >= 8 and len(cases) == 4, (lang, len(prices), len(cases))
+    assert len(prices) >= 8 and not cases, (lang, len(prices), len(cases))
     return prices, cases
 
 def url(lang: str, slug: str) -> str:
@@ -278,10 +276,6 @@ def build(lang: str, slug: str, prices: list[dict], cases: list[dict]) -> str:
     price_html = "".join(f'<div class="price"><div><h3>{esc(p["title"])}</h3><p>{esc(p["text"])}</p></div>'
                          f'<div><div class="sum">{esc(p["sum"])}</div>' + (f'<div class="alt">{esc(p["alt"])}</div>' if p["alt"] else "")
                          + "</div></div>" for p in rows)
-    case_html = "".join(
-        (f'<a class="case" href="{esc(x["href"])}" target="_blank" rel="noopener">' if x["href"] else '<div class="case">')
-        + f'<img src="{esc(x["img"])}" alt="{esc(x["title"])}" width="960" height="600" loading="lazy"><div><h3>{esc(x["title"])}</h3>'
-        f'<p>{esc(x["text"])}</p></div>' + ("</a>" if x["href"] else "</div>") for x in (cases[i] for i in CASES[slug]))
     other = "".join(f'<a href="/{lang}/{s}">{esc(PAGES[s][lang]["name"])}</a>' for s in SLUGS if s != slug)
     first = int(re.sub(r"\D", "", rows[0]["sum"]) or 0)
     ld = {"@context": "https://schema.org", "@graph": [
@@ -335,8 +329,6 @@ def build(lang: str, slug: str, prices: list[dict], cases: list[dict]) -> str:
 <ul class="inc">{"".join(f"<li>{esc(x)}</li>" for x in c["includes"])}</ul>
 <h2>{esc(ui["how_h"])}</h2>
 <ol class="steps">{"".join(f"<li>{esc(x)}</li>" for x in ui["steps"])}</ol>
-<h2>{esc(ui["cases_h"])}</h2>
-<div class="cases">{case_html}</div>
 <h2>{esc(ui["other_h"])}</h2>
 <div class="other">{other}</div>
 <div class="cta"><h2 style="margin-top:0">{esc(ui["cta_h"])}</h2><p>{esc(ui["cta_lead"])}</p>
