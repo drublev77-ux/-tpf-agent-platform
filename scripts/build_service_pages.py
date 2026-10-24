@@ -23,7 +23,8 @@ SLUGS = ("websites", "web-apps", "online-shops", "telegram-bots", "crm-integrati
 
 # Positions in the home page's price list and project list (index.html: prices[] and CASES[]).
 PRICES = {"websites": (0, 1), "web-apps": (2, 3, 5), "online-shops": (4,), "telegram-bots": (6, 7), "crm-integration": (4,)}
-CASES = {"websites": (7, 6), "web-apps": (3, 0, 4), "online-shops": (2,), "telegram-bots": (5,), "crm-integration": (1, 2)}
+# positions in the home page's works: 0 Global Gain Engine, 1 Glina shop, 2 Remont-Brigada, 3 Glina bot
+CASES = {"websites": (1, 0), "web-apps": (0, 2), "online-shops": (1,), "telegram-bots": (3,), "crm-integration": (0, 1)}
 
 UI = {
     "ru": dict(home="Главная", price_h="Цены", price_note="Точная цена — в смете: бесплатно и до оплаты.",
@@ -260,7 +261,7 @@ def home_facts(lang: str) -> tuple[list[dict], list[dict]]:
     cases = [dict(href=href or "", img=img, title=html.unescape(t), text=html.unescape(p))
              for href, img, t, p in re.findall(r'<(?:a|div) class="case"(?: href="([^"]*)")?[^>]*><img src="([^"]+)"[^>]*>'
                                                r'<div><div class="mono casetag">.*?</div><h3>(.*?)</h3><p>(.*?)</p>', page)]
-    assert len(prices) >= 8 and len(cases) == 8, (lang, len(prices), len(cases))
+    assert len(prices) >= 8 and len(cases) == 4, (lang, len(prices), len(cases))
     return prices, cases
 
 def url(lang: str, slug: str) -> str:
