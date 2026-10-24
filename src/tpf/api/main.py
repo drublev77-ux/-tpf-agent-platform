@@ -413,6 +413,13 @@ BLOG_PAGES = {*(f"/{lang}/blog" for lang in BLOG), *(f"/{lang}/blog/{a['slug']}"
 SITE_PAGES |= BLOG_PAGES                     # one address per blog page too: /en/blog/ sends 308 to /en/blog
 
 
+def _blog_index(lang: str):
+    async def serve() -> FileResponse:
+        return FileResponse(BLOG_DIR / f"{lang}.html", media_type="text/html; charset=utf-8",
+                            headers={"Cache-Control": "public, max-age=300"})
+    return serve
+
+
 def _blog_page(lang: str, name: str):
     async def serve() -> FileResponse:
         return FileResponse(BLOG_DIR / lang / f"{name}.html", media_type="text/html; charset=utf-8",
@@ -421,9 +428,9 @@ def _blog_page(lang: str, name: str):
 
 
 for _lang, _arts in BLOG.items():
-    page(f"/{_lang}/blog")(_blog_page(_lang, _lang))                      # the blog index: blog/<lang>.html
+    page(f"/{_lang}/blog")(_blog_index(_lang))                            # the blog index: blog/<lang>.html
     for _a in _arts:
-        page(f"/{_lang}/blog/{_a['slug']}")(_blog_page(_lang, f"{_a['slug']}"))
+        page(f"/{_lang}/blog/{_a['slug']}")(_blog_page(_lang, _a["slug"]))
 
 
 @page("/robots.txt")
