@@ -34,7 +34,7 @@ def test_each_language_page_is_filled_in_and_fresh(name, lang, address):
     assert len(re.findall(r"<h1[ >]", html)) == 1 and re.search(r"<h1>.*?\S.*?</h1>", html, re.S)
     text = re.sub(r"<script.*?</script>|<style.*?</style>|<[^>]+>", " ", html, flags=re.S)
     assert len(text.split()) > 150 if name != "zh" else len(text) > 1500         # the page's text is in the HTML itself
-    assert html.count('class="case"') == 8 and 'href="/en"' in html and 'href="/zh"' in html and 'href="/ru"' in html and 'href="/nl"' in html
+    assert 'id="cases"' not in html and 'href="/en"' in html and 'href="/zh"' in html and 'href="/ru"' in html and 'href="/nl"' in html
     ld = json.loads(re.search(r'<script type="application/ld\+json" id="ld">(.*?)</script>', html, re.S).group(1))
     assert ld["@graph"][0]["@type"] == "Organization" and ld["@graph"][0]["description"] == desc.replace("&amp;", "&")
     assert f'<meta property="og:url" content="https://tpf-technology.com{address}">' in html
