@@ -405,6 +405,27 @@ for _lang in SITE_LANGS:
     page(f"/{_lang}")(_lang_page(_lang))
 
 
+# The blog: the finished articles, each in the language it was written (scripts/build_blog_pages.py writes
+# the pages and the manifest the routes and the sitemap below are driven by).
+BLOG_DIR = SITE_DIR / "blog"
+BLOG: dict[str, list[dict]] = json.loads((BLOG_DIR / "manifest.json").read_text()) if (BLOG_DIR / "manifest.json").is_file() else {}
+BLOG_PAGES = {*(f"/{lang}/blog" for lang in BLOG), *(f"/{lang}/blog/{a['slug']}" for lang, arts in BLOG.items() for a in arts)}
+SITE_PAGES |= BLOG_PAGES                     # one address per blog page too: /en/blog/ sends 308 to /en/blog
+
+
+def _blog_page(lang: str, name: str):
+    async def serve() -> FileResponse:
+        return FileResponse(BLOG_DIR / lang / f"{name}.html", media_type="text/html; charset=utf-8",
+                            headers={"Cache-Control": "public, max-age=300"})
+    return serve
+
+
+for _lang, _arts in BLOG.items():
+    page(f"/{_lang}/blog")(_blog_page(_lang, _lang))                      # the blog index: blog/<lang>.html
+    for _a in _arts:
+        page(f"/{_lang}/blog/{_a['slug']}")(_blog_page(_lang, f"{_a['slug']}"))
+
+
 @page("/robots.txt")
 async def robots() -> Response:
     # Order pages, the admin area and the endpoints forms and applications post to are nobody's search result.
@@ -446,6 +467,9 @@ async def sitemap() -> Response:
         also = "".join(f'<xhtml:link rel="alternate" hreflang="{code}" href="{SITE_URL}/{lang}/{slug}"/>' for lang, code in SITE_LANGS.items()) \
             + f'<xhtml:link rel="alternate" hreflang="x-default" href="{SITE_URL}/en/{slug}"/>'
         urls += "".join(f"<url><loc>{SITE_URL}/{lang}/{slug}</loc><lastmod>{changed}</lastmod>{also}</url>" for lang in SITE_LANGS)
+    for lang, arts in BLOG.items():                        # the blog index of each language
+        urls += f"<url><loc>{SITE_URL}/{lang}/blog</loc><lastmod>{changed}</lastmod></url>"
+        urls += "".join(f"<url><loc>{SITE_URL}/{lang}/blog/{a['slug']}</loc><lastmod>{changed}</lastmod></url>" for a in arts)
     urls += f"<url><loc>{SITE_URL}/privacy</loc><lastmod>{changed}</lastmod></url>"
     xml = ('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
            f'xmlns:xhtml="http://www.w3.org/1999/xhtml">{urls}</urlset>')

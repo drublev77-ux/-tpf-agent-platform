@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ru"><head>
-<meta name="tpf-source" content="b3c2fbc1a516657b">
+<meta name="tpf-source" content="d89cd18cf6e4fe59">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Сайты, веб‑приложения и Telegram‑боты под ключ — TPF Technology</title>
@@ -250,13 +250,13 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 <footer>
 <img src="/brand.jpg" alt="TPF Technology" loading="lazy" width="240" height="94">
 <span data-t="footer">© 2026 TPF Technology. Все права защищены.</span>
-<div><a href="#services" data-t="nav_services">Услуги</a><a href="#prices" data-t="nav_prices">Цены</a><a href="#contact" data-t="nav_contact">Контакты</a><a href="/privacy" data-t="privacy">Политика обработки данных</a></div>
+<div><a href="#services" data-t="nav_services">Услуги</a><a href="#prices" data-t="nav_prices">Цены</a><a href="#contact" data-t="nav_contact">Контакты</a><a id="bloglink" data-t="nav_blog" href="/ru/blog">Блог</a><a href="/privacy" data-t="privacy">Политика обработки данных</a></div>
 </footer>
 
 <script>
 var I18N = {
   ru: {
-    lang_label: 'Язык', nav_services: 'Услуги', nav_prices: 'Цены', nav_agents: 'ИИ‑агенты', nav_stack: 'Интеграции', nav_cases: 'Проекты', nav_contact: 'Контакты', cta_discuss: 'Обсудить проект',
+    lang_label: 'Язык', nav_blog: 'Блог', nav_services: 'Услуги', nav_prices: 'Цены', nav_agents: 'ИИ‑агенты', nav_stack: 'Интеграции', nav_cases: 'Проекты', nav_contact: 'Контакты', cta_discuss: 'Обсудить проект',
     hero_kicker: 'СТУДИЯ РАЗРАБОТКИ ПРОГРАММНОГО ОБЕСПЕЧЕНИЯ', hero_kicker_s: 'СТУДИЯ РАЗРАБОТКИ ПО', hero_title: 'Создаём софт, который думает', dot: '.',
     hero_lead: 'Разрабатываем ПО, сайты и мобильные приложения силами команды ИИ‑агентов под контролем инженеров — от идеи до запуска и поддержки.',
     hero_cta: 'Оставить заявку', img_alt: 'Светящийся мозг на фоне нейронной сети — символ TPF Technology', menu: 'Открыть меню',
@@ -316,7 +316,7 @@ var I18N = {
     footer: '© 2026 TPF Technology. Все права защищены.'
   },
   en: {
-    lang_label: 'Language', nav_services: 'Services', nav_prices: 'Pricing', nav_agents: 'AI agents', nav_stack: 'Integrations', nav_cases: 'Projects', nav_contact: 'Contact', cta_discuss: 'Discuss a project',
+    lang_label: 'Language', nav_blog: 'Blog', nav_services: 'Services', nav_prices: 'Pricing', nav_agents: 'AI agents', nav_stack: 'Integrations', nav_cases: 'Projects', nav_contact: 'Contact', cta_discuss: 'Discuss a project',
     hero_kicker: 'SOFTWARE DEVELOPMENT STUDIO', hero_kicker_s: 'SOFTWARE STUDIO', hero_title: 'We build software that thinks', dot: '.',
     hero_lead: 'We build software, websites and mobile apps with a team of AI agents supervised by engineers — from idea to launch and support.',
     hero_cta: 'Get in touch', img_alt: 'A glowing brain over a neural network — the TPF Technology emblem', menu: 'Open menu',
@@ -376,7 +376,7 @@ var I18N = {
     footer: '© 2026 TPF Technology. All rights reserved.'
   },
   zh: {
-    lang_label: '语言', nav_services: '服务', nav_prices: '价格', nav_agents: 'AI 智能体', nav_stack: '集成', nav_cases: '项目', nav_contact: '联系我们', cta_discuss: '洽谈项目',
+    lang_label: '语言', nav_blog: '博客', nav_services: '服务', nav_prices: '价格', nav_agents: 'AI 智能体', nav_stack: '集成', nav_cases: '项目', nav_contact: '联系我们', cta_discuss: '洽谈项目',
     hero_kicker: '软件开发工作室', hero_kicker_s: '软件开发工作室', hero_title: '我们打造会思考的软件', dot: '。',
     hero_lead: '由工程师监督的 AI 智能体团队为您开发软件、网站和移动应用——从创意到上线与运维。',
     hero_cta: '提交需求', img_alt: '神经网络背景中发光的大脑——TPF Technology 标志', menu: '打开菜单',
@@ -639,7 +639,7 @@ var CASES = [{"img": "/case-brigada.jpg", "href": "", "ru": ["ПРИЛОЖЕНИ
 // Nederlands. The page is in Dutch; an order placed from it is handled in English (the agents, the e-mails and
 // the order page speak ru, en and zh), and the form says so.
 I18N.nl = Object.assign({}, I18N.en, {
-  lang_label: 'Taal', nav_services: 'Diensten', nav_prices: 'Prijzen', nav_agents: 'AI‑agents', nav_stack: 'Technologie', nav_cases: 'Projecten', nav_contact: 'Contact', cta_discuss: 'Project bespreken',
+  lang_label: 'Taal', nav_blog: 'Blog', nav_services: 'Diensten', nav_prices: 'Prijzen', nav_agents: 'AI‑agents', nav_stack: 'Technologie', nav_cases: 'Projecten', nav_contact: 'Contact', cta_discuss: 'Project bespreken',
   hero_kicker: 'STUDIO VOOR SOFTWAREONTWIKKELING', hero_kicker_s: 'SOFTWARESTUDIO', hero_title: 'Wij bouwen software die meedenkt', dot: '.',
   hero_cta: 'Neem contact op', img_alt: 'Een gloeiend brein boven een neuraal netwerk — het embleem van TPF Technology', menu: 'Menu openen',
   sv_kicker: '01 / DIENSTEN', sv_title: 'Wat wij bouwen',
@@ -812,6 +812,7 @@ function render() {
     }); }
   document.getElementById('fwa').setAttribute('aria-label', t.q_wa); document.getElementById('ftg').setAttribute('aria-label', t.q_tg);
   document.querySelectorAll('[data-ph]').forEach(function (n) { n.placeholder = t[n.dataset.ph] || ''; });
+  var bl = document.getElementById('bloglink'); if (bl) { bl.href = (lang === 'zh' ? '/en' : '/' + lang) + '/blog'; }
   document.querySelectorAll('[data-list]').forEach(function (n) { fill(n, t[n.dataset.list], function (s) { return el('span', s); }); });
   document.getElementById('heroimg').alt = t.img_alt;
   // What search engines read about the studio: the same services and "from" prices the page shows, in its language.
