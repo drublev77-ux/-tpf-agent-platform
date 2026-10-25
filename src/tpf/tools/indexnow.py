@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 from pathlib import Path
 
@@ -19,9 +20,10 @@ from tpf.config import Settings
 log = logging.getLogger("tpf.indexnow")
 
 SITE_DIR = Path(__file__).resolve().parent.parent / "site"
+BLOG_DIR = SITE_DIR / "blog"                # scripts/build_blog_pages.py writes the pages and their manifest here
 SITE_URL = "https://tpf-technology.com"
 SERVICE_SLUGS = ("websites", "web-apps", "online-shops", "telegram-bots", "crm-integration")   # a page per kind of work in each language
-PAGES = ("", "ru", "en", "nl", "zh", "privacy",     # the addresses in /sitemap.xml (tests keep the two in step)
+PAGES = ("", "ru", "en", "nl", "zh", "privacy",     # the addresses in /sitemap.xml besides the blog (tests keep the two in step)
          *(f"{lang}/{slug}" for lang in ("ru", "en", "nl", "zh") for slug in SERVICE_SLUGS))
 # The shared endpoint passes every report on to all IndexNow engines, Yandex included. Yandex's own endpoint was
 # dropped on 2026-10-14: since 2026-10-13 it closes the connection from the worker without answering.
@@ -34,8 +36,18 @@ def key() -> str:
     return path.read_text().strip() if path.is_file() else ""
 
 
+def blog() -> dict[str, list[dict]]:
+    path = BLOG_DIR / "manifest.json"
+    return json.loads(path.read_text()) if path.is_file() else {}
+
+
+def blog_pages() -> list[str]:
+    """The blog's addresses, as /sitemap.xml lists them: each language's index, then its articles."""
+    return [page for lang, arts in blog().items() for page in (f"{lang}/blog", *(f"{lang}/blog/{a['slug']}" for a in arts))]
+
+
 def urls() -> list[str]:
-    return [f"{SITE_URL}/{page}" for page in PAGES]
+    return [f"{SITE_URL}/{page}" for page in (*PAGES, *blog_pages())]
 
 
 def source_hash() -> str:
@@ -46,7 +58,11 @@ def source_hash() -> str:
 def version() -> str:
     """What the site's pages are right now: changes whenever a page a search engine indexes does."""
     privacy = hashlib.sha256((SITE_DIR / "privacy.html").read_bytes()).hexdigest()[:8]
-    return f"{source_hash()}-{privacy}"
+    posts = hashlib.sha256()                # a new, removed or edited blog article is a new version of the site too
+    for path in sorted(BLOG_DIR.rglob("*")) if BLOG_DIR.is_dir() else ():
+        if path.is_file():
+            posts.update(path.relative_to(BLOG_DIR).as_posix().encode() + b"\0" + path.read_bytes())
+    return f"{source_hash()}-{privacy}-{posts.hexdigest()[:8]}"
 
 
 async def is_live(client: httpx.AsyncClient) -> bool:
