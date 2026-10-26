@@ -239,9 +239,28 @@ class EmailNotifier:
                             email_html(f"{text}\n\n{admin}", "ru", None))
 
 
+class ChainNotifier:
+    """Fans every notification out to all configured channels (e-mail AND webhook), so the
+    lead pipeline keeps receiving events while Brevo letters to clients stay on."""
+
+    def __init__(self, *notifiers: Notifier) -> None:
+        self._notifiers = notifiers
+
+    async def to_client(self, order: dict[str, Any], text: str) -> None:
+        for n in self._notifiers:
+            await n.to_client(order, text)
+
+    async def to_operator(self, order: dict[str, Any], text: str) -> None:
+        for n in self._notifiers:
+            await n.to_operator(order, text)
+
+
 def make_notifier(settings: Settings) -> Notifier:
+    parts: list[Notifier] = []
     if settings.email_enabled:
-        return EmailNotifier(settings)
+        parts.append(EmailNotifier(settings))
     if settings.notifier == "webhook" and settings.notify_webhook_url:
-        return WebhookNotifier(settings.notify_webhook_url)
+        parts.append(WebhookNotifier(settings.notify_webhook_url))
+    if parts:
+        return ChainNotifier(*parts)
     return LogNotifier()
