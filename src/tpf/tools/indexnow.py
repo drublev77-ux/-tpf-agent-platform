@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 from pathlib import Path
 
@@ -34,8 +35,16 @@ def key() -> str:
     return path.read_text().strip() if path.is_file() else ""
 
 
+def blog_pages() -> list[str]:
+    """The blog index and articles of each language, from the manifest scripts/build_blog_pages.py writes
+    (the same list the sitemap is built from)."""
+    path = SITE_DIR / "blog" / "manifest.json"
+    blog = json.loads(path.read_text()) if path.is_file() else {}
+    return [p for lang, arts in blog.items() for p in (f"{lang}/blog", *(f"{lang}/blog/{a['slug']}" for a in arts))]
+
+
 def urls() -> list[str]:
-    return [f"{SITE_URL}/{page}" for page in PAGES]
+    return [f"{SITE_URL}/{page}" for page in (*PAGES, *blog_pages())]
 
 
 def source_hash() -> str:
