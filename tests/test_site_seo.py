@@ -133,6 +133,36 @@ def test_each_service_has_a_page_in_each_language_with_the_home_page_prices(lang
         assert ld["@graph"][0]["@type"] == "Service" and ld["@graph"][0]["offers"]["priceSpecification"]["minPrice"] > 0
 
 
+LANDING_SLUGS = ("agri-digital", "mkb-website", "mvp-ai")   # the niche landing pages the outreach campaigns link to
+
+
+@pytest.mark.parametrize("lang", ["ru", "en", "nl", "zh"])
+def test_each_niche_landing_page_exists_in_each_language(lang):
+    for slug in LANDING_SLUGS:
+        page = (SITE / "services" / lang / f"{slug}.html").read_text(encoding="utf-8")
+        assert f'<link rel="canonical" href="https://tpf-technology.com/{lang}/{slug}">' in page
+        assert len(re.findall(r"<h1>", page)) == 1 and 'href="/' + lang + '#contact"' in page
+        assert 'src="/consent.js?v=2"' in page
+        shown = re.findall(r'<div class="sum">(.*?)</div>', page)   # the niche packages carry their own prices
+        assert shown and all(s.strip() for s in shown), (slug, shown)
+        ld = json.loads(re.search(r'<script type="application/ld\+json">(.*?)</script>', page, re.S).group(1))
+        assert ld["@graph"][0]["@type"] == "Service" and ld["@graph"][0]["offers"]["priceSpecification"]["minPrice"] > 0
+
+
+def test_niche_landing_pages_are_served_and_in_the_sitemap(pool, settings, monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", settings.database_url)
+    get_settings.cache_clear()
+    from tpf.api.main import app
+    with TestClient(app) as client:
+        sitemap = client.get("/sitemap.xml").text
+        for lang in ("ru", "en", "nl", "zh"):
+            for slug in LANDING_SLUGS:
+                page = client.get(f"/{lang}/{slug}")
+                assert page.status_code == 200 and "<h1>" in page.text
+                assert f"<loc>https://tpf-technology.com/{lang}/{slug}</loc>" in sitemap
+    get_settings.cache_clear()
+
+
 def test_service_pages_are_served_and_in_the_sitemap(pool, settings, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", settings.database_url)
     get_settings.cache_clear()

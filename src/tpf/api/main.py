@@ -388,7 +388,8 @@ def _lang_page(lang: str):
 
 # A page of its own for each kind of work, in every language (scripts/build_service_pages.py writes them).
 SERVICE_SLUGS = ("websites", "web-apps", "online-shops", "telegram-bots", "crm-integration")
-SITE_PAGES = {"/privacy", *(f"/{lang}" for lang in SITE_LANGS), *(f"/{lang}/{slug}" for lang in SITE_LANGS for slug in SERVICE_SLUGS)}
+LANDING_SLUGS = ("agri-digital", "mkb-website", "mvp-ai")   # the niche landing pages the outreach campaigns link to
+SITE_PAGES = {"/privacy", *(f"/{lang}" for lang in SITE_LANGS), *(f"/{lang}/{slug}" for lang in SITE_LANGS for slug in (*SERVICE_SLUGS, *LANDING_SLUGS))}
 
 
 def _service_page(lang: str, slug: str):
@@ -399,7 +400,7 @@ def _service_page(lang: str, slug: str):
 
 
 for _lang in SITE_LANGS:
-    for _slug in SERVICE_SLUGS:
+    for _slug in (*SERVICE_SLUGS, *LANDING_SLUGS):
         page(f"/{_lang}/{_slug}")(_service_page(_lang, _slug))
 for _lang in SITE_LANGS:
     page(f"/{_lang}")(_lang_page(_lang))
@@ -470,7 +471,7 @@ async def sitemap() -> Response:
     alternates = "".join(f'<xhtml:link rel="alternate" hreflang="{code}" href="{SITE_URL}/{lang}"/>' for lang, code in SITE_LANGS.items()) \
         + f'<xhtml:link rel="alternate" hreflang="x-default" href="{SITE_URL}/"/>'
     urls = "".join(f"<url><loc>{SITE_URL}/{path}</loc><lastmod>{changed}</lastmod>{alternates}</url>" for path in ("", *SITE_LANGS))
-    for slug in SERVICE_SLUGS:
+    for slug in (*SERVICE_SLUGS, *LANDING_SLUGS):
         also = "".join(f'<xhtml:link rel="alternate" hreflang="{code}" href="{SITE_URL}/{lang}/{slug}"/>' for lang, code in SITE_LANGS.items()) \
             + f'<xhtml:link rel="alternate" hreflang="x-default" href="{SITE_URL}/en/{slug}"/>'
         urls += "".join(f"<url><loc>{SITE_URL}/{lang}/{slug}</loc><lastmod>{changed}</lastmod>{also}</url>" for lang in SITE_LANGS)

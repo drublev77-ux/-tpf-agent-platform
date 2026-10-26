@@ -225,6 +225,177 @@ PAGES = {
     },
 }
 
+
+# The niche landing pages the outreach campaigns link to (sales_kit/offers_by_niche.md).
+# Unlike the service pages, these carry their own price rows: the packages are niche-specific
+# and are not in the home page's price list, so they are written here, not read from it.
+NICHE_SLUGS = ("agri-digital", "mkb-website", "mvp-ai")
+
+NICHE_PAGES = {
+    "agri-digital": {
+        "ru": dict(name="Сайты для агро и food",
+                   title="Сайты и онлайн-продажи для агрокомпаний — TPF Technology",
+                   desc="Многоязычные B2B-сайты, каталоги продукции и фермерские магазины для хозяйств и food-компаний: прямые продажи онлайн без посредников. Смета бесплатно, код ваш.",
+                   h1="Сайты и онлайн-продажи для агро- и food-компаний",
+                   lead="Строим цифровое присутствие для хозяйств и food-компаний: многоязычные B2B-сайты с каталогом продукции и канал прямой онлайн-продажи, чтобы покупатели приходили напрямую, без посредников. Мы также разрабатываем сельскохозяйственных роботов и знаем отрасль изнутри.",
+                   includes=["Многоязычный B2B-сайт (NL/EN/DE) с каталогом продукции и формами заявок",
+                             "Фермерский магазин: онлайн-заказы и оплата, все заказы в одной админке",
+                             "Бот заказов для оптовиков в Telegram или WhatsApp",
+                             "Автоматические рассылки «что созрело на этой неделе»",
+                             "Аналитика: откуда приходят покупатели и что они смотрят"],
+                   rows=[dict(title="Пакет B2B", text="Многоязычный сайт с каталогом и формами заявок. Запуск за 3–4 недели.", sum="от 2 900 €", alt=""),
+                         dict(title="Пакет прямых продаж", text="То же плюс интернет-магазин: заказы, оплата, доставка или самовывоз, единая админка.", sum="от 4 900 €", alt=""),
+                         dict(title="Бот заказов для оптовиков", text="Telegram- или WhatsApp-бот, который принимает заказы у ваших оптовых покупателей.", sum="от 1 500 €", alt="")]),
+        "en": dict(name="Websites for agri & food",
+                   title="Websites and online sales for agri companies — TPF Technology",
+                   desc="Multilingual B2B websites, product catalogues and farm shops for growers and food companies: sell direct online, without middlemen. Free estimate, the code is yours.",
+                   h1="Websites and online sales for agri and food companies",
+                   lead="We build digital presence for growers and food companies: multilingual B2B websites with a product catalogue, and a direct online sales channel — so buyers reach you without middlemen. We also develop agricultural robots, so we know the sector from the inside.",
+                   includes=["Multilingual B2B website (NL/EN/DE) with a product catalogue and request forms",
+                             "Farm shop: online orders and payment, all orders in one dashboard",
+                             "A wholesale order bot on Telegram or WhatsApp",
+                             "Automatic 'in season this week' e-mail announcements",
+                             "Analytics: where buyers come from and what they look at"],
+                   rows=[dict(title="B2B package", text="A multilingual website with a catalogue and request forms. Live in 3–4 weeks.", sum="from €2,900", alt=""),
+                         dict(title="Direct-sales package", text="The same, plus an online shop: orders, payment, delivery or pickup, one dashboard.", sum="from €4,900", alt=""),
+                         dict(title="Wholesale order bot", text="A Telegram or WhatsApp bot that takes orders from your wholesale buyers.", sum="from €1,500", alt="")]),
+        "nl": dict(name="Websites voor agrarisch & food",
+                   title="Website en online verkoop voor agrarische bedrijven — TPF Technology",
+                   desc="Meertalige B2B-websites, productcatalogi en verkoopsites voor telers en foodbedrijven: verkoop direct online, zonder tussenpersonen. Gratis offerte.",
+                   h1="Website en online verkoop voor agrarische en foodbedrijven",
+                   lead="Wij bouwen digitale zichtbaarheid voor telers en foodbedrijven: meertalige B2B-websites met productcatalogus en een direct online verkoopkanaal — zodat kopers u zonder tussenpersonen vinden. Wij ontwikkelen ook landbouwrobots en kennen de sector van binnenuit.",
+                   includes=["Meertalige B2B-website (NL/EN/DE) met productcatalogus en aanvraagformulieren",
+                             "Verkoopsite: online bestellingen en betaling, alle orders in één beheeromgeving",
+                             "Bestelbot voor groothandel via Telegram of WhatsApp",
+                             "Automatische e-mails: 'dit week vers geplukt'",
+                             "Analytics: waar kopers vandaan komen en wat zij bekijken"],
+                   rows=[dict(title="B2B-pakket", text="Meertalige website met catalogus en aanvraagformulieren. Live in 3–4 weken.", sum="vanaf €2.900", alt=""),
+                         dict(title="Direct-verkooppakket", text="Zelfde, plus een webshop: bestellingen, betaling, levering of afhalen, één dashboard.", sum="vanaf €4.900", alt=""),
+                         dict(title="Bestelbot groothandel", text="Een Telegram- of WhatsApp-bot die bestellingen van uw groothandelafnemers opneemt.", sum="vanaf €1.500", alt="")]),
+        "zh": dict(name="农业与食品企业网站",
+                   title="农业企业网站与在线销售 — TPF Technology",
+                   desc="为种植企业和食品公司打造多语言B2B网站、产品目录和在线直营商店：无需中间商，直接在线销售。报价免费，源代码归您。",
+                   h1="农业与食品企业网站与在线销售",
+                   lead="我们为种植企业和食品公司构建数字化形象：带产品目录的多语言B2B网站，以及直接的在线销售渠道，让采购商无需中间商即可找到您。我们同时研发农业机器人，深知行业内部。",
+                   includes=["多语言B2B网站（NL/EN/DE），含产品目录与询价表单",
+                             "在线直营商店：在线下单与付款，所有订单集中管理",
+                             "面向批发客户的Telegram或WhatsApp订购机器人",
+                             "自动发送『本周新鲜上市』邮件",
+                             "数据分析：采购商从哪里来、看什么页面"],
+                   rows=[dict(title="B2B套餐", text="多语言网站，含目录与询价表单。3–4周上线。", sum="€2,900 起", alt=""),
+                         dict(title="直营销售套餐", text="同上，另加在线商店：下单、付款、配送或自提，统一管理。", sum="€4,900 起", alt=""),
+                         dict(title="批发订购机器人", text="通过Telegram或WhatsApp机器人接收批发客户订单。", sum="€1,500 起", alt="")]),
+    },
+    "mkb-website": {
+        "ru": dict(name="Сайты для малого бизнеса",
+                   title="Сайты для малого бизнеса под ключ — TPF Technology",
+                   desc="Быстрый мобильный сайт, который превращает посетителей в заявки: дизайн, тексты, формы, аналитика. От 2 500 €, запуск за 3 недели. Бесплатный аудит вашего сайта.",
+                   h1="Сайт, который превращает посетителей в заявки",
+                   lead="Для малого и среднего бизнеса: современный быстрый сайт, который превращает посетителей в заявки. Мобильный, с формами заявок, аналитикой и понятными ценами — запуск за 3 недели.",
+                   includes=["Мобильный дизайн: больше половины посетителей заходят с телефона",
+                             "Формы заявок, которые сразу приходят на вашу почту",
+                             "Готовность к поисковикам: страницы, sitemap, карточка в Google",
+                             "Скорость и HTTPS, всё измеримо в аналитике",
+                             "Пакет поддержки: хостинг, обновления, мелкие правки"],
+                   rows=[dict(title="Новый сайт", text="Полностью новый сайт: дизайн, тексты, формы. Запуск за 3 недели.", sum="от 2 500 €", alt=""),
+                         dict(title="Пакет поддержки", text="Хостинг, обновления, резервные копии и мелкие правки.", sum="99 € в месяц", alt=""),
+                         dict(title="Бесплатный аудит сайта", text="Разбор вашего текущего сайта: скорость, мобильность, заявки. Одна страница с конкретными пунктами.", sum="бесплатно", alt="")]),
+        "en": dict(name="SME websites",
+                   title="Fast, lead-generating websites for SMEs — TPF Technology",
+                   desc="A modern, mobile-first website that turns visitors into requests: design, copy, forms, analytics. From €2,500, live in 3 weeks. Free audit of your current website.",
+                   h1="A website that turns visitors into requests",
+                   lead="For SMEs: a modern, fast website that turns visitors into requests. Mobile-first, with request forms, analytics and clear pricing — live within 3 weeks.",
+                   includes=["Mobile-first design: over half of your visitors come from a phone",
+                             "Request forms delivered straight to your mailbox",
+                             "Search-ready: pages, sitemap, your Google Business profile",
+                             "Speed and HTTPS, measured in analytics",
+                             "Care plan: hosting, updates, small changes"],
+                   rows=[dict(title="New website", text="A complete new website: design, copy, forms. Live in 3 weeks.", sum="from €2,500", alt=""),
+                         dict(title="Care plan", text="Hosting, updates, backups and small changes.", sum="€99 per month", alt=""),
+                         dict(title="Free website audit", text="We review your current site: speed, mobile, lead capture. One page of concrete points.", sum="free", alt="")]),
+        "nl": dict(name="MKB-websites",
+                   title="Nieuwe website voor MKB-bedrijven — TPF Technology",
+                   desc="Een moderne, mobielvriendelijke website die bezoekers omzet in aanvragen: ontwerp, teksten, formulieren, analytics. Vanaf €2.500, live in 3 weken. Gratis site-audit.",
+                   h1="Nieuwe website die leads oplevert",
+                   lead="Voor MKB-bedrijven in Nederland en België: een moderne, snelle website die bezoekers omzet in aanvragen. Mobiel-first, met aanvraagformulieren, analytics en heldere prijzen — live binnen 3 weken.",
+                   includes=["Mobiel-first ontwerp: meer dan de helft van uw bezoekers komt via de telefoon",
+                             "Aanvraagformulieren die direct in uw mailbox binnenkomen",
+                             "Klaar voor Google: pagina's, sitemap en uw Google Business-profiel",
+                             "Snelheid en HTTPS, meetbaar in analytics",
+                             "Onderhoudspakket: hosting, updates en kleine wijzigingen"],
+                   rows=[dict(title="Nieuwe website", text="Een compleet nieuwe website: ontwerp, teksten, formulieren. Live in 3 weken.", sum="vanaf €2.500", alt=""),
+                         dict(title="Onderhoudspakket", text="Hosting, updates, back-ups en kleine wijzigingen.", sum="€99 per maand", alt=""),
+                         dict(title="Gratis site-audit", text="Wij doorlichten uw huidige site: snelheid, mobiel, leads. Eén pagina met concrete punten.", sum="gratis", alt="")]),
+        "zh": dict(name="中小企业网站",
+                   title="为中小企业打造的高转化网站 — TPF Technology",
+                   desc="现代化移动优先网站，把访客变成询盘：设计、文案、表单、数据分析。€2,500起，3周上线。现有网站可免费评估。",
+                   h1="把访客变成询盘的网站",
+                   lead="为中小企业打造：现代化、加载迅速的网站，把访客转化为询盘。移动优先，配询盘表单、数据分析和清晰报价——3周内上线。",
+                   includes=["移动优先设计：超过一半访客来自手机",
+                             "询盘表单直达您的邮箱",
+                             "搜索引擎就绪：页面、sitemap、Google商家资料",
+                             "速度与HTTPS，全部可用数据分析衡量",
+                             "维护套餐：主机、更新与小修改"],
+                   rows=[dict(title="全新网站", text="完整新网站：设计、文案、表单。3周上线。", sum="€2,500 起", alt=""),
+                         dict(title="维护套餐", text="主机、更新、备份与小修改。", sum="€99 每月", alt=""),
+                         dict(title="免费网站评估", text="分析您现有网站：速度、移动端、询盘。一页具体改进清单。", sum="免费", alt="")]),
+    },
+    "mvp-ai": {
+        "ru": dict(name="MVP и AI-автоматизация",
+                   title="Разработка MVP и AI-автоматизация — TPF Technology",
+                   desc="MVP веб-приложения за 4–6 недель по фиксированной цене и AI-автоматизация: чат-боты, обработка заявок, документооборот. Смета бесплатно, код ваш.",
+                   h1="Разработка MVP и AI-автоматизация процессов",
+                   lead="Для основателей и растущих компаний: MVP веб-приложения за 4–6 недель по фиксированной цене и автоматизация рутины — чат-боты, обработка заявок, документооборот — на AI-агентах, которые мы сами эксплуатируем в продакшене.",
+                   includes=["Фиксированная цена и точный срок: спека, разработка, запуск",
+                             "AI-функции: чат-бот, обработка заявок, работа с документами",
+                             "Тестовая версия до окончательной оплаты",
+                             "Исходный код и все права — ваши",
+                             "После запуска: поддержка или передача вашей команде"],
+                   rows=[dict(title="MVP веб-приложение", text="Спека, дизайн, разработка и запуск за 4–6 недель. Фиксированная цена.", sum="от 6 000 €", alt=""),
+                         dict(title="AI-автоматизация процессов", text="Чат-боты, обработка заявок, документооборот — AI-агенты берут рутину на себя.", sum="от 2 000 €", alt=""),
+                         dict(title="AI-аудит процесса", text="Где AI окупится в вашем процессе. Сумма зачитывается при заказе разработки.", sum="500 €", alt="")]),
+        "en": dict(name="MVP & AI automation",
+                   title="MVP development and AI automation — TPF Technology",
+                   desc="MVP web applications in 4–6 weeks at a fixed price, plus AI automation: chatbots, lead processing, document flow. Free estimate, the source code is yours.",
+                   h1="MVP development and AI process automation",
+                   lead="For founders and growing companies: we ship MVP web applications in 4–6 weeks at a fixed price, and automate the routine — chatbots, lead processing, document flow — with AI agents we run in production ourselves.",
+                   includes=["A fixed price and a firm date: spec, build, launch",
+                             "AI features: chatbot, lead processing, document handling",
+                             "A review version you check before the final payment",
+                             "The source code and all rights are yours",
+                             "After launch: a care plan or handover to your team"],
+                   rows=[dict(title="MVP web application", text="Spec, design, build and launch in 4–6 weeks. Fixed price.", sum="from €6,000", alt=""),
+                         dict(title="AI process automation", text="Chatbots, lead processing, document flow — AI agents take over the routine.", sum="from €2,000", alt=""),
+                         dict(title="AI audit of your process", text="Where AI pays off in your workflow. Credited in full if we build it.", sum="€500", alt="")]),
+        "nl": dict(name="MVP & AI-automatisering",
+                   title="MVP-ontwikkeling en AI-automatisering — TPF Technology",
+                   desc="MVP-webapplicaties in 4–6 weken tegen een vaste prijs, plus AI-automatisering: chatbots, leadverwerking, documentstroom. Gratis offerte, de broncode is van u.",
+                   h1="MVP-ontwikkeling en AI-automatisering van processen",
+                   lead="Voor oprichters en groeiende bedrijven: wij leveren MVP-webapplicaties in 4–6 weken tegen een vaste prijs, en automatiseren het routinewerk — chatbots, leadverwerking, documentstroom — met AI-agents die wij zelf in productie draaien.",
+                   includes=["Een vaste prijs en een duidelijke datum: specificatie, bouw, lancering",
+                             "AI-functies: chatbot, leadverwerking, documentverwerking",
+                             "Een testversie die u controleert vóór de laatste betaling",
+                             "De broncode en alle rechten zijn van u",
+                             "Na de lancering: onderhoudspakket of overdracht aan uw team"],
+                   rows=[dict(title="MVP-webapplicatie", text="Specificatie, ontwerp, bouw en lancering in 4–6 weken. Vaste prijs.", sum="vanaf €6.000", alt=""),
+                         dict(title="AI-procesautomatisering", text="Chatbots, leadverwerking, documentstroom — AI-agents nemen het routinewerk over.", sum="vanaf €2.000", alt=""),
+                         dict(title="AI-audit van uw proces", text="Waar AI zich terugverdient in uw workflow. Volledig verrekenbaar bij opdracht.", sum="€500", alt="")]),
+        "zh": dict(name="MVP与AI自动化",
+                   title="MVP开发与AI流程自动化 — TPF Technology",
+                   desc="4–6周内以固定价格交付MVP Web应用，并提供AI自动化：聊天机器人、线索处理、文档流程。报价免费，源代码归您。",
+                   h1="MVP开发与AI流程自动化",
+                   lead="面向创始人和成长期公司：我们以固定价格在4–6周内交付MVP Web应用，并自动完成重复工作——聊天机器人、线索处理、文档流程——使用我们自己在生产环境运行的AI智能体。",
+                   includes=["固定价格与明确交付日：规格、开发、上线",
+                             "AI功能：聊天机器人、线索处理、文档处理",
+                             "尾款支付前可先验收测试版本",
+                             "源代码与全部权利归您所有",
+                             "上线后：维护套餐或交接给您的团队"],
+                   rows=[dict(title="MVP Web应用", text="规格、设计、开发与上线，4–6周。固定价格。", sum="€6,000 起", alt=""),
+                         dict(title="AI流程自动化", text="聊天机器人、线索处理、文档流程——AI智能体接管重复工作。", sum="€2,000 起", alt=""),
+                         dict(title="AI流程评估", text="找出AI在您流程中的回报点。下单开发时全额抵扣。", sum="€500", alt="")]),
+    },
+}
+
 STYLE = """:root{--bg:#07090C;--line:#16202A;--line2:#2A3844;--ink:#E6EDF2;--soft:#B7C3CC;--muted:#8D9AA5;--accent:#5CE1F0;--pad:clamp(20px,5.5vw,80px)}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.65 Manrope,'Noto Sans SC',system-ui,sans-serif}
 a{color:var(--accent)}header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:14px var(--pad);border-bottom:1px solid var(--line)}
@@ -266,13 +437,14 @@ def url(lang: str, slug: str) -> str:
     return f"{BASE}/{lang}/{slug}"
 
 def build(lang: str, slug: str, prices: list[dict], cases: list[dict]) -> str:
-    ui, c = UI[lang], PAGES[slug][lang]
+    book = PAGES if slug in PAGES else NICHE_PAGES
+    ui, c = UI[lang], book[slug][lang]
     hreflang, locale = LANGS[lang]
     alternates = "".join(f'<link rel="alternate" hreflang="{LANGS[l][0]}" href="{url(l, slug)}">\n' for l in LANGS) \
         + f'<link rel="alternate" hreflang="x-default" href="{url("en", slug)}">\n'
     langs = "".join(f'<a href="/{l}/{slug}" hreflang="{LANGS[l][0]}" aria-current="{str(l == lang).lower()}">{"中文" if l == "zh" else l.upper()}</a>'
                     for l in LANGS)
-    rows = [prices[i] for i in PRICES[slug]]
+    rows = c["rows"] if "rows" in c else [prices[i] for i in PRICES[slug]]
     price_html = "".join(f'<div class="price"><div><h3>{esc(p["title"])}</h3><p>{esc(p["text"])}</p></div>'
                          f'<div><div class="sum">{esc(p["sum"])}</div>' + (f'<div class="alt">{esc(p["alt"])}</div>' if p["alt"] else "")
                          + "</div></div>" for p in rows)
@@ -343,9 +515,9 @@ def main() -> None:
     for lang in LANGS:
         prices, cases = home_facts(lang)
         (OUT / lang).mkdir(parents=True, exist_ok=True)
-        for slug in SLUGS:
+        for slug in (*SLUGS, *NICHE_SLUGS):
             (OUT / lang / f"{slug}.html").write_text(build(lang, slug, prices, cases), encoding="utf-8")
-    print(f"service pages: {len(LANGS) * len(SLUGS)}")
+    print(f"service pages: {len(LANGS) * (len(SLUGS) + len(NICHE_SLUGS))}")
 
 if __name__ == "__main__":
     main()
