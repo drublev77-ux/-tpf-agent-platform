@@ -261,6 +261,8 @@ def make_notifier(settings: Settings) -> Notifier:
         parts.append(EmailNotifier(settings))
     if settings.notifier == "webhook" and settings.notify_webhook_url:
         parts.append(WebhookNotifier(settings.notify_webhook_url))
+    if len(parts) == 1:
+        return parts[0]              # one channel: no wrapper, so isinstance checks stay honest
     if parts:
         return ChainNotifier(*parts)
     return LogNotifier()

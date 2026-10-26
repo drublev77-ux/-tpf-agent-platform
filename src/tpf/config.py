@@ -1,4 +1,5 @@
 """Runtime configuration. Every tunable lives in the environment, never in code."""
+import os
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -105,9 +106,13 @@ class Settings(BaseSettings):
     # Web applications: a separate Postgres where each order gets its own schema and role. Empty = sites only.
     tenant_database_url: str = ""
 
-    # Notifications
-    notifier: str = "log"  # log | webhook
-    notify_webhook_url: str = ""
+    # Notifications. On the Vercel deployment of the studio site (tpf-technology.com) the env vars
+    # NOTIFIER / NOTIFY_WEBHOOK_URL are not set in the dashboard, so the defaults fan new-order and
+    # client events out to the studio's Base44 intake webhook (it wakes the qualifying agent);
+    # the worker and local dev keep log / empty unless the variables are set in the environment.
+    notifier: str = "webhook" if os.getenv("VERCEL") else "log"  # log | webhook
+    notify_webhook_url: str = ("https://superagent-26a7b007.base44.app/functions/tpfLeadWebhook"
+                               if os.getenv("VERCEL") else "")
     public_base_url: str = "http://localhost:8000"
     # E-mail over an HTTPS API (Railway blocks outbound SMTP): off | resend | brevo
     email_provider: str = "off"

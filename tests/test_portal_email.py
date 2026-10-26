@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tpf.config import Settings, get_settings
-from tpf.notifications import EmailNotifier, email_html, make_notifier, portal_url
+from tpf.notifications import ChainNotifier, EmailNotifier, email_html, make_notifier, portal_url
 
 
 @pytest.fixture
@@ -156,10 +156,14 @@ async def test_no_fallback_without_its_key():
     assert len(sent) == 1
 
 
+def _channels(n) -> list:
+    return list(n._notifiers) if isinstance(n, ChainNotifier) else [n]
+
+
 def test_notifier_selection_and_links():
-    assert isinstance(make_notifier(_settings()), EmailNotifier)
-    assert not isinstance(make_notifier(_settings(email_api_key="")), EmailNotifier)
-    assert not isinstance(make_notifier(_settings(email_provider="off")), EmailNotifier)
+    assert any(isinstance(x, EmailNotifier) for x in _channels(make_notifier(_settings())))
+    assert not any(isinstance(x, EmailNotifier) for x in _channels(make_notifier(_settings(email_api_key=""))))
+    assert not any(isinstance(x, EmailNotifier) for x in _channels(make_notifier(_settings(email_provider="off"))))
     html = email_html("Смотрите https://x.vercel.app\nспасибо", "zh", "https://p/1?t=a")
     assert '<a href="https://x.vercel.app"' in html and "查看订单" in html and "<br>" in html
 
