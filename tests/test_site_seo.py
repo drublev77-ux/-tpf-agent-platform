@@ -175,3 +175,29 @@ def test_the_video_field_speaks_the_page_language(name, choose):
     "Выберите файл" on the English page); the page labels its own button instead."""
     html = (SITE / f"index.{name}.html").read_text(encoding="utf-8")
     assert f'<span class="pickbtn" data-t="f_choose">{choose}</span>' in html and 'name="video"' in html
+
+
+def test_worker_package_carries_the_whole_site():
+    """The worker runs from the installed package (Dockerfile.worker: pip install .), not the source tree: a site
+    file the package-data globs miss is invisible to it. The blog manifest was, so IndexNow never heard of the blog."""
+    import glob
+    import tomllib
+    root = Path(__file__).resolve().parent.parent
+    patterns = tomllib.loads((root / "pyproject.toml").read_text())["tool"]["setuptools"]["package-data"]["tpf"]
+    pkg = root / "src" / "tpf"
+    packaged = {Path(f).resolve() for pat in patterns for f in glob.glob(str(pkg / pat), recursive=True)}
+    missing = [str(f.relative_to(pkg)) for f in (pkg / "site").rglob("*") if f.is_file() and f.resolve() not in packaged]
+    assert missing == []
+
+
+def test_indexnow_version_changes_with_the_blog(tmp_path, monkeypatch):
+    import shutil
+    from tpf.tools import indexnow
+    for name in ("index.html", "privacy.html"):
+        shutil.copy(indexnow.SITE_DIR / name, tmp_path / name)
+    (tmp_path / "blog").mkdir()
+    (tmp_path / "blog" / "manifest.json").write_text('{"ru": []}')
+    monkeypatch.setattr(indexnow, "SITE_DIR", tmp_path)
+    before = indexnow.version()
+    (tmp_path / "blog" / "manifest.json").write_text('{"ru": [{"slug": "new-article"}]}')
+    assert indexnow.version() != before          # a new article is reported to the search engines

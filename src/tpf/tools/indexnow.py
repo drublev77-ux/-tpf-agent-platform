@@ -55,7 +55,10 @@ def source_hash() -> str:
 def version() -> str:
     """What the site's pages are right now: changes whenever a page a search engine indexes does."""
     privacy = hashlib.sha256((SITE_DIR / "privacy.html").read_bytes()).hexdigest()[:8]
-    return f"{source_hash()}-{privacy}"
+    blog = SITE_DIR / "blog" / "manifest.json"
+    if not blog.is_file():
+        return f"{source_hash()}-{privacy}"
+    return f"{source_hash()}-{privacy}-{hashlib.sha256(blog.read_bytes()).hexdigest()[:8]}"   # a new article is a change too
 
 
 async def is_live(client: httpx.AsyncClient) -> bool:

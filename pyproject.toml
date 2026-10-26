@@ -28,7 +28,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-tpf = ["migrations/*.sql", "site/*"]
+tpf = ["migrations/*.sql", "site/*", "site/**/*"]   # the blog and service pages live in subfolders
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
