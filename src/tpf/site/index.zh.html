@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN"><head>
-<meta name="tpf-source" content="5384e8b9d67c12ac">
+<meta name="tpf-source" content="c667e4e91721acb3">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>网站、网络应用与 Telegram 机器人开发 — TPF Technology</title>
@@ -143,6 +143,12 @@ label{display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--soft
 input,select,textarea{font:16px Manrope,'Noto Sans SC',system-ui,sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--line2);border-radius:12px;padding:0 16px;height:52px;width:100%}
 textarea{height:auto;padding:14px 16px;resize:vertical}
 input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.field{display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--soft)}
+.filepick{flex-direction:row;align-items:center;gap:14px;flex-wrap:wrap;cursor:pointer;position:relative}
+.filepick input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
+.pickbtn{display:inline-flex;align-items:center;height:46px;padding:0 20px;border:1px solid var(--accent);border-radius:999px;color:var(--accent);font-weight:600;font-size:15px}
+.filepick input:focus-visible+.pickbtn{outline:2px solid var(--accent);outline-offset:3px}
+.pickname{color:var(--muted);font-size:14px;overflow-wrap:anywhere}
 .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 .small{font-size:13px;color:#8D9AA5}
 .msg{padding:16px 18px;border-radius:14px;border:1px solid var(--accent);font-size:15px}.msg.err{border-color:var(--warm);color:var(--warm)}
@@ -238,7 +244,10 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 <label><span data-t="f_currency">付款货币</span><select name="currency" id="currency"><option value="EUR">EUR — €</option><option value="USD">USD — $</option></select></label>
 </div>
 <label><span data-t="f_about">项目简介</span><textarea name="about" rows="5" required="" minlength="10" maxlength="15000" data-ph="f_about_ph" placeholder="简要描述您的需求"></textarea></label>
-<label><span data-t="f_video">视频（可选）</span><input name="video" type="file" accept="video/*,.mp4,.mov,.webm,.m4v,.mkv"><small class="small" data-t="f_video_hint">用语音讲述需求，或在屏幕上展示示例——我们将根据视频编写规格书和报价。最大 50 MB，仅查看前 5 分钟。</small></label>
+<div class="field"><span data-t="f_video">视频（可选）</span>
+<!-- the browser's own file button speaks the browser's language, not the page's: ours is labelled by the page -->
+<label class="filepick"><input name="video" id="video" type="file" accept="video/*,.mp4,.mov,.webm,.m4v,.mkv"><span class="pickbtn" data-t="f_choose">选择视频</span><span class="pickname" id="video-name" data-t="f_nofile">未选择文件</span></label>
+<small class="small" data-t="f_video_hint">用语音讲述需求，或在屏幕上展示示例——我们将根据视频编写规格书和报价。最大 50 MB，仅查看前 5 分钟。</small></div>
 <label class="hp" aria-hidden="true">Website<input name="website" type="text" tabindex="-1" autocomplete="off"></label>
 <button class="btn fill" type="submit" id="submit" data-t="f_submit">提交需求</button>
 <div id="msg" role="status" aria-live="polite"></div>
@@ -747,7 +756,7 @@ LOOK.nl = { cs_lead: 'De demoprojecten zijn op ons platform gebouwd, van aanvraa
 // Questions people ask before ordering. Answers repeat only what the page itself says; {0}, {1}, {2}, {6} are the
 // "from" prices of the price list in the same language, so a price change cannot leave an answer behind.
 var FAQ = {
-  ru: { more: 'Подробнее →', fq_kicker: 'ВОПРОСЫ И ОТВЕТЫ', fq_title: 'Частые вопросы', faq: [
+  ru: { f_choose: 'Выбрать видео', f_nofile: 'Файл не выбран', more: 'Подробнее →', fq_kicker: 'ВОПРОСЫ И ОТВЕТЫ', fq_title: 'Частые вопросы', faq: [
     ['Сколько стоит сайт, приложение или бот?', 'Цена зависит от объёма работ. Ориентиры: лендинг — {0}, сайт из нескольких страниц — {1}, веб‑приложение — {2}, простой Telegram‑бот — {6}. Точную смету вы получаете бесплатно и до оплаты.'],
     ['Как быстро будет готово?', 'Смета обычно готова в течение часа после заявки. Первая версия для проверки — за часы или дни, в зависимости от объёма.'],
     ['Как проходит оплата?', 'Половина суммы — перед стартом, вторая половина — только после того, как вы приняли работу. Оплата банковской картой в евро или долларах США — валюту вы выбираете в заявке.'],
@@ -755,7 +764,7 @@ var FAQ = {
     ['Можно ли внести правки?', 'Да. У каждого заказа своя страница со статусом, ТЗ, сметой и версией для проверки. Там же кнопка «запросить правки» — вы принимаете работу до окончательной оплаты.'],
     ['Что нужно, чтобы начать?', 'Опишите задачу в форме на этой странице или напишите на orders@tpf-technology.com. Можно приложить видео до 50 МБ: рассказать о задаче голосом или показать пример на экране.']
   ] },
-  en: { more: 'Learn more →', fq_kicker: 'FAQ', fq_title: 'Frequently asked questions', faq: [
+  en: { f_choose: 'Choose a video', f_nofile: 'No file chosen', more: 'Learn more →', fq_kicker: 'FAQ', fq_title: 'Frequently asked questions', faq: [
     ['How much does a website, app or bot cost?', 'The price depends on the scope. As a guide: a landing page {0}, a multi‑page website {1}, a web application {2}, a simple Telegram bot {6}. You get the exact estimate free of charge and before you pay.'],
     ['How quickly will it be ready?', 'The estimate is usually ready within an hour of your request. The first version for review takes hours or days, depending on the scope.'],
     ['How does payment work?', 'Half is due before we start, half only after you have accepted the work. You pay by card in euros or US dollars — choose the currency in the request.'],
@@ -763,7 +772,7 @@ var FAQ = {
     ['Can I ask for changes?', 'Yes. Every order has its own page with the status, spec, estimate and the review version, and a “request changes” button. You accept the work before the final payment.'],
     ['What do I need to get started?', 'Describe the task in the form on this page or write to orders@tpf-technology.com. You can attach a video of up to 50 MB: tell us about the task aloud or show an example on screen.']
   ] },
-  nl: { more: 'Meer informatie →', fq_kicker: 'VRAGEN', fq_title: 'Veelgestelde vragen', faq: [
+  nl: { f_choose: 'Video kiezen', f_nofile: 'Geen bestand gekozen', more: 'Meer informatie →', fq_kicker: 'VRAGEN', fq_title: 'Veelgestelde vragen', faq: [
     ['Wat kost een website, app of bot?', 'De prijs hangt af van de omvang. Als richtlijn: een landingspagina {0}, een website met meerdere pagina’s {1}, een webapplicatie {2}, een eenvoudige Telegram‑bot {6}. U krijgt de exacte offerte gratis en vóór betaling.'],
     ['Hoe snel is het klaar?', 'De offerte is meestal binnen een uur na uw aanvraag klaar. De eerste versie ter beoordeling volgt binnen uren of dagen, afhankelijk van de omvang.'],
     ['Hoe werkt de betaling?', 'De helft betaalt u vóór de start, de rest pas nadat u het werk hebt goedgekeurd. U betaalt per kaart in euro of Amerikaanse dollar — kies de valuta in de aanvraag.'],
@@ -771,7 +780,7 @@ var FAQ = {
     ['Kan ik wijzigingen vragen?', 'Ja. Elke opdracht heeft een eigen pagina met status, specificatie, offerte, de testversie en een knop “wijzigingen aanvragen”. U keurt het werk goed vóór de laatste betaling.'],
     ['Wat heb ik nodig om te beginnen?', 'Beschrijf de opdracht in het formulier op deze pagina of mail naar orders@tpf-technology.com. U mag in het Nederlands schrijven; wij antwoorden in het Engels. U kunt een video tot 50 MB bijvoegen.']
   ] },
-  zh: { more: '了解更多 →', fq_kicker: '常见问题', fq_title: '常见问题', faq: [
+  zh: { f_choose: '选择视频', f_nofile: '未选择文件', more: '了解更多 →', fq_kicker: '常见问题', fq_title: '常见问题', faq: [
     ['网站、应用或机器人的价格是多少？', '价格取决于工作量。参考价：落地页 {0}，多页网站 {1}，网络应用 {2}，简单 Telegram 机器人 {6}。准确报价免费，并在付款前提供。'],
     ['多久可以完成？', '提交需求后，报价通常在一小时内完成。首个审核版本在数小时或数天内完成，取决于工作量。'],
     ['如何付款？', '开工前支付一半，另一半在您验收之后支付。可使用银行卡以欧元或美元付款——请在需求中选择货币。'],
@@ -863,6 +872,9 @@ function render() {
 var PAGE_LANG = (location.pathname.match(/^\/(ru|en|nl|zh)\/?$/) || [])[1];
 try { var saved = localStorage.getItem('tpf_lang'); if (PAGE_LANG) lang = PAGE_LANG; else if (I18N[saved]) lang = saved; else if (/^zh/i.test(navigator.language)) lang = 'zh'; else if (/^nl/i.test(navigator.language)) lang = 'nl'; else if (!/^(ru|be|uk|kk)/i.test(navigator.language)) lang = 'en'; } catch (e) {}
 render();
+function showVideoName() { var f = document.getElementById('video').files[0], n = document.getElementById('video-name');
+  n.textContent = f ? f.name : T().f_nofile; }
+document.getElementById('video').addEventListener('change', showVideoName);
 // 'Describe the process' leads to the form with that kind of project already chosen.
 var AUTO_TYPE = 5;
 document.getElementById('auto-cta').addEventListener('click', function () { document.getElementById('types').selectedIndex = AUTO_TYPE; });
@@ -906,7 +918,7 @@ document.getElementById('form').addEventListener('submit', function (ev) {
       body: JSON.stringify({ client_name: name, client_email: email, language: lang === 'nl' ? 'en' : lang, channel: 'site',
         request_text: '[' + f.type.value + '] ' + about, video: video, currency: f.currency.value }) }).then(json);
   }).then(function (r) {
-      if (r.ok) { f.reset(); show(file ? t.ok_video : t.ok, false, r.d.portal_url); }
+      if (r.ok) { f.reset(); showVideoName(); show(file ? t.ok_video : t.ok, false, r.d.portal_url); }
       else show(r.status === 429 ? t.e_busy : r.status === 422 ? t.e_fields : t.e_fail, true);
     })
     .catch(function (e) { show(e && e.message === 'busy' ? t.e_busy : e && e.message === 'upload' ? t.e_upload : t.e_fail, true); })

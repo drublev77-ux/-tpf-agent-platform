@@ -166,3 +166,11 @@ def test_google_analytics_waits_for_consent(pool, settings, monkeypatch):
         served = client.get("/consent.js")
         assert served.status_code == 200 and served.headers["content-type"].startswith("text/javascript")
     get_settings.cache_clear()
+
+
+@pytest.mark.parametrize("name,choose", [("ru", "Выбрать видео"), ("en", "Choose a video"), ("nl", "Video kiezen"), ("zh", "选择视频")])
+def test_the_video_field_speaks_the_page_language(name, choose):
+    """The browser's own file button is labelled in the browser's language (a Russian browser showed
+    "Выберите файл" on the English page); the page labels its own button instead."""
+    html = (SITE / f"index.{name}.html").read_text(encoding="utf-8")
+    assert f'<span class="pickbtn" data-t="f_choose">{choose}</span>' in html and 'name="video"' in html
