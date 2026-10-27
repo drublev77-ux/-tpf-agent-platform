@@ -231,3 +231,22 @@ def test_indexnow_version_changes_with_the_blog(tmp_path, monkeypatch):
     before = indexnow.version()
     (tmp_path / "blog" / "manifest.json").write_text('{"ru": [{"slug": "new-article"}]}')
     assert indexnow.version() != before          # a new article is reported to the search engines
+
+
+def test_indexnow_version_changes_with_the_service_pages(tmp_path, monkeypatch):
+    import shutil
+    from tpf.tools import indexnow
+    for name in ("index.html", "privacy.html"):
+        shutil.copy(indexnow.SITE_DIR / name, tmp_path / name)
+    (tmp_path / "services" / "en").mkdir(parents=True)
+    (tmp_path / "services" / "en" / "websites.html").write_text("<h1>Websites</h1>")
+    monkeypatch.setattr(indexnow, "SITE_DIR", tmp_path)
+    before = indexnow.version()
+    (tmp_path / "services" / "en" / "agri-digital.html").write_text("<h1>Agri</h1>")
+    added = indexnow.version()
+    assert added != before                       # a new landing page is reported, though index.html is the same
+    (tmp_path / "services" / "en" / "websites.html").write_text("<h1>Websites, new prices</h1>")
+    changed = indexnow.version()
+    assert changed != added                      # and so is a changed one
+    monkeypatch.setattr(indexnow, "PAGES", (*indexnow.PAGES, "en/new-page"))
+    assert indexnow.version() != changed         # and a new address in the list

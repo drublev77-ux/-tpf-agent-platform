@@ -53,13 +53,25 @@ def source_hash() -> str:
     return hashlib.sha256((SITE_DIR / "index.html").read_bytes()).hexdigest()[:16]
 
 
+def pages_hash() -> str:
+    """The list of reported addresses and the service and landing pages behind them: a new or changed page there
+    is a new version too, though index.html stays the same."""
+    h = hashlib.sha256("\n".join(urls()).encode())
+    services = SITE_DIR / "services"
+    for page in sorted(services.rglob("*.html")) if services.is_dir() else ():
+        h.update(str(page.relative_to(services)).encode())
+        h.update(page.read_bytes())
+    return h.hexdigest()[:8]
+
+
 def version() -> str:
     """What the site's pages are right now: changes whenever a page a search engine indexes does."""
     privacy = hashlib.sha256((SITE_DIR / "privacy.html").read_bytes()).hexdigest()[:8]
     blog = SITE_DIR / "blog" / "manifest.json"
-    if not blog.is_file():
-        return f"{source_hash()}-{privacy}"
-    return f"{source_hash()}-{privacy}-{hashlib.sha256(blog.read_bytes()).hexdigest()[:8]}"   # a new article is a change too
+    parts = [source_hash(), privacy]
+    if blog.is_file():
+        parts.append(hashlib.sha256(blog.read_bytes()).hexdigest()[:8])   # a new article is a change too
+    return "-".join((*parts, pages_hash()))
 
 
 async def is_live(client: httpx.AsyncClient) -> bool:
