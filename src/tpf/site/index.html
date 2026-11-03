@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Сайты, веб‑приложения и Telegram‑боты под ключ — TPF Technology</title>
-<meta name="description" content="Студия TPF Technology: сайты, веб‑приложения, интернет‑магазины, Telegram‑боты и автоматизация процессов под ключ. ТЗ и смета бесплатно и до оплаты, оплата 50/50, исходный код остаётся у вас.">
+<meta name="description" content="Студия TPF Technology: сайты, веб‑приложения, магазины, Telegram‑боты и автоматизация. ТЗ и смета бесплатно до оплаты, код остаётся у вас.">
 <link rel="canonical" href="https://tpf-technology.com/">
-<link rel="alternate" hreflang="ru" href="https://tpf-technology.com/ru">
+<link rel="alternate" hreflang="ru" href="https://tpf-technology.com/">
 <link rel="alternate" hreflang="en" href="https://tpf-technology.com/en">
 <link rel="alternate" hreflang="nl" href="https://tpf-technology.com/nl">
 <link rel="alternate" hreflang="zh-Hans" href="https://tpf-technology.com/zh">
@@ -843,7 +843,7 @@ function render() {
     s.append(el('h3', f[0])); d.append(s, el('p', f[1])); return d; });
   document.getElementById('langs').setAttribute('aria-label', t.lang_label);
   fill(document.getElementById('langs'), LANGS, function (l) {
-    var b = el('a', l[1]); b.href = '/' + l[0]; b.hreflang = l[0] === 'zh' ? 'zh-Hans' : l[0]; b.setAttribute('aria-current', String(l[0] === lang));
+    var b = el('a', l[1]); b.href = l[0] === 'ru' ? '/' : '/' + l[0]; b.hreflang = l[0] === 'zh' ? 'zh-Hans' : l[0]; b.setAttribute('aria-current', String(l[0] === lang));
     b.onclick = function () { try { localStorage.setItem('tpf_lang', l[0]); } catch (e) {} };
     return b; });
   fill(document.getElementById('services-grid'), t.services, function (s, i) {

@@ -206,12 +206,23 @@ def head(lang: str, title: str, desc: str, url: str, ld: str) -> str:
 <style>{CSS}</style>"""
 
 
-def shell(lang: str, title: str, desc: str, url: str, ld: str, body: str, t: dict) -> str:
+BLOG_LANGS = {"ru": "ru", "en": "en", "nl": "nl"}     # a language with blog articles of its own
+
+
+def blog_alternates(lang: str) -> str:
+    """hreflang for the blog index pages: only the languages that actually have a blog."""
+    base = {"ru": "https://tpf-technology.com/ru",
+            "en": "https://tpf-technology.com/en",
+            "nl": "https://tpf-technology.com/nl"}
+    links = "".join(f'<link rel="alternate" hreflang="{BLOG_LANGS[l]}" href="{base[l]}/blog">\n' for l in BLOG_LANGS)
+    return links + '<link rel="alternate" hreflang="x-default" href="https://tpf-technology.com/en/blog">\n'
+
+
+def shell(lang: str, title: str, desc: str, url: str, ld: str, body: str, t: dict, alternates: str = "") -> str:
     return f"""<!doctype html>
 <html lang="{lang}">
 <head>
-{head(lang, title, desc, url, ld)}
-</head>
+{head(lang, title, desc, url, ld)}{alternates}</head>
 <body>
 <script src="/consent.js?v=2" data-tpf-analytics async></script>
 <header>
@@ -271,7 +282,10 @@ def index_page(lang: str, arts: list[dict], t: dict) -> str:
     items = "".join(f'<li><a href="/{lang}/blog/{a["slug"]}">{inline(a["title"])}</a><p>{html.escape(a["desc"][:160], quote=False)}</p></li>'
                     for a in arts)
     body = f"{crumbs}\n<h1>{t['blog']} TPF Technology</h1>\n<p>{intro}</p>\n<ul class=\"index\">{items}</ul>"
-    return shell(lang, f"{t['blog']} — TPF Technology", desc, url, ld, body, t)
+    title = {"ru": "Блог — TPF Technology",
+             "en": "Blog: websites, web apps and Telegram bots — TPF Technology",
+             "nl": "Blog over websites, webshops en AI-automatisering — TPF Technology"}.get(lang, f"{t['blog']} — TPF Technology")
+    return shell(lang, title, desc, url, ld, body, t, alternates=blog_alternates(lang))
 
 
 def main() -> None:

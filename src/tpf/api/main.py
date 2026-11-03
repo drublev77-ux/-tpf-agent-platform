@@ -434,6 +434,14 @@ for _lang, _arts in BLOG.items():
         page(f"/{_lang}/blog/{_a['slug']}")(_blog_page(_lang, _a["slug"]))
 
 
+async def _blog_home() -> RedirectResponse:
+    """The bare /blog has no page of its own: send it to the English blog, the default for outreach."""
+    return RedirectResponse(SITE_URL + "/en/blog", status_code=308)
+
+
+page("/blog")(_blog_home)
+
+
 @page("/robots.txt")
 async def robots() -> Response:
     # Order pages, the admin area and the endpoints forms and applications post to are nobody's search result.
@@ -468,9 +476,11 @@ def _site_changed() -> str:
 @page("/sitemap.xml")
 async def sitemap() -> Response:
     changed = _site_changed()
-    alternates = "".join(f'<xhtml:link rel="alternate" hreflang="{code}" href="{SITE_URL}/{lang}"/>' for lang, code in SITE_LANGS.items()) \
+    home = {lang: f"{SITE_URL}/" if lang == "ru" else f"{SITE_URL}/{lang}" for lang in SITE_LANGS}
+    alternates = "".join(f'<xhtml:link rel="alternate" hreflang="{code}" href="{home[lang]}"/>' for lang, code in SITE_LANGS.items()) \
         + f'<xhtml:link rel="alternate" hreflang="x-default" href="{SITE_URL}/"/>'
-    urls = "".join(f"<url><loc>{SITE_URL}/{path}</loc><lastmod>{changed}</lastmod>{alternates}</url>" for path in ("", *SITE_LANGS))
+    urls = "".join(f"<url><loc>{home[path] if path else SITE_URL + '/'}</loc><lastmod>{changed}</lastmod>{alternates}</url>"
+                   for path in ("", *(lang for lang in SITE_LANGS if lang != "ru")))
     for slug in (*SERVICE_SLUGS, *LANDING_SLUGS):
         also = "".join(f'<xhtml:link rel="alternate" hreflang="{code}" href="{SITE_URL}/{lang}/{slug}"/>' for lang, code in SITE_LANGS.items()) \
             + f'<xhtml:link rel="alternate" hreflang="x-default" href="{SITE_URL}/en/{slug}"/>'

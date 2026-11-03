@@ -1,12 +1,12 @@
 <!doctype html>
 <html lang="nl"><head>
-<meta name="tpf-source" content="2f1ba04da5eb36e1">
+<meta name="tpf-source" content="f030513960c10fac">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Websites, webapps en Telegram‑bots laten maken — TPF Technology</title>
 <meta name="description" content="TPF Technology bouwt websites, webapps, webshops, Telegram‑bots en procesautomatisering met AI‑agents onder toezicht van engineers. Gratis offerte vóór betaling; de code is van u.">
 <link rel="canonical" href="https://tpf-technology.com/nl">
-<link rel="alternate" hreflang="ru" href="https://tpf-technology.com/ru">
+<link rel="alternate" hreflang="ru" href="https://tpf-technology.com/">
 <link rel="alternate" hreflang="en" href="https://tpf-technology.com/en">
 <link rel="alternate" hreflang="nl" href="https://tpf-technology.com/nl">
 <link rel="alternate" hreflang="zh-Hans" href="https://tpf-technology.com/zh">
@@ -177,7 +177,7 @@ footer div{display:flex;gap:24px}footer a{color:var(--muted)}
 <a href="#services" data-t="nav_services">Diensten</a><a href="#automation" data-t="nav_auto">Automatisering</a><a href="#prices" data-t="nav_prices">Prijzen</a><a href="#contact" data-t="nav_contact">Contact</a>
 </nav>
 <div class="right">
-<div class="langs" role="group" id="langs" aria-label="Taal"><a href="/ru" hreflang="ru" aria-current="false">RU</a><a href="/en" hreflang="en" aria-current="false">EN</a><a href="/nl" hreflang="nl" aria-current="true">NL</a><a href="/zh" hreflang="zh-Hans" aria-current="false">中文</a></div>
+<div class="langs" role="group" id="langs" aria-label="Taal"><a href="/" hreflang="ru" aria-current="false">RU</a><a href="/en" hreflang="en" aria-current="false">EN</a><a href="/nl" hreflang="nl" aria-current="true">NL</a><a href="/zh" hreflang="zh-Hans" aria-current="false">中文</a></div>
 <a class="btn sm cta-top" href="#contact" data-t="cta_discuss">Project bespreken</a>
 </div>
 </header>
@@ -843,7 +843,7 @@ function render() {
     s.append(el('h3', f[0])); d.append(s, el('p', f[1])); return d; });
   document.getElementById('langs').setAttribute('aria-label', t.lang_label);
   fill(document.getElementById('langs'), LANGS, function (l) {
-    var b = el('a', l[1]); b.href = '/' + l[0]; b.hreflang = l[0] === 'zh' ? 'zh-Hans' : l[0]; b.setAttribute('aria-current', String(l[0] === lang));
+    var b = el('a', l[1]); b.href = l[0] === 'ru' ? '/' : '/' + l[0]; b.hreflang = l[0] === 'zh' ? 'zh-Hans' : l[0]; b.setAttribute('aria-current', String(l[0] === lang));
     b.onclick = function () { try { localStorage.setItem('tpf_lang', l[0]); } catch (e) {} };
     return b; });
   fill(document.getElementById('services-grid'), t.services, function (s, i) {

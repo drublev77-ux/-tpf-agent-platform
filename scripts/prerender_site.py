@@ -42,7 +42,7 @@ def finish(html: str, lang: str, root: bool = False) -> str:
     """Head tags that differ per language, taken from what the page itself rendered."""
     title = re.search(r"<title>(.*?)</title>", html, re.S).group(1)
     desc = re.search(r'<meta name="description" content="([^"]*)"', html).group(1)
-    url = f"{BASE}/" if root else f"{BASE}/{lang}"
+    url = f"{BASE}/" if (root or lang == "ru") else f"{BASE}/{lang}"      # the Russian home lives at the bare address
 
     def attr(pattern: str, value: str) -> None:
         nonlocal html

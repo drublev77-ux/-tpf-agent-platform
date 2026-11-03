@@ -19,7 +19,7 @@ prerender = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(prerender)
 
 
-@pytest.mark.parametrize("name,lang,address", [("root", "ru", "/"), ("ru", "ru", "/ru"), ("en", "en", "/en"), ("nl", "nl", "/nl"), ("zh", "zh-CN", "/zh")])
+@pytest.mark.parametrize("name,lang,address", [("root", "ru", "/"), ("ru", "ru", "/"), ("en", "en", "/en"), ("nl", "nl", "/nl"), ("zh", "zh-CN", "/zh")])
 def test_each_language_page_is_filled_in_and_fresh(name, lang, address):
     html = (SITE / f"index.{name}.html").read_text(encoding="utf-8")
     made_from = re.search(r'<meta name="tpf-source" content="([0-9a-f]+)"', html).group(1)
@@ -34,7 +34,9 @@ def test_each_language_page_is_filled_in_and_fresh(name, lang, address):
     assert len(re.findall(r"<h1[ >]", html)) == 1 and re.search(r"<h1>.*?\S.*?</h1>", html, re.S)
     text = re.sub(r"<script.*?</script>|<style.*?</style>|<[^>]+>", " ", html, flags=re.S)
     assert len(text.split()) > 150 if name != "zh" else len(text) > 1500         # the page's text is in the HTML itself
-    assert 'id="cases"' not in html and 'href="/en"' in html and 'href="/zh"' in html and 'href="/ru"' in html and 'href="/nl"' in html
+    assert 'id="cases"' not in html
+    switcher = dict(re.findall(r'<a href="([^"]*)" hreflang="([^"]*)"', html))        # RU home is the bare address
+    assert switcher == {"/": "ru", "/en": "en", "/nl": "nl", "/zh": "zh-Hans"}
     ld = json.loads(re.search(r'<script type="application/ld\+json" id="ld">(.*?)</script>', html, re.S).group(1))
     assert ld["@graph"][0]["@type"] == "Organization" and ld["@graph"][0]["description"] == desc.replace("&amp;", "&")
     assert f'<meta property="og:url" content="https://tpf-technology.com{address}">' in html
@@ -61,7 +63,7 @@ def test_site_serves_language_pages_robots_and_sitemap(pool, settings, monkeypat
         assert "Disallow: /portal/" in robots and "Disallow: /admin" in robots and "Sitemap: https://tpf-technology.com/sitemap.xml" in robots
         sitemap = client.get("/sitemap.xml")
         assert sitemap.headers["content-type"].startswith("application/xml")
-        for address in ("/</loc>", "/ru</loc>", "/en</loc>", "/nl</loc>", "/zh</loc>", "/privacy</loc>"):
+        for address in ("/</loc>", "/en</loc>", "/nl</loc>", "/zh</loc>", "/privacy</loc>"):   # the Russian home is /
             assert "https://tpf-technology.com" + address in sitemap.text
         assert "portal" not in sitemap.text
         from tpf.tools import indexnow
